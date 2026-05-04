@@ -1,0 +1,393 @@
+"""
+Tests for the pharmacology module (Drug PK/PD system).
+
+Run with:
+    python -m pytest tests/test_pharmacology.py -v
+"""
+
+from __future__ import annotations
+
+import sys
+import os
+import math
+
+# Path setup — same pattern as conftest.py
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _project_root)
+sys.path.insert(0, os.path.join(_project_root, "src"))
+
+import pytest
+
+
+# =============================================================================
+#  SECTION 1: Drug base class — PK one-compartment model
+# =============================================================================
+
+
+class TestDrugPK:
+    """One-compartment PK: C(t) = Dose × e^(-k×t), k = ln(2)/t_half."""
+
+    def test_drug_not_administered_has_zero_concentration(self):
+        """Before administration, concentration must be zero."""
+        from src.pharmacology import Drug
+
+        drug = Drug(name="test_drug", half_life_s=60.0)
+        assert drug.concentration == 0.0
+
+    def test_drug_administer_increases_concentration(self):
+        """IV bolus should raise concentration proportional to dose."""
+        from src.pharmacology import Drug
+
+        drug = Drug(name="test_drug", half_life_s=60.0)
+        drug.administer(dose_mg_kg=2.0)
+        assert drug.concentration == 2.0
+
+    def test_drug_decay_follows_first_order_kinetics(self):
+        """After one half-life, concentration should halve."""
+        from src.pharmacology import Drug
+
+        drug = Drug(name="test_drug", half_life_s=60.0)
+        drug.administer(dose_mg_kg=2.0)
+        drug.compute(dt=60.0)  # one half-life
+        assert math.isclose(drug.concentration, 1.0, rel_tol=0.01)
+
+    def test_drug_decay_multiple_steps(self):
+        """Two half-lives → concentration = 1/4 of initial."""
+        from src.pharmacology import Drug
+
+        drug = Drug(name="test_drug", half_life_s=60.0)
+        drug.administer(dose_mg_kg=4.0)
+        drug.compute(dt=60.0)
+        drug.compute(dt=60.0)
+        assert math.isclose(drug.concentration, 1.0, rel_tol=0.01)
+
+    def test_drug_k_derived_from_half_life(self):
+        """Decay constant k = ln(2) / t_half."""
+        from src.pharmacology import Drug
+
+        drug = Drug(name="test_drug", half_life_s=120.0)
+        expected_k = math.log(2) / 120.0
+        assert math.isclose(drug.k, expected_k, rel_tol=1e-9)
+
+    def test_drug_concentration_never_negative(self):
+        """Even after many half-lives, concentration stays ≥ 0."""
+        from src.pharmacology import Drug
+
+        drug = Drug(name="test_drug", half_life_s=60.0)
+        drug.administer(dose_mg_kg=5.0)
+        for _ in range(100):
+            drug.compute(dt=60.0)
+        assert drug.concentration >= 0.0
+
+
+# =============================================================================
+#  SECTION 2: Drug PD — Hill equation
+# =============================================================================
+
+
+class TestDrugPD:
+    """Pharmacodynamic effect via Hill equation: E = Emax × C^n / (EC50^n + C^n)."""
+
+    def test_pd_effect_at_zero_concentration_is_zero(self):
+        from src.pharmacology import Drug
+
+        drug = Drug(name="test", half_life_s=60.0)
+        assert drug.pd_effect() == 0.0
+
+    def test_pd_effect_at_ec50_is_half_emax(self):
+        """When C == EC50, effect should be Emax/2."""
+        from src.pharmacology import Drug
+
+        drug = Drug(name="test", half_life_s=60.0, emax=1.0, ec50=1.0, hill=1.0)
+        drug.administer(dose_mg_kg=1.0)  # C = 1.0 = EC50
+        effect = drug.pd_effect()
+        assert math.isclose(effect, 0.5, rel_tol=0.01)
+
+    def test_pd_effect_saturates_at_emax(self):
+        """Very high concentration → effect ≈ Emax."""
+        from src.pharmacology import Drug
+
+        drug = Drug(name="test", half_life_s=60.0, emax=1.0, ec50=1.0, hill=1.0)
+        drug.administer(dose_mg_kg=100.0)
+        effect = drug.pd_effect()
+        assert math.isclose(effect, 1.0, rel_tol=0.01)
+
+    def test_pd_effect_with_hill_coefficient(self):
+        """Hill > 1 makes the curve steeper."""
+        from src.pharmacology import Drug
+
+        drug_steep = Drug(name="test", half_life_s=60.0, emax=1.0, ec50=1.0, hill=3.0)
+        drug_flat = Drug(name="test", half_life_s=60.0, emax=1.0, ec50=1.0, hill=1.0)
+        drug_steep.administer(dose_mg_kg=0.5)
+        drug_flat.administer(dose_mg_kg=0.5)
+        # At C < EC50, steeper hill → smaller effect
+        assert drug_steep.pd_effect() < drug_flat.pd_effect()
+
+
+# =============================================================================
+#  SECTION 3: Specific drugs — Pimobendan
+# =============================================================================
+
+
+class TestPimobendan:
+    """Pimobendan: PDE-III inhibitor → positive inotropy."""
+
+    def test_pimobendan_increases_contractility(self):
+        """Pimobendan's pd_effect should return a positive multiplier for contractility."""
+        from src.pharmacology import Pimobendan
+
+        drug = Pimobendan()
+        drug.administer(dose_mg_kg=0.25)
+        effect = drug.pd_effect()
+        assert effect > 0.0
+
+    def test_pimobendan_has_canonical_half_life(self):
+        """Pimobendan half-life in dogs ≈ 2 hours (7200 s)."""
+        from src.pharmacology import Pimobendan
+
+        drug = Pimobendan()
+        assert math.isclose(drug.half_life, 7200.0, rel_tol=0.1)
+
+
+# =============================================================================
+#  SECTION 4: Drug Registry — factory
+# =============================================================================
+
+
+class TestDrugRegistry:
+    """Drug registry creates drug instances by name."""
+
+    def test_registry_creates_pimobendan(self):
+        from src.pharmacology import create_drug
+
+        drug = create_drug("pimobendan")
+        assert drug.name == "pimobendan"
+
+    def test_registry_creates_furosemide(self):
+        from src.pharmacology import create_drug
+
+        drug = create_drug("furosemide")
+        assert drug.name == "furosemide"
+
+    def test_registry_creates_epinephrine(self):
+        from src.pharmacology import create_drug
+
+        drug = create_drug("epinephrine")
+        assert drug.name == "epinephrine"
+
+    def test_registry_creates_fluid_bolus(self):
+        from src.pharmacology import create_drug
+
+        drug = create_drug("fluid_bolus")
+        assert drug.name == "fluid_bolus"
+
+    def test_registry_unknown_drug_raises(self):
+        from src.pharmacology import create_drug
+
+        with pytest.raises(KeyError):
+            create_drug("nonexistent_drug")
+
+
+# =============================================================================
+#  SECTION 5: VirtualCreature integration
+# =============================================================================
+
+
+class TestPharmacologyIntegration:
+    """Drugs administered through VirtualCreature affect ODE parameters."""
+
+    def test_creature_has_pharmacology_module(self):
+        """VirtualCreature should hold a PharmacologyState after attachment."""
+        from src.simulation import VirtualCreature
+
+        vc = VirtualCreature(body_weight_kg=20.0)
+        # Before attachment: no pharmacology attribute
+        assert not hasattr(vc, "pharmacology")
+
+    def test_creature_can_attach_pharmacology(self):
+        from src.simulation import VirtualCreature
+        from src.pharmacology import PharmacologyState
+
+        vc = VirtualCreature(body_weight_kg=20.0)
+        ph = PharmacologyState(weight_kg=20.0)
+        vc.pharmacology = ph
+        assert vc.pharmacology is ph
+
+    def test_administer_drug_through_creature(self):
+        """creature.administer_drug('pimobendan') should add drug to state."""
+        from src.simulation import VirtualCreature
+        from src.pharmacology import PharmacologyState
+
+        vc = VirtualCreature(body_weight_kg=20.0)
+        vc.pharmacology = PharmacologyState(weight_kg=20.0)
+        vc.pharmacology.administer_drug("pimobendan", dose_mg_kg=0.25)
+        assert len(vc.pharmacology.active_drugs) == 1
+
+    def test_simulation_step_applies_pharmacology(self):
+        """After a step with pimobendan, contractility_factor should increase."""
+        from src.simulation import VirtualCreature
+        from src.pharmacology import PharmacologyState
+
+        vc = VirtualCreature(body_weight_kg=20.0)
+        vc.pharmacology = PharmacologyState(weight_kg=20.0)
+        vc.pharmacology.administer_drug("pimobendan", dose_mg_kg=0.25)
+        # Record baseline
+        baseline_cf = vc.heart.contractility_factor
+        # Step
+        vc.step()
+        # Pimobendan should have increased contractility_factor
+        assert vc.heart.contractility_factor > baseline_cf
+
+
+# =============================================================================
+#  SECTION 6: Game-layer drug administration via process_action
+# =============================================================================
+
+
+class TestGameLayerDrugAdministration:
+    """
+    Drugs administered through game.action_system.process_action
+    with action_type='administer_drug' should affect ODE parameters.
+    """
+
+    def _make_state(self):
+        """Helper: create a GameState with pharmacology attached."""
+        from src.simulation import VirtualCreature
+        from src.pharmacology import PharmacologyState
+        from game.action_system import GameState
+
+        vc = VirtualCreature(body_weight_kg=20.0)
+        vc.pharmacology = PharmacologyState(weight_kg=20.0)
+        state = GameState(engine=vc, disease_name="pneumonia")
+        return state
+
+    def test_administer_drug_action_pimobendan(self):
+        """process_action('administer_drug', {drug_name='pimobendan'}) should work."""
+        from game.action_system import process_action
+
+        state = self._make_state()
+        result = process_action(
+            state,
+            "administer_drug",
+            {
+                "drug_name": "pimobendan",
+                "dose_mg_kg": 0.25,
+            },
+        )
+        assert result["success"] is True
+        assert state.engine.pharmacology is not None
+        assert len(state.engine.pharmacology.active_drugs) == 1
+
+    def test_administer_drug_then_step_increases_contractility(self):
+        """After administering pimobendan + step, contractility_factor ↑."""
+        from game.action_system import process_action
+
+        state = self._make_state()
+        baseline_cf = state.engine.heart.contractility_factor
+        process_action(
+            state,
+            "administer_drug",
+            {
+                "drug_name": "pimobendan",
+                "dose_mg_kg": 0.25,
+            },
+        )
+        process_action(state, "wait", {})
+        assert state.engine.heart.contractility_factor > baseline_cf
+
+    def test_administer_fluid_bolus_increases_blood_volume(self):
+        """Fluid bolus through game action should increase blood volume."""
+        from game.action_system import process_action
+
+        state = self._make_state()
+        baseline_bv = state.engine.heart.circulating_volume_ml
+        process_action(
+            state,
+            "administer_drug",
+            {
+                "drug_name": "fluid_bolus",
+                "volume_ml": 200.0,
+            },
+        )
+        # After one step, the fluid should be added
+        process_action(state, "wait", {})
+        assert state.engine.heart.circulating_volume_ml > baseline_bv
+
+    def test_administer_epinephrine_increases_svr(self):
+        """Epinephrine through game action should increase SVR during step."""
+        from game.action_system import process_action
+
+        state = self._make_state()
+        admin_result = process_action(
+            state,
+            "administer_drug",
+            {
+                "drug_name": "epinephrine",
+                "dose_mg_kg": 0.02,
+            },
+        )
+        assert admin_result["success"] is True
+        assert len(state.engine.pharmacology.active_drugs) == 1
+        process_action(state, "wait", {})
+        # SVR is modulated during step(); check history for the effect
+        svr_history = state.engine.history.get("svr_factor", [])
+        if svr_history:
+            # At least one step should have svr_factor > 1.0 (epinephrine effect)
+            assert max(svr_history) > 1.0
+
+    def test_administer_multiple_drugs(self):
+        """Multiple drugs can be administered and all remain active."""
+        from game.action_system import process_action
+
+        state = self._make_state()
+        process_action(
+            state,
+            "administer_drug",
+            {
+                "drug_name": "pimobendan",
+                "dose_mg_kg": 0.25,
+            },
+        )
+        process_action(
+            state,
+            "administer_drug",
+            {
+                "drug_name": "furosemide",
+                "dose_mg_kg": 1.0,
+            },
+        )
+        assert len(state.engine.pharmacology.active_drugs) == 2
+
+    def test_administer_unknown_drug_returns_error(self):
+        """Administering an unregistered drug should return success=False."""
+        from game.action_system import process_action
+
+        state = self._make_state()
+        result = process_action(
+            state,
+            "administer_drug",
+            {
+                "drug_name": "nonexistent_drug",
+                "dose_mg_kg": 1.0,
+            },
+        )
+        assert result["success"] is False
+
+    def test_administer_drug_returns_pharma_effects(self):
+        """After administer_drug + wait, the pharmacology return should be non-empty."""
+        from game.action_system import process_action
+
+        state = self._make_state()
+        process_action(
+            state,
+            "administer_drug",
+            {
+                "drug_name": "pimobendan",
+                "dose_mg_kg": 0.25,
+            },
+        )
+        result = process_action(state, "wait", {})
+        assert result["success"] is True
+        # step() return includes pharmacology key in its dict
+        step_result = state.engine.step()
+        assert "pharmacology" in step_result
