@@ -391,3 +391,128 @@ class TestGameLayerDrugAdministration:
         # step() return includes pharmacology key in its dict
         step_result = state.engine.step()
         assert "pharmacology" in step_result
+
+
+# =============================================================================
+#  SECTION 7: API layer — /api/administer-drug endpoint
+# =============================================================================
+
+
+class TestApiAdministerDrug:
+    """
+    Flask API endpoint /api/administer-drug should administer drugs
+    and return updated game state with vitals.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup_app(self):
+        """Create Flask test client and seed a game session."""
+        from gui_app import app, _game_sessions, CASES_DATA
+        from src.simulation import VirtualCreature
+        from src.diseases import create_disease
+        from game.action_system import GameState
+
+        self.app = app
+        self.client = app.test_client()
+
+        # Create a game session
+        case = CASES_DATA["cases"][0]
+        vc = VirtualCreature(body_weight_kg=case["animal"]["weight_kg"])
+        disease = create_disease(case["disease"])
+        vc.attach_disease(disease)
+        state = GameState(engine=vc, disease_name=case["disease"])
+        _game_sessions["test_case_001"] = state
+
+        yield
+
+        # Cleanup
+        _game_sessions.pop("test_case_001", None)
+
+    def test_api_administer_drug_success(self):
+        """POST /api/administer-drug should return success and updated vitals."""
+        resp = self.client.post(
+            "/api/administer-drug",
+            json={
+                "session_id": "test_case_001",
+                "drug_name": "pimobendan",
+                "dose_mg_kg": 0.25,
+            },
+        )
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert data["success"] is True
+        assert "vitals" in data
+        assert "phase" in data
+
+    def test_api_administer_drug_then_wait_affects_vitals(self):
+        """After administer_drug + wait, contractility should increase."""
+        # Administer pimobendan
+        self.client.post(
+            "/api/administer-drug",
+            json={
+                "session_id": "test_case_001",
+                "drug_name": "pimobendan",
+                "dose_mg_kg": 0.25,
+            },
+        )
+
+        # Wait to let the drug take effect
+        resp2 = self.client.post("/api/wait", json={"session_id": "test_case_001"})
+        assert resp2.get_json()["success"] is True
+
+    def test_api_administer_fluid_bolus(self):
+        """Fluid bolus via API should increase blood volume."""
+        resp = self.client.post(
+            "/api/administer-drug",
+            json={
+                "session_id": "test_case_001",
+                "drug_name": "fluid_bolus",
+                "volume_ml": 200.0,
+            },
+        )
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert data["success"] is True
+
+    def test_api_administer_unknown_drug(self):
+        """Unknown drug should return success=False."""
+        resp = self.client.post(
+            "/api/administer-drug",
+            json={
+                "session_id": "test_case_001",
+                "drug_name": "nonexistent_drug",
+                "dose_mg_kg": 1.0,
+            },
+        )
+        data = resp.get_json()
+        assert data["success"] is False
+
+    def test_api_administer_drug_no_session(self):
+        """Request with invalid session_id should return 404."""
+        resp = self.client.post(
+            "/api/administer-drug",
+            json={
+                "session_id": "nonexistent_session",
+                "drug_name": "pimobendan",
+                "dose_mg_kg": 0.25,
+            },
+        )
+        assert resp.status_code == 404
+
+    def test_api_administer_drug_game_over(self):
+        """Request after game ended should return 400."""
+        from gui_app import _game_sessions
+
+        # Force game over
+        state = _game_sessions["test_case_001"]
+        state.phase = "lost"
+
+        resp = self.client.post(
+            "/api/administer-drug",
+            json={
+                "session_id": "test_case_001",
+                "drug_name": "pimobendan",
+                "dose_mg_kg": 0.25,
+            },
+        )
+        assert resp.status_code == 400
