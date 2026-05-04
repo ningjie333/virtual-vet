@@ -197,6 +197,30 @@ def register_drug(name: str, cls: type[Drug]) -> None:
     _DRUG_REGISTRY[name] = cls
 
 
+def list_drugs() -> dict[str, dict]:
+    """
+    Return metadata for all registered drugs.
+
+    Returns:
+        Dict of {drug_name: {name, half_life_h, description}}.
+    """
+    _descriptions: dict[str, str] = {
+        "pimobendan": "PDE-III抑制剂 → 正性肌力 + 血管扩张",
+        "furosemide": "袢利尿剂 → 抑制Na-K-2Cl共转运体",
+        "epinephrine": "α/β肾上腺素能激动剂 → ↑SVR + ↑HR + ↑收缩力",
+        "fluid_bolus": "晶体液冲击 → 直接增加血容量",
+    }
+    result: dict[str, dict] = {}
+    for name, cls in _DRUG_REGISTRY.items():
+        tmp = cls()
+        result[name] = {
+            "name": tmp.name,
+            "half_life_h": round(tmp.half_life / 3600.0, 2),
+            "description": _descriptions.get(name, ""),
+        }
+    return result
+
+
 # ── PharmacologyState ────────────────────────────────────────────────────────
 
 

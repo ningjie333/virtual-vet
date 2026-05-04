@@ -516,3 +516,59 @@ class TestApiAdministerDrug:
             },
         )
         assert resp.status_code == 400
+
+
+# =============================================================================
+#  SECTION 8: list_drugs() and /api/drugs endpoint
+# =============================================================================
+
+
+class TestListDrugs:
+    """list_drugs() returns metadata for all registered drugs."""
+
+    def test_list_drugs_returns_all_registered(self):
+        from src.pharmacology import list_drugs
+
+        result = list_drugs()
+        assert "pimobendan" in result
+        assert "furosemide" in result
+        assert "epinephrine" in result
+        assert "fluid_bolus" in result
+
+    def test_list_drugs_has_required_keys(self):
+        from src.pharmacology import list_drugs
+
+        result = list_drugs()
+        for name, meta in result.items():
+            assert "name" in meta, f"{name} missing 'name'"
+            assert "half_life_h" in meta, f"{name} missing 'half_life_h'"
+            assert "description" in meta, f"{name} missing 'description'"
+
+    def test_list_drugs_half_life_values(self):
+        from src.pharmacology import list_drugs
+
+        result = list_drugs()
+        assert result["pimobendan"]["half_life_h"] == 2.0
+        assert result["furosemide"]["half_life_h"] == 1.5
+        assert result["fluid_bolus"]["half_life_h"] > 1e5  # effectively no decay
+
+
+class TestApiDrugs:
+    """GET /api/drugs returns drug metadata."""
+
+    def test_api_drugs_returns_200(self):
+        from gui_app import app
+
+        client = app.test_client()
+        resp = client.get("/api/drugs")
+        assert resp.status_code == 200
+
+    def test_api_drugs_returns_all_drugs(self):
+        from gui_app import app
+
+        client = app.test_client()
+        data = client.get("/api/drugs").get_json()
+        assert "pimobendan" in data
+        assert "furosemide" in data
+        assert "epinephrine" in data
+        assert "fluid_bolus" in data

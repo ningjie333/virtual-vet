@@ -117,6 +117,14 @@ def api_treatments():
     return jsonify(TREATMENTS)
 
 
+@app.route("/api/drugs", methods=["GET"])
+def api_drugs():
+    """返回所有可用药物及其元信息"""
+    from src.pharmacology import list_drugs
+
+    return jsonify(list_drugs())
+
+
 @app.route("/api/new-game", methods=["POST"])
 def api_new_game():
     """
