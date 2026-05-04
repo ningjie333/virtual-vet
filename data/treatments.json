@@ -1,0 +1,55 @@
+{
+  "pneumonia": {
+    "name": "补液治疗（肺炎）",
+    "name_en": "Fluid Therapy (Pneumonia)",
+    "description": "静脉补液改善循环和氧合，配合对症支持",
+    "correct_for": "pneumonia",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 200}
+        ]
+      }
+    }
+  },
+  "acute_renal_failure": {
+    "name": "积极补液（肾衰）",
+    "name_en": "Aggressive Fluid Therapy (ARF)",
+    "description": "积极静脉输液恢复肾灌注，纠正电解质紊乱",
+    "correct_for": "acute_renal_failure",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 300}
+        ]
+      }
+    }
+  },
+  "dilated_cardiomyopathy": {
+    "name": "强心利尿治疗（DCM）",
+    "name_en": "Inotropic & Diuretic Therapy (DCM)",
+    "description": "静脉注射匹莫苯丹增强心肌收缩力，配合呋塞米利尿减轻前负荷",
+    "correct_for": "dilated_cardiomyopathy",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "pimobendan", "dose_mg_kg": 0.25},
+          {"drug_name": "furosemide", "dose_mg_kg": 1.0}
+        ]
+      }
+    }
+  },
+  "supportive_care": {
+    "name": "支持治疗",
+    "name_en": "Supportive Care",
+    "description": "补液、营养支持、对症处理，等待进一步检查结果",
+    "correct_for": null,
+    "on_apply": {
+      "type": "administer_drug",
+      "params": {"drug_name": "fluid_bolus", "volume_ml": 200}
+    }
+  }
+}
