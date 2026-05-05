@@ -33,6 +33,15 @@ export interface Vitals {
   is_night?: boolean;
 }
 
+export interface ApStressState {
+  ap: number;
+  max_ap: number;
+  stress: number;
+  pending_reports: number;
+  ap_cost?: number;
+  combo_bonus?: string | null;
+}
+
 export interface ResultEntry {
   param: string;
   value: number | string;

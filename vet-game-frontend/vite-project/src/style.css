@@ -81,6 +81,25 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .ec-cost{font-family:var(--mono);font-size:0.62rem;color:var(--text-muted)}
 .ec-done-mark{font-family:var(--mono);font-size:0.6rem;color:var(--grn)}
 
+/* ── AP / Stress Badges ── */
+.badge-ap{background:rgba(33,150,243,0.1);border:1px solid rgba(33,150,243,0.25);color:#64b5f6}
+.badge-ap.ap-low{background:rgba(244,67,54,0.15);border-color:rgba(244,67,54,0.4);color:#ef5350;animation:ap-pulse 1.5s ease-in-out infinite}
+.badge-stress{background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.2);color:#ffb74d}
+.badge-stress.stress-high{background:rgba(255,87,34,0.15);border-color:rgba(255,87,34,0.35);color:#ff7043}
+.badge-stress.stress-crit{background:rgba(244,67,54,0.2);border-color:rgba(244,67,54,0.5);color:#ef5350;animation:ap-pulse 1s ease-in-out infinite}
+.badge-pending{background:rgba(156,39,176,0.1);border:1px solid rgba(156,39,176,0.25);color:#ce93d8}
+@keyframes ap-pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+
+/* ── Exam Tier ── */
+.ec.cat-快速检查::before{background:#2196f3}
+.ec.cat-核心诊断::before{background:#ff9800}
+.ec.cat-金标准::before{background:#f44336}
+
+/* ── Combo Toast ── */
+.combo-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(76,175,80,0.15);border:1px solid rgba(76,175,80,0.4);color:#81c784;padding:10px 20px;border-radius:8px;font-family:var(--mono);font-size:0.75rem;z-index:1000;animation:combo-in 0.3s ease-out, combo-out 0.3s ease-in 2.7s forwards}
+@keyframes combo-in{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes combo-out{from{opacity:1}to{opacity:0}}
+
 /* ── Reports ── */
 .rc{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:8px}
 .rc-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,0.02);border-bottom:1px solid var(--border);cursor:pointer}

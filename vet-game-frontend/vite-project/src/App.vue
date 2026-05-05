@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, watch, nextTick } from "vue";
-import type { Case, Vitals, Report } from "./types";
+import type { Case, Vitals, Report, ApStressState } from "./types";
 import { api } from "./api";
 import CaseSelect from "./components/CaseSelect.vue";
 import PatientCard from "./components/PatientCard.vue";
@@ -34,6 +34,9 @@ const gameOverData = ref<{ reason: string; actual_disease: string; score?: { tot
 const maxActions = ref(10);
 const isNight = ref(false);
 const gameTime = ref("08:00");
+const apStress = reactive<ApStressState>({ ap: 10, max_ap: 10, stress: 0, pending_reports: 0 });
+const lastCombo = ref<string | null>(null);
+const comboTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 
 // ── 疾病名映射 ──
 const diseaseNameMap: Record<string, string> = {
@@ -66,6 +69,23 @@ function updateFrom(d: Record<string, unknown>) {
   }
   if (d.game_time !== undefined) gameTime.value = d.game_time as string;
   if (d.is_night !== undefined) isNight.value = d.is_night as boolean;
+  if (d.ap !== undefined) apStress.ap = d.ap as number;
+  if (d.max_ap !== undefined) apStress.max_ap = d.max_ap as number;
+  if (d.stress !== undefined) apStress.stress = d.stress as number;
+  if (d.pending_reports !== undefined) apStress.pending_reports = d.pending_reports as number;
+  if (d.ap_cost !== undefined) apStress.ap_cost = d.ap_cost as number;
+  if (d.combo_bonus !== undefined && d.combo_bonus) {
+    lastCombo.value = d.combo_bonus as string;
+    if (comboTimer.value) clearTimeout(comboTimer.value);
+    comboTimer.value = setTimeout(() => { lastCombo.value = null; }, 3000);
+  }
+  if (d.new_reports && Array.isArray(d.new_reports)) {
+    for (const r of d.new_reports) {
+      if (!reports.value.find((x) => x.test_type === (r as Report).test_type && x.summary === (r as Report).summary)) {
+        reports.value.push(r as Report);
+      }
+    }
+  }
 }
 
 // ── Night mode body class ──
@@ -250,6 +270,9 @@ function restart() {
         </button>
       </div>
       <div class="top-right" v-if="phase !== 'select'">
+        <span class="badge badge-ap" :class="{ 'ap-low': apStress.ap <= 3 }">⚡ AP: {{ apStress.ap }}/{{ apStress.max_ap }}</span>
+        <span class="badge badge-stress" :class="{ 'stress-high': apStress.stress >= 50, 'stress-crit': apStress.stress >= 80 }">😰 压力: {{ apStress.stress }}</span>
+        <span v-if="apStress.pending_reports > 0" class="badge badge-pending">📋 待出报告: {{ apStress.pending_reports }}</span>
         <span class="badge badge-turn">行动: {{ actionCount }}/{{ maxActions }}</span>
         <span :class="['clock-display', { night: isNight }]">{{ isNight ? '🌙' : '🕐' }} {{ gameTime }}</span>
         <span v-if="isNight" class="badge badge-night">夜间模式</span>
@@ -295,6 +318,7 @@ function restart() {
             :exams-done="examsDone"
             :reports="reports"
             :loading="loading"
+            :current-ap="apStress.ap"
             @exam="doExam"
           />
 
@@ -364,11 +388,16 @@ function restart() {
             @click="doWait"
             :disabled="phase === 'done'"
           >
-            ⏳ 等待观察（消耗 1 行动点）
+            ⏳ 等待观察（恢复 2 AP，缓解压力）
           </button>
         </div>
       </template>
     </div>
+  </div>
+
+  <!-- Combo Bonus Toast -->
+  <div v-if="lastCombo" class="combo-toast">
+    🎉 组合折扣：{{ lastCombo }}
   </div>
 
   <!-- Game Over Overlay -->
