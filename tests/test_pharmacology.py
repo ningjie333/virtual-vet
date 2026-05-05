@@ -572,3 +572,164 @@ class TestApiDrugs:
         assert "furosemide" in data
         assert "epinephrine" in data
         assert "fluid_bolus" in data
+
+
+# =============================================================================
+#  SECTION 9: End-to-end game flow tests
+# =============================================================================
+
+
+class TestE2EGameFlow:
+    """
+    Full game flow: new-game → examine → wait → administer-drug → treat.
+    Covers all three diseases via the Flask API.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        """Create Flask test client and seed game sessions for all cases."""
+        import json
+        from gui_app import app, _game_sessions, CASES_DATA
+        from src.simulation import VirtualCreature
+        from src.diseases import create_disease
+        from game.action_system import GameState
+
+        self.app = app
+        self.client = app.test_client()
+
+        # Create a session for each case
+        self.session_ids: dict[str, str] = {}
+        for case in CASES_DATA["cases"]:
+            vc = VirtualCreature(body_weight_kg=case["animal"]["weight_kg"])
+            disease = create_disease(case["disease"])
+            vc.attach_disease(disease)
+            state = GameState(engine=vc, disease_name=case["disease"])
+            sid = f"e2e_{case['id']}"
+            _game_sessions[sid] = state
+            self.session_ids[case["disease"]] = sid
+
+        yield
+
+        # Cleanup
+        for sid in self.session_ids.values():
+            _game_sessions.pop(sid, None)
+
+    def _post(self, path: str, json: dict):
+        return self.client.post(path, json=json)
+
+    def _get(self, path: str):
+        return self.client.get(path)
+
+    # ── 肺炎流程 ──
+
+    def test_e2e_pneumonia_full_flow(self):
+        """Pneumonia: examine → wait → treat → won."""
+        sid = self.session_ids["pneumonia"]
+
+        # 开具检查
+        r = self._post("/api/examine", {"session_id": sid, "test_type": "physical"})
+        assert r.get_json()["success"] is True
+
+        # 等待让疾病进展
+        r = self._post("/api/wait", {"session_id": sid})
+        assert r.get_json()["success"] is True
+
+        # 正确诊断+治疗
+        r = self._post("/api/diagnose", {"session_id": sid, "diagnosis": "pneumonia"})
+        data = r.get_json()
+        assert data["success"] is True
+        assert data["phase"] == "won"
+        assert data["treatment_result"]["correct"] is True
+        assert "fluid_bolus" in data["treatment_result"]["drugs_given"]
+
+    def test_e2e_pneumonia_wrong_diagnosis(self):
+        """Pneumonia with wrong diagnosis → playing continues."""
+        sid = self.session_ids["pneumonia"]
+
+        r = self._post("/api/diagnose", {"session_id": sid, "diagnosis": "acute_renal_failure"})
+        data = r.get_json()
+        assert data["treatment_result"]["correct"] is False
+        assert data["phase"] == "playing"
+
+    # ── ARF 流程 ──
+
+    def test_e2e_arf_full_flow(self):
+        """ARF: examine → wait → treat → won."""
+        sid = self.session_ids["acute_renal_failure"]
+
+        r = self._post("/api/examine", {"session_id": sid, "test_type": "blood_biochem"})
+        assert r.get_json()["success"] is True
+
+        r = self._post("/api/wait", {"session_id": sid})
+        assert r.get_json()["success"] is True
+
+        r = self._post("/api/diagnose", {"session_id": sid, "diagnosis": "acute_renal_failure"})
+        data = r.get_json()
+        assert data["success"] is True
+        assert data["phase"] == "won"
+        assert data["treatment_result"]["correct"] is True
+        assert "fluid_bolus" in data["treatment_result"]["drugs_given"]
+
+    # ── DCM 流程 ──
+
+    def test_e2e_dcm_full_flow(self):
+        """DCM: examine → wait → emergency drug → treat → won."""
+        sid = self.session_ids["dilated_cardiomyopathy"]
+
+        # 开具检查
+        r = self._post("/api/examine", {"session_id": sid, "test_type": "auscultation"})
+        assert r.get_json()["success"] is True
+
+        # 紧急给药：肾上腺素
+        r = self._post("/api/administer-drug", {
+            "session_id": sid,
+            "drug_name": "epinephrine",
+            "dose_mg_kg": 0.02,
+        })
+        assert r.get_json()["success"] is True
+
+        # 正确诊断+治疗（DCM → 匹莫苯丹 + 呋塞米）
+        r = self._post("/api/diagnose", {"session_id": sid, "diagnosis": "dilated_cardiomyopathy"})
+        data = r.get_json()
+        assert data["success"] is True
+        assert data["phase"] == "won"
+        assert data["treatment_result"]["correct"] is True
+        drugs = data["treatment_result"]["drugs_given"]
+        assert "pimobendan" in drugs
+        assert "furosemide" in drugs
+
+    def test_e2e_dcm_supportive_care(self):
+        """DCM: supportive care gives fluid, doesn't end game."""
+        sid = self.session_ids["dilated_cardiomyopathy"]
+
+        r = self._post("/api/diagnose", {"session_id": sid, "diagnosis": "supportive_care"})
+        data = r.get_json()
+        assert data["success"] is True
+        assert data["phase"] == "playing"
+
+    # ── 通用流程 ──
+
+    def test_e2e_game_state_after_actions(self):
+        """Game state should reflect actions taken."""
+        sid = self.session_ids["pneumonia"]
+
+        self._post("/api/examine", {"session_id": sid, "test_type": "physical"})
+        self._post("/api/wait", {"session_id": sid})
+
+        r = self._get(f"/api/game-state?session_id={sid}")
+        data = r.get_json()
+        assert data["action_count"] >= 2
+
+    def test_e2e_multiple_drugs_via_administer(self):
+        """Multiple administer-drug calls should accumulate."""
+        sid = self.session_ids["dilated_cardiomyopathy"]
+
+        self._post("/api/administer-drug", {
+            "session_id": sid, "drug_name": "pimobendan", "dose_mg_kg": 0.25,
+        })
+        self._post("/api/administer-drug", {
+            "session_id": sid, "drug_name": "furosemide", "dose_mg_kg": 1.0,
+        })
+
+        r = self._post("/api/wait", {"session_id": sid})
+        assert r.get_json()["success"] is True

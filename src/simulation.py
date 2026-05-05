@@ -3,6 +3,10 @@ Simulation Engine - 多系统耦合仿真引擎
 整合心脏、肺部、肾脏模块，实现器官间耦合
 """
 
+import logging
+from dataclasses import dataclass
+from typing import Literal
+
 import numpy as np
 from blood import BloodCompartment
 from heart import HeartModule
@@ -10,6 +14,7 @@ from lung import LungModule
 from kidney import KidneyModule
 from toxicology import ToxicologyModule
 from organ_health import OrganHealthTracker
+from fluid import FluidCompartment, HendersonHasselbalch
 from parameters import (
     DT_SECONDS, SIMULATION_STEP_MS, T_MAX_MINUTES,
     PLASMA_VOLUME_FRACTION,
@@ -17,6 +22,57 @@ from parameters import (
     tidal_volume_ml, base_minute_ventilation,
     renal_blood_flow_ml_min, gfr_ml_min, baseline_urine_output_ml_min,
 )
+
+logger = logging.getLogger(__name__)
+
+
+# ── FactorCommand 指令结构体 ─────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class FactorCommand:
+    """
+    单条因子指令：声明式地描述"对哪个参数执行什么操作"。
+
+    Attributes:
+        target: 参数路径，格式 "module.attr"（如 "heart.heart_rate"）
+        op: 操作类型 — "multiply"（乘因子）/ "add"（加偏移）/ "set"（设绝对值）
+        value: 操作数值
+    """
+    target: str
+    op: Literal["multiply", "add", "set"]
+    value: float
+
+
+# ── 参数路径映射表 ───────────────────────────────────────────────────────────
+# 所有可被子系统（疾病、药物、事件）修改的引擎参数，必须在此注册。
+# 格式: "module.attr" → (engine_module_name, attribute_name)
+
+_PARAM_PATHS: dict[str, tuple[str, str]] = {
+    # 心脏
+    "heart.heart_rate":           ("heart", "heart_rate"),
+    "heart.contractility_factor": ("heart", "contractility_factor"),
+    "heart.SVR":                  ("heart", "SVR"),
+    "heart.MAP":                  ("heart", "mean_arterial_pressure"),
+    "heart.CVP":                  ("heart", "central_venous_pressure"),
+    "heart.blood_volume":         ("heart", "circulating_volume_ml"),
+    "heart.stroke_volume":        ("heart", "stroke_volume"),
+    # 肺
+    "lung.diffusion_coefficient": ("lung", "diffusion_coefficient"),
+    "lung.PaO2":                  ("lung", "alveolar_PO2"),
+    "lung.PaCO2":                 ("lung", "alveolar_PCO2"),
+    "lung.VQ_ratio":              ("lung", "VQ_ratio"),
+    "lung.respiratory_rate":      ("lung", "respiratory_rate"),
+    # 肾脏
+    "kidney.GFR":                    ("kidney", "GFR"),
+    "kidney.urine_output":           ("kidney", "urine_output"),
+    "kidney.renal_blood_flow":       ("kidney", "renal_blood_flow"),
+    "kidney._disease_gfr_multiplier": ("kidney", "_disease_gfr_multiplier"),
+    # 血液
+    "blood.potassium":            ("blood", "potassium_mEq_L"),
+    "blood.pH":                   ("blood", "arterial_pH"),
+    "blood.temperature":          ("blood", "core_temperature_C"),
+    "blood.BUN":                  ("blood", "bun_mg_dL"),
+}
 
 
 class VirtualCreature:
@@ -76,6 +132,13 @@ class VirtualCreature:
         self.organ_health = OrganHealthTracker()
         self.disease = None  # 疾病模块（由外部 attach_disease() 注入）
 
+        # 三室体液模型
+        self.fluid = FluidCompartment(weight_kg=body_weight_kg)
+        self._hh = HendersonHasselbalch(
+            hco3_meq_l=self.fluid.vascular_hco3_meq_l,
+            pco2_mmHg=self.blood.arterial_PCO2_mmHg,
+        )
+
         # 仿真时间
         self.current_time_s = 0.0
         self.dt = DT_SECONDS                       # 积分步长（秒）
@@ -113,6 +176,11 @@ class VirtualCreature:
             "heart_health": [],
             "lung_health": [],
             "kidney_health": [],
+            # 体液三室
+            "fluid_vascular_ml": [],
+            "fluid_isf_ml": [],
+            "fluid_icf_ml": [],
+            "fluid_nfp_mmHg": [],
         }
 
         # 场景事件
@@ -139,6 +207,48 @@ class VirtualCreature:
         """
         self.disease = disease_module
         self.disease.activate(self.current_time_s)
+
+    def apply_factor(self, cmd: FactorCommand) -> None:
+        """
+        统一因子写入接口 — 所有外部扰动（疾病、药物、事件）的唯一参数修改入口。
+
+        根据 FactorCommand 中的 target 查找 _PARAM_PATHS，对对应模块的属性执行
+        multiply / add / set 操作。未知 target 或 op 记录警告并静默返回。
+
+        Args:
+            cmd: FactorCommand 指令
+        """
+        path = _PARAM_PATHS.get(cmd.target)
+        if path is None:
+            logger.warning("apply_factor: unknown target '%s'", cmd.target)
+            return
+
+        module_name, attr_name = path
+        module = getattr(self, module_name, None)
+        if module is None:
+            logger.warning("apply_factor: module '%s' not found", module_name)
+            return
+
+        current = getattr(module, attr_name, None)
+        if current is None:
+            logger.warning("apply_factor: attr '%s' not found on %s", attr_name, module_name)
+            return
+
+        if cmd.op == "multiply":
+            new_value = current * cmd.value
+        elif cmd.op == "add":
+            new_value = current + cmd.value
+        elif cmd.op == "set":
+            new_value = cmd.value
+        else:
+            logger.warning("apply_factor: unknown op '%s'", cmd.op)
+            return
+
+        setattr(module, attr_name, new_value)
+        logger.debug(
+            "apply_factor: %s %s %.4f → %.4f",
+            cmd.target, cmd.op, current, new_value,
+        )
 
     def _process_events(self, t: float):
         """处理到达当前时间的事件"""
@@ -242,15 +352,21 @@ class VirtualCreature:
         svr_factor = tox_state["svr_factor"]
 
         # Step 1.5: 药理学（治疗药物 PK/PD 效应）
-        # 在心脏循环之前应用，让药物系数参与 ODE 计算
+        # 药物通过 FactorCommand → apply_factor() 统一写入（与疾病模块同路径）
         pharma_effects: dict = {}
         if hasattr(self, "pharmacology") and self.pharmacology is not None:
-            pharma_effects = self.pharmacology.compute(dt, self)
-            # 药物效应覆盖 toxicology 的 contractility_factor（治疗优先）
-            if "contractility_multiplier" in pharma_effects:
-                self.heart.contractility_factor *= pharma_effects["contractility_multiplier"]
-            if "svr_multiplier" in pharma_effects:
-                svr_factor *= pharma_effects["svr_multiplier"]
+            # 记录 tox 写入后的 SVR 基准值（pharma 的 multiply 基于此）
+            svr_before_pharma = self.heart.SVR
+            pharma_commands = self.pharmacology.compute(dt, self)
+            for cmd in pharma_commands:
+                self.apply_factor(cmd)
+            # 同步 pharma 对 SVR 的修改到局部变量：
+            # heart.compute() 会覆盖 self.SVR（baroreflex），所以 pharma 的 SVR 效果
+            # 必须通过 svr_factor 局部变量传递（与 tox 相同的路径）
+            svr_after_pharma = self.heart.SVR
+            if svr_after_pharma != svr_before_pharma:
+                # pharma 修改了 self.SVR，将变化比例应用到 svr_factor
+                svr_factor *= (svr_after_pharma / svr_before_pharma)
 
         # Step 2: 心脏循环（输入：血容量 → 输出：CO、MAP）
         heart_state = self.heart.compute(dt, svr_factor=svr_factor)
@@ -281,7 +397,7 @@ class VirtualCreature:
             kidney_state["GFR_ml_min"] *= self.organ_health.kidney_factor
             self.kidney.GFR *= self.organ_health.kidney_factor
 
-        # Step 5.5: 疾病模块 — 修改已计算的器官输出
+        # Step 5.5: 疾病模块 — 通过 apply_factor() 统一写入
         if self.disease and self.disease.active:
             self.disease._current_time_s = t
             engine_state = {
@@ -293,39 +409,18 @@ class VirtualCreature:
                 "lung": {"arterial_PO2": lung_state["arterial_PO2"]},
                 "kidney": {"GFR_ml_min": kidney_state["GFR_ml_min"]},
             }
-            disease_factors = self.disease.compute(dt, engine_state)
-            lung_factors = disease_factors.get("lung", {})
-            heart_factors = disease_factors.get("heart", {})
-            kidney_factors = disease_factors.get("kidney", {})
-            # 肺：降低 PaO2（弥散障碍）
-            if "diffusion_multiplier" in lung_factors:
-                lung_state["arterial_PO2"] *= lung_factors["diffusion_multiplier"]
-                lung_state["arterial_saturation"] *= lung_factors["diffusion_multiplier"]
-            # 心脏：心率偏移（发热代偿 / DCM 失代偿）
-            if "heart_rate_offset" in heart_factors:
-                heart_state["heart_rate_bpm"] += heart_factors["heart_rate_offset"]
-            # SVR：脓毒性血管扩张
-            if "svr_multiplier" in heart_factors and heart_factors["svr_multiplier"] < 1.0:
-                heart_state["MAP_mmHg"] *= heart_factors["svr_multiplier"]
-            # DCM：收缩力降低（直接调制 contractility_factor）
-            if "contractility_multiplier" in heart_factors:
-                heart_state["contractility_factor"] *= heart_factors["contractility_multiplier"]
-            # DCM：CVP 升高（静脉淤血）
-            if "cvp_add" in heart_factors:
-                heart_state["CVP_mmHg"] += heart_factors["cvp_add"]
-            # DCM：血容量增加（水钠潴留）
-            if "blood_volume_add_pct" in heart_factors:
-                self.heart.circulating_volume_ml *= (1.0 + heart_factors["blood_volume_add_pct"])
-            # 肾脏：GFR 下降（低灌注）+ BUN 累积 + 高钾 + 酸中毒
-            if "gfr_multiplier" in kidney_factors:
-                self.kidney._disease_gfr_multiplier = kidney_factors["gfr_multiplier"]
-            # 注意：BUN 由 kidney.py 自己的 ODE 处理（GFR↓→BUN↑），不需要疾病模块传入
-            if "potassium_add" in kidney_factors:
-                # 血钾：每步覆盖为目标值（基线 4.2 + ARF 偏移），不累积
-                self.blood.potassium_mEq_L = 4.2 + kidney_factors["potassium_add"]
-            if "ph_effect" in kidney_factors:
-                # pH 效应：覆盖式偏移
-                self.blood.arterial_pH = 7.40 + kidney_factors["ph_effect"]
+            commands = self.disease.compute(dt, engine_state)
+            for cmd in commands:
+                self.apply_factor(cmd)
+
+            # 重新读取被疾病修改后的器官状态（用于后续器官健康追踪和历史记录）
+            heart_state["heart_rate_bpm"] = self.heart.heart_rate
+            heart_state["MAP_mmHg"] = self.heart.mean_arterial_pressure
+            heart_state["CVP_mmHg"] = self.heart.central_venous_pressure
+            heart_state["cardiac_output_ml_min"] = self.heart.cardiac_output
+            lung_state["arterial_PO2"] = self.blood.arterial_PO2_mmHg
+            kidney_state["GFR_ml_min"] = self.kidney.GFR
+            kidney_state["urine_output_ml_min"] = self.kidney.urine_output
 
         # 从修改后的 dict 读取最终值（而非旧快照）
         final_MAP = heart_state["MAP_mmHg"]
@@ -342,6 +437,13 @@ class VirtualCreature:
         bv_loss = self.kidney.blood_volume_loss_rate * dt / 60.0  # mL/min × dt(s) / 60
         if bv_loss > 0:
             self.heart.circulating_volume_ml = max(0.0, self.heart.circulating_volume_ml - bv_loss)
+
+        # Step 7.6: 三室体液交换 + Henderson-Hasselbalch pH
+        fluid_state = self.fluid.compute(dt)
+        # 用 HH 方程更新动脉血 pH（基于当前 HCO₃⁻ 和 PCO₂）
+        self._hh.hco3 = self.fluid.vascular_hco3_meq_l
+        self._hh.pco2 = self.blood.arterial_PCO2_mmHg
+        self.blood.arterial_pH = self._hh._compute_ph()
 
         # Step 8: 记录（使用修改后的最终值）
         self.history["time_s"].append(t)
@@ -365,6 +467,11 @@ class VirtualCreature:
         self.history["heart_health"].append(self.organ_health.heart_health)
         self.history["lung_health"].append(self.organ_health.lung_health)
         self.history["kidney_health"].append(self.organ_health.kidney_health)
+        # 体液三室
+        self.history["fluid_vascular_ml"].append(fluid_state["vascular_ml"])
+        self.history["fluid_isf_ml"].append(fluid_state["isf_ml"])
+        self.history["fluid_icf_ml"].append(fluid_state["icf_ml"])
+        self.history["fluid_nfp_mmHg"].append(fluid_state["nfp_mmHg"])
 
         # 更新时间
         self.current_time_s += dt

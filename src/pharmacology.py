@@ -18,7 +18,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.simulation import VirtualCreature
+    from src.simulation import VirtualCreature, FactorCommand
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,21 @@ class Drug:
             return 0.0
         return self.emax * (c**self.hill) / (self.ec50**self.hill + c**self.hill)
 
+    def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
+        """
+        Convert PD effect into a list of FactorCommand instructions.
+
+        Subclasses override this to declare which engine parameters they modify.
+        Default: no effects (returns empty list).
+
+        Args:
+            pd_effect: Current PD effect magnitude from pd_effect().
+
+        Returns:
+            list[FactorCommand] instructions for the engine to apply.
+        """
+        return []
+
 
 class Pimobendan(Drug):
     """
@@ -104,6 +119,16 @@ class Pimobendan(Drug):
             ec50=0.15,  # EC50 ≈ 0.15 mg/kg
             hill=1.5,
         )
+
+    def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
+        """Pimobendan: multiply contractility_factor by (1 + pd)."""
+        from src.simulation import FactorCommand
+        if pd_effect <= 0.0:
+            return []
+        return [
+            FactorCommand(target="heart.contractility_factor", op="multiply",
+                          value=round(1.0 + pd_effect, 4)),
+        ]
 
 
 class Furosemide(Drug):
@@ -121,6 +146,16 @@ class Furosemide(Drug):
             hill=1.2,
         )
 
+    def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
+        """Furosemide: multiply urine_output by (1 + pd)."""
+        from src.simulation import FactorCommand
+        if pd_effect <= 0.0:
+            return []
+        return [
+            FactorCommand(target="kidney.urine_output", op="multiply",
+                          value=round(1.0 + pd_effect, 4)),
+        ]
+
 
 class Epinephrine(Drug):
     """
@@ -136,6 +171,18 @@ class Epinephrine(Drug):
             ec50=0.01,
             hill=2.0,
         )
+
+    def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
+        """Epinephrine: multiply SVR and heart_rate."""
+        from src.simulation import FactorCommand
+        if pd_effect <= 0.0:
+            return []
+        return [
+            FactorCommand(target="heart.SVR", op="multiply",
+                          value=round(1.0 + pd_effect, 4)),
+            FactorCommand(target="heart.heart_rate", op="multiply",
+                          value=round(1.0 + 0.3 * pd_effect, 4)),
+        ]
 
 
 class FluidBolus(Drug):
@@ -158,6 +205,16 @@ class FluidBolus(Drug):
         """Override: dose = volume in mL, stored directly as concentration proxy."""
         self.concentration += volume_ml
         self._administered = True
+
+    def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
+        """Fluid bolus: add volume to blood_volume (set concentration as add amount)."""
+        from src.simulation import FactorCommand
+        if self.concentration > 0:
+            return [
+                FactorCommand(target="heart.blood_volume", op="add",
+                              value=round(self.concentration, 2)),
+            ]
+        return []
 
 
 # ── Drug Registry ────────────────────────────────────────────────────────────
@@ -256,45 +313,31 @@ class PharmacologyState:
         self.active_drugs.append(drug)
         logger.info("Pharmacology: administered %s (dose=%.2f mg/kg)", name, dose_mg_kg)
 
-    def compute(self, dt: float, creature: VirtualCreature) -> dict:
+    def compute(self, dt: float, creature: VirtualCreature) -> list[FactorCommand]:
         """
-        Advance all drugs by dt, apply PD effects to creature ODE params.
+        Advance all drugs by dt, return FactorCommand instructions for engine to apply.
+
+        Each drug's PD effect is converted to FactorCommand instructions.
+        The engine applies these via apply_factor(), ensuring a unified write path.
+
+        FluidBolus volume is consumed after one step (concentration reset to 0).
 
         Args:
             dt: Time step in seconds.
-            creature: VirtualCreature instance to modify.
+            creature: VirtualCreature instance (for apply_factor target).
 
         Returns:
-            Dict of applied effects (for logging / reporting).
+            list[FactorCommand] instructions for all active drugs this step.
         """
-        effects: dict[str, float] = {}
+        all_commands: list[FactorCommand] = []
         for drug in self.active_drugs:
             drug.compute(dt)
+            pd = drug.pd_effect()
+            cmds = drug.factor_commands(pd)
+            all_commands.extend(cmds)
 
-            if isinstance(drug, Pimobendan):
-                pd = drug.pd_effect()
-                creature.heart.contractility_factor *= 1.0 + pd
-                effects["contractility_multiplier"] = 1.0 + pd
+            # FluidBolus: consume volume after first application
+            if isinstance(drug, FluidBolus) and drug.concentration > 0:
+                drug.concentration = 0.0
 
-            elif isinstance(drug, Furosemide):
-                pd = drug.pd_effect()
-                creature.kidney.urine_output *= 1.0 + pd
-                # Fluid loss from urine → reduce blood volume
-                creature.heart.blood_volume_change(-pd * 0.5 * dt / 60.0)
-                effects["urine_multiplier"] = 1.0 + pd
-
-            elif isinstance(drug, Epinephrine):
-                pd = drug.pd_effect()
-                creature.heart.SVR *= 1.0 + pd
-                creature.heart.heart_rate *= 1.0 + 0.3 * pd
-                effects["svr_multiplier"] = 1.0 + pd
-                effects["hr_multiplier"] = 1.0 + 0.3 * pd
-
-            elif isinstance(drug, FluidBolus):
-                # Instant volume addition (only on first step after administration)
-                if drug.concentration > 0:
-                    creature.heart.blood_volume_change(drug.concentration)
-                    effects["volume_added_ml"] = drug.concentration
-                    drug.concentration = 0.0  # consumed after one step
-
-        return effects
+        return all_commands
