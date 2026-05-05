@@ -165,6 +165,8 @@ def api_new_game():
     session_id = case_id
     _game_sessions[session_id] = state
 
+    from game.time_manager import format_game_time, is_night_time
+
     return jsonify(
         {
             "session_id": session_id,
@@ -176,8 +178,8 @@ def api_new_game():
                 "medical_phase": "stable",
                 "death_timer": state.death_timer,
             },
-            "game_time": "08:00",
-            "is_night": False,
+            "game_time": format_game_time(state.game_clock_s),
+            "is_night": is_night_time(state.game_clock_s),
             "vitals": _get_vitals(vc),
         }
     )
@@ -204,6 +206,7 @@ def api_examine():
     # 使用 action_system 的 process_action
     result = process_action(state, "examine", {"test_type": test_type})
 
+    engine_summary = result.get("engine_summary", {})
     response = {
         "success": result["success"],
         "phase": result["phase"],
@@ -214,6 +217,8 @@ def api_examine():
         "report": result.get("result"),
         "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
+        "game_time": engine_summary.get("game_time", "08:00"),
+        "is_night": engine_summary.get("is_night", False),
     }
 
     # 如果游戏结束，附加结果信息
@@ -255,6 +260,7 @@ def api_administer_drug():
         params["dose_mg_kg"] = dose_mg_kg
 
     result = process_action(state, "administer_drug", params)
+    engine_summary = result.get("engine_summary", {})
 
     response = {
         "success": result["success"],
@@ -265,6 +271,8 @@ def api_administer_drug():
         "death_timer": state.death_timer,
         "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
+        "game_time": engine_summary.get("game_time", "08:00"),
+        "is_night": engine_summary.get("is_night", False),
     }
 
     if not result["success"]:
@@ -293,6 +301,7 @@ def api_diagnose():
 
     # 使用 action_system 的 process_action
     result = process_action(state, "treat", {"disease_guess": diagnosis})
+    engine_summary = result.get("engine_summary", {})
 
     response = {
         "success": result["success"],
@@ -304,6 +313,8 @@ def api_diagnose():
         "treatment_result": result.get("result"),
         "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
+        "game_time": engine_summary.get("game_time", "08:00"),
+        "is_night": engine_summary.get("is_night", False),
     }
 
     if state.phase == "won":
@@ -335,6 +346,7 @@ def api_wait():
         return jsonify({"error": "游戏会话不存在"}), 404
 
     result = process_action(state, "wait", {})
+    engine_summary = result.get("engine_summary", {})
 
     response = {
         "success": result["success"],
@@ -345,6 +357,8 @@ def api_wait():
         "death_timer": state.death_timer,
         "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
+        "game_time": engine_summary.get("game_time", "08:00"),
+        "is_night": engine_summary.get("is_night", False),
     }
 
     if state.phase == "lost":
