@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, watch } from "vue";
+import { ref, computed, reactive, onMounted, watch, nextTick } from "vue";
 import type { Case, Vitals, Report } from "./types";
 import { api } from "./api";
 import CaseSelect from "./components/CaseSelect.vue";
@@ -32,6 +32,8 @@ const hintClass = ref("");
 const gameLog = ref<string[]>([]);
 const gameOverData = ref<{ reason: string; actual_disease: string; score?: { total: number; grade: string; actions_used: number } }>({ reason: "", actual_disease: "" });
 const maxActions = ref(10);
+const isNight = ref(false);
+const gameTime = ref("08:00");
 
 // ── 疾病名映射 ──
 const diseaseNameMap: Record<string, string> = {
@@ -62,7 +64,16 @@ function updateFrom(d: Record<string, unknown>) {
     gameOverData.value = d.game_over as typeof gameOverData.value;
     phase.value = "done";
   }
+  if (d.game_time !== undefined) gameTime.value = d.game_time as string;
+  if (d.is_night !== undefined) isNight.value = d.is_night as boolean;
 }
+
+// ── Night mode body class ──
+watch(isNight, (night) => {
+  nextTick(() => {
+    document.body.classList.toggle("night-mode", night);
+  });
+}, { immediate: true });
 
 // ── Lifecycle ──
 onMounted(async () => {
@@ -91,6 +102,8 @@ async function startGame(caseId: string) {
   hint.value = "";
   tab.value = "exam";
   maxActions.value = d.case.time_limit_actions || 10;
+  gameTime.value = d.game_time || "08:00";
+  isNight.value = d.is_night || false;
 }
 
 async function doExam(testType: string) {
@@ -238,6 +251,8 @@ function restart() {
       </div>
       <div class="top-right" v-if="phase !== 'select'">
         <span class="badge badge-turn">行动: {{ actionCount }}/{{ maxActions }}</span>
+        <span :class="['clock-display', { night: isNight }]">{{ isNight ? '🌙' : '🕐' }} {{ gameTime }}</span>
+        <span v-if="isNight" class="badge badge-night">夜间模式</span>
         <span :class="['badge', phaseClass]">{{ phaseLabel }}</span>
         <span class="death-timer" v-if="deathTimer !== null">⚠ 濒死倒计时: {{ deathTimer }}</span>
       </div>
@@ -336,7 +351,7 @@ function restart() {
         </div>
       </template>
       <template v-else>
-        <VitalCard label="心 率 HR" id="HR_bpm" unit="bpm" :warn="[60, 140]" :danger="[50, 170]" :vitals="vitals" />
+        <VitalCard label="心 率 HR" id="HR_bpm" unit="bpm" :warn="[60, 140]" :danger="[50, 170]" :vitals="vitals" :is-night="isNight" />
         <VitalCard label="平均动脉压 MAP" id="MAP_mmHg" unit="mmHg" :warn="[70, 120]" :danger="[55, 150]" :vitals="vitals" />
         <VitalCard label="血氧饱和度 SpO₂" id="SpO2" unit="%" :warn="[95, 100]" :danger="[85, 100]" :vitals="vitals" />
         <VitalCard label="呼吸频率 RR" id="RR" unit="/min" :warn="[12, 30]" :danger="[8, 40]" :vitals="vitals" />

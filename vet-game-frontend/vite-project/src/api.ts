@@ -19,7 +19,7 @@ export const api = {
 
   getTreatments: () => request<Record<string, { name: string; description: string; correct_for: string | null }>>("GET", "/treatments"),
 
-  newGame: (caseId: string): Promise<{ session_id: string; case: Case; game_state: GameState; vitals: Vitals }> =>
+  newGame: (caseId: string): Promise<{ session_id: string; case: Case; game_state: GameState; vitals: Vitals; game_time: string; is_night: boolean }> =>
     request("POST", "/new-game", { case_id: caseId }),
 
   examine: (sessionId: string, testType: string): Promise<{
@@ -79,7 +79,7 @@ export const api = {
     suggested_tests: string[];
   }> => request("GET", `/diagnosis?session_id=${sessionId}`),
 
-  getDrugs: (): Promise<Record<string, { name: string; description: string }>> =>
+  getDrugs: (): Promise<Record<string, { name: string; half_life_h: number; description: string }>> =>
     request("GET", "/drugs"),
 
   administerDrug: (sessionId: string, drug: DrugEntry): Promise<AdministerDrugResponse> =>

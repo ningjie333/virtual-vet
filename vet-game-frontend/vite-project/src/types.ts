@@ -29,6 +29,8 @@ export interface Vitals {
   GFR: number;
   pH: number;
   action_count?: number;
+  game_time?: string;
+  is_night?: boolean;
 }
 
 export interface ResultEntry {
@@ -54,6 +56,8 @@ export interface GameState {
   elapsed_time_s: number;
   medical_phase: string;
   death_timer: number | null;
+  game_time?: string;
+  is_night?: boolean;
 }
 
 export interface DiagnosisMatch {
