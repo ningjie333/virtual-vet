@@ -5,6 +5,11 @@ Kidney Module - 肾脏泌尿系统
 
 from parameters import *
 
+# ── GFR Starling 模型系数 ──
+_GFR_PGC_MAP_RATIO = 0.6       # 肾小球毛细血管压 / MAP 比值
+_GFR_PBS_CVP_OFFSET = 10.0     # 鲍曼囊压 = CVP + 10 mmHg
+_GFR_KF = 3.0                  # 肾小球超滤系数 mL/min/mmHg
+
 
 class KidneyModule:
     """
@@ -128,14 +133,12 @@ class KidneyModule:
         πGC ≈ 血浆胶体渗透压（≈ 25 mmHg）
         πBS ≈ 0（鲍曼囊胶渗压可忽略）
         """
-        PGC = MAP * 0.6  # 肾小球毛细血管压 ≈ MAP 的 60%
-        PBS = CVP + 10   # 鲍曼囊压 ≈ CVP + 10 mmHg
-        plasma_colloid = 25.0  # 血浆胶体渗透压 mmHg
+        PGC = MAP * _GFR_PGC_MAP_RATIO       # 肾小球毛细血管压
+        PBS = CVP + _GFR_PBS_CVP_OFFSET      # 鲍曼囊压
+        plasma_colloid = PLASMA_COLLOID_OSMOTIC_MMHG  # 血浆胶体渗透压（引用 parameters.py）
 
         filtration_pressure = PGC - PBS - plasma_colloid
-        # 目标 GFR = base_GFR = 60 mL/min（20kg 犬）
-        # net_pressure ≈ 21 mmHg → Kf = GFR/net_pressure ≈ 60/21 ≈ 2.86
-        Kf = 3.0
+        Kf = _GFR_KF                          # 肾小球超滤系数
 
         self.GFR = max(0.0, Kf * filtration_pressure)
         # 应用疾病导致的 GFR 乘子（持久化，每步生效）

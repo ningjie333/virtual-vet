@@ -290,8 +290,8 @@ class VirtualCreature:
             self.blood.get_arterial_O2_content() -
             self.blood.get_venous_O2_content()) / 100.0
 
-        # 简化：CO2 产生量约为 O2 消耗量的 RQ 倍
-        RQ = 0.8
+        # CO2 产生量 = O2 消耗量 × 呼吸商（引用肺模块权威值）
+        RQ = self.lung.respiratory_quotient
         CO2_released = O2_extracted * RQ
 
         # 更新静脉血气分压（简化）

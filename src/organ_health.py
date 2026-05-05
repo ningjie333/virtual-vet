@@ -20,6 +20,21 @@ class OrganHealthTracker:
     最终: health 接近 0 → 该器官无法维持基本功能 → 死亡
     """
 
+    # ── 衰竭阈值 (秒) — 低灌注/缺氧累积超过此值开始产生不可逆损伤 ──
+    HEART_THRESHOLD_S = 180
+    LUNG_THRESHOLD_S = 180
+    KIDNEY_THRESHOLD_S = 240
+
+    # ── 衰竭速率 (health/s) — 超阈值后的线性退化速率 ──
+    HEART_DEGRADE_RATE = 0.002
+    LUNG_DEGRADE_RATE = 0.002
+    KIDNEY_DEGRADE_RATE = 0.0025
+
+    # — 完全衰竭 health 值 — 低于此值器官无法维持基本功能 ──
+    HEART_FAILURE_AT = 0.3
+    LUNG_FAILURE_AT = 0.2
+    KIDNEY_FAILURE_AT = 0.15
+
     def __init__(self):
         # ===== 器官健康状态 (1.0 = 完全健康, 0.0 = 衰竭) =====
         self.heart_health = 1.0
@@ -31,20 +46,16 @@ class OrganHealthTracker:
         self._lung_exposure = 0.0    # PaO₂ < 65 的累计秒数
         self._kidney_exposure = 0.0  # MAP < 65 的累计秒数
 
-        # ===== 衰竭阈值 (秒) — 游戏中约 3-4 分钟的低灌注开始累积损伤 =====
-        self._heart_threshold = 180
-        self._lung_threshold = 180
-        self._kidney_threshold = 240
-
-        # ===== 衰竭速率 =====
-        self._heart_degrade_rate = 0.002
-        self._lung_degrade_rate = 0.002
-        self._kidney_degrade_rate = 0.0025
-
-        # ===== 完全衰竭的 health 阈值 =====
-        self._heart_failure_at = 0.3
-        self._lung_failure_at = 0.2
-        self._kidney_failure_at = 0.15
+        # 阈值和速率引用类级常数
+        self._heart_threshold = self.HEART_THRESHOLD_S
+        self._lung_threshold = self.LUNG_THRESHOLD_S
+        self._kidney_threshold = self.KIDNEY_THRESHOLD_S
+        self._heart_degrade_rate = self.HEART_DEGRADE_RATE
+        self._lung_degrade_rate = self.LUNG_DEGRADE_RATE
+        self._kidney_degrade_rate = self.KIDNEY_DEGRADE_RATE
+        self._heart_failure_at = self.HEART_FAILURE_AT
+        self._lung_failure_at = self.LUNG_FAILURE_AT
+        self._kidney_failure_at = self.KIDNEY_FAILURE_AT
 
     def track(self, dt: float, heart_state: dict, lung_state: dict, kidney_state: dict):
         MAP = heart_state["MAP_mmHg"]

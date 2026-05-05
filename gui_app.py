@@ -503,22 +503,30 @@ def _build_game_log(state: GameState) -> list[str]:
     return log
 
 
+# ── 评分参数 ──
+_SCORE_BASE = 100
+_SCORE_ACTION_PENALTY = 3
+_SCORE_MAX_PENALTY = 80
+_SCORE_MIN = 20
+_GRADE_THRESHOLDS = [
+    (90, "S"),
+    (75, "A"),
+    (60, "B"),
+    (40, "C"),
+]
+_GRADE_DEFAULT = "D"
+
+
 def _calc_score(state: GameState) -> dict:
     """计算最终评分"""
-    # 基础分 100，每消耗 1 行动扣 3 分，最低 20 分
-    action_penalty = min(80, state.action_count * 3)
-    score = max(20, 100 - action_penalty)
+    action_penalty = min(_SCORE_MAX_PENALTY, state.action_count * _SCORE_ACTION_PENALTY)
+    score = max(_SCORE_MIN, _SCORE_BASE - action_penalty)
 
-    if score >= 90:
-        grade = "S"
-    elif score >= 75:
-        grade = "A"
-    elif score >= 60:
-        grade = "B"
-    elif score >= 40:
-        grade = "C"
-    else:
-        grade = "D"
+    grade = _GRADE_DEFAULT
+    for threshold, g in _GRADE_THRESHOLDS:
+        if score >= threshold:
+            grade = g
+            break
 
     return {
         "total": score,

@@ -71,6 +71,8 @@ RESPIRATORY_RATE_REST = 18                        # 静息呼吸频率 /min
 RESPIRATORY_RATE_STRESS = 40                      # 应激呼吸频率 /min
 
 # 气体分压 (mmHg)
+ATMOSPHERIC_PRESSURE_MMHG = 760.0                 # 标准大气压（海平面）
+WATER_VAPOR_PRESSURE_MMHG = 47.0                  # 37°C 水蒸气分压
 ATMOSPHERIC_PO2 = 150.0                           # 大气氧分压（海平面）
 ATMOSPHERIC_PCO2 = 0.0                            # 大气CO2分压
 ALVEOLAR_PO2_NORMAL = 100.0                       # 正常肺泡氧分压
@@ -84,6 +86,11 @@ BLOOD_O2_CAPACITY_ML_O2_PER_100ML = 20.0          # 100mL血液携氧量 mL O2/1
 
 # 肺扩散系数 (mL O2/min/mmHg)
 LUNG_DIFFUSION_COEFFICIENT = 25.0
+
+# --- 血液化学 ---
+HCO3_EXTRACELLULAR_MEQ_L = 24.0                    # 细胞外 HCO₃⁻ mEq/L
+HCO3_INTRACELLULAR_MEQ_L = 12.0                    # 细胞内 HCO₃⁻ mEq/L
+PLASMA_COLLOID_OSMOTIC_MMHG = 25.0                # 血浆胶体渗透压 πc
 
 # --- 泌尿系统 ---
 PLASMA_SODIUM_MEQ_L = 145.0                       # 血浆钠离子 mEq/L

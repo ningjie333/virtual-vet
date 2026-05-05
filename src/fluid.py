@@ -23,6 +23,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+from parameters import HCO3_EXTRACELLULAR_MEQ_L, HCO3_INTRACELLULAR_MEQ_L, PLASMA_COLLOID_OSMOTIC_MMHG
+
 if TYPE_CHECKING:
     pass
 
@@ -38,7 +40,7 @@ TBW_FRACTION = 0.60         # 总体液
 # Starling 力量基准值
 BASE_CAPILLARY_HYDROSTATIC_MMHG = 25.0    # Pc
 BASE_TISSUE_HYDROSTATIC_MMHG = -3.0       # Pi
-BASE_PLASMA_COLLOID_MMHG = 25.0           # πc
+BASE_PLASMA_COLLOID_MMHG = PLASMA_COLLOID_OSMOTIC_MMHG  # πc（引用 parameters.py）
 BASE_TISSUE_COLLOID_MMHG = 5.0            # πi
 
 # 滤过系数
@@ -59,9 +61,9 @@ K_INTRACELLULAR = 150.0    # 细胞内 K⁺ mEq/L
 CL_EXTRACELLULAR = 105.0    # 细胞外 Cl⁻ mEq/L
 CL_INTRACELLULAR = 4.0     # 细胞内 Cl⁻ mEq/L
 
-# HCO₃⁻ 分布
-HCO3_EXTRACELLULAR = 24.0  # 细胞外 HCO₃⁻ mEq/L
-HCO3_INTRACELLULAR = 12.0  # 细胞内 HCO₃⁻ mEq/L
+# HCO₃⁻ 分布（引用 parameters.py 中的权威值）
+HCO3_EXTRACELLULAR = HCO3_EXTRACELLULAR_MEQ_L
+HCO3_INTRACELLULAR = HCO3_INTRACELLULAR_MEQ_L
 
 
 class HendersonHasselbalch:

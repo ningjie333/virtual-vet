@@ -61,8 +61,8 @@ class LungModule:
 
         # 大气参数
         self.FiO2 = 0.2093                          # 吸入气氧浓度 21%
-        self.Patm_mmHg = 760.0                      # 大气压
-        self.PH2O_mmHg = 47.0                       # 水蒸气分压
+        self.Patm_mmHg = ATMOSPHERIC_PRESSURE_MMHG   # 大气压（海平面）
+        self.PH2O_mmHg = WATER_VAPOR_PRESSURE_MMHG    # 37°C 水蒸气分压
 
         # 气体交换量
         self.O2_consumption = 0.0                   # mL O2/min
@@ -218,7 +218,7 @@ class LungModule:
         简化：假设 [HCO3-] = 24 mEq/L
         """
         PCO2 = self.blood.arterial_PCO2_mmHg
-        HCO3 = 24.0  # 假设恒定（真实情况由肾脏调节）
+        HCO3 = HCO3_EXTRACELLULAR_MEQ_L  # 引用 parameters.py（真实情况由肾脏调节）
         pH = 6.1 + math.log10(HCO3 / (0.03 * PCO2)) if PCO2 > 0 else 7.4
         self.blood.arterial_pH = max(7.0, min(7.8, pH))
 

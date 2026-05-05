@@ -246,7 +246,7 @@ class TestOrganHealthEdgeCases:
     def test_organ_health_at_floor(self):
         """Set heart_health to failure threshold -- any_failure is True."""
         oh = OrganHealthTracker()
-        oh.heart_health = oh._heart_failure_at  # exactly at threshold
+        oh.heart_health = OrganHealthTracker.HEART_FAILURE_AT  # exactly at threshold
         assert oh.any_failure is True
 
     def test_sigmoid_at_zero_ratio(self):
