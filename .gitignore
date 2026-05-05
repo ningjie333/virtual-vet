@@ -4,3 +4,20 @@ __pycache__/
 .env
 *.egg-info/
 results/
+
+# Frontend
+vet-game-frontend/vite-project/node_modules/
+vet-game-frontend/vite-project/.coverage
+vet-game-frontend/vite-project/dist/
+vet-game-frontend/static/
+static/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
