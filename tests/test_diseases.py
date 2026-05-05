@@ -316,3 +316,170 @@ class TestDiseaseIntegrationWithSimulation:
         post_gfr = creature.history["GFR"][-1]
 
         assert post_gfr < pre_gfr
+
+
+# ===========================================================================
+# PHOSPHORUS POISONING TESTS
+# ===========================================================================
+
+
+class TestPhosphorusPoisoning:
+    """Tests for PhosphorusPoisoningModule ODE dynamics and factor outputs."""
+
+    def test_toxicity_increases(self):
+        """Cellular toxicity should increase over time after activation."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="moderate")
+        pm.activate(current_time_s=0.0)
+        initial = pm.cellular_toxicity
+        run_compute_n_steps(pm, 3600)
+        assert pm.cellular_toxicity > initial
+
+    def test_toxicity_clamped_to_1(self):
+        """Cellular toxicity should never exceed 1.0."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="severe")
+        pm.activate(current_time_s=0.0)
+        run_compute_n_steps(pm, 360000)
+        assert pm.cellular_toxicity <= 1.0
+
+    def test_myocardial_depression_increases(self):
+        """Myocardial depression should increase over time."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="moderate")
+        pm.activate(current_time_s=0.0)
+        run_compute_n_steps(pm, 3600)
+        assert pm.myocardial_depression > 0.0
+
+    def test_acidosis_develops(self):
+        """Metabolic acidosis should develop after sufficient time."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="moderate")
+        pm.activate(current_time_s=0.0)
+        run_compute_n_steps(pm, 36000)
+        assert pm.metabolic_acidosis > 0.0
+
+    def test_renal_injury_develops(self):
+        """Renal injury should develop over time."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="moderate")
+        pm.activate(current_time_s=0.0)
+        run_compute_n_steps(pm, 36000)
+        assert pm.renal_injury > 0.0
+
+    def test_contractility_factor_decreases(self):
+        """Contractility factor command value should decrease as toxicity rises."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="moderate")
+        pm.activate(current_time_s=0.0)
+        initial_cmds = pm.compute(0.1, DUMMY_ENGINE_STATE)
+        initial_ctr = _find_cmd_value(initial_cmds, "heart.contractility_factor")
+        assert initial_ctr is not None
+        run_compute_n_steps(pm, 36000)
+        later_cmds = pm.compute(0.1, DUMMY_ENGINE_STATE)
+        later_ctr = _find_cmd_value(later_cmds, "heart.contractility_factor")
+        assert later_ctr < initial_ctr
+
+    def test_gfr_multiplier_decreases(self):
+        """GFR multiplier command should decrease as renal injury progresses."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="moderate")
+        pm.activate(current_time_s=0.0)
+        initial_gfr = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "kidney._disease_gfr_multiplier")
+        assert initial_gfr is not None
+        run_compute_n_steps(pm, 36000)
+        later_gfr = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "kidney._disease_gfr_multiplier")
+        assert later_gfr < initial_gfr
+
+    def test_hco3_decreases(self):
+        """Blood HCO3 command value should decrease (metabolic acidosis)."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="severe")
+        pm.activate(current_time_s=0.0)
+        initial_hco3 = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "blood.HCO3")
+        assert initial_hco3 is not None
+        run_compute_n_steps(pm, 72000)
+        later_hco3 = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "blood.HCO3")
+        assert later_hco3 < initial_hco3
+
+    def test_severe_faster_than_mild(self):
+        """Severe phosphorus poisoning should progress faster than mild."""
+        from src.diseases import PhosphorusPoisoningModule
+        mild = PhosphorusPoisoningModule(severity="mild")
+        severe = PhosphorusPoisoningModule(severity="severe")
+        mild.activate(current_time_s=0.0)
+        severe.activate(current_time_s=0.0)
+        run_compute_n_steps(mild, 36000)
+        run_compute_n_steps(severe, 36000)
+        assert severe.cellular_toxicity > mild.cellular_toxicity
+
+    def test_inactive_returns_empty(self):
+        """Inactive disease should return empty list from compute()."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="moderate")
+        result = pm.compute(0.1, DUMMY_ENGINE_STATE)
+        assert result == []
+
+    def test_summary(self):
+        """summary() should return dict with expected keys."""
+        from src.diseases import PhosphorusPoisoningModule
+        pm = PhosphorusPoisoningModule(severity="moderate")
+        pm.activate(current_time_s=0.0)
+        s = pm.summary()
+        expected_keys = {
+            "name",
+            "active",
+            "cellular_toxicity",
+            "myocardial_depression",
+            "metabolic_acidosis",
+            "renal_injury",
+        }
+        assert set(s.keys()) == expected_keys
+        assert s["name"] == "phosphorus_poisoning"
+        assert s["active"] is True
+
+
+class TestPhosphorusPoisoningIntegration:
+    """Integration: PhosphorusPoisoningModule modifies VirtualCreature physiology."""
+
+    def test_phosphorus_affects_simulation(self):
+        """Attach phosphorus poisoning; MAP and pH should decrease vs baseline.
+
+        Note: phosphorus poisoning needs more steps to manifest because
+        the ODE dynamics have time constants of 20-30 min.
+        We use 6000 steps (600 s = 10 min) for the disease to develop.
+        """
+        baseline = VirtualCreature(body_weight_kg=20.0)
+        for _ in range(6000):
+            baseline.step()
+        baseline_map = baseline.history["MAP_mmHg"][-1]
+        baseline_ph = baseline.history["pH"][-1]
+
+        from src.diseases import PhosphorusPoisoningModule
+        creature = VirtualCreature(body_weight_kg=20.0)
+        poisoning = PhosphorusPoisoningModule(severity="moderate")
+        creature.attach_disease(poisoning)
+        for _ in range(6000):
+            creature.step()
+        disease_map = creature.history["MAP_mmHg"][-1]
+        disease_ph = creature.history["pH"][-1]
+
+        assert disease_map < baseline_map
+        assert disease_ph < baseline_ph
+
+    def test_phosphorus_gfr_decrease(self):
+        """Phosphorus poisoning should decrease GFR vs baseline."""
+        baseline = VirtualCreature(body_weight_kg=20.0)
+        for _ in range(6000):
+            baseline.step()
+        baseline_gfr = baseline.history["GFR"][-1]
+
+        from src.diseases import PhosphorusPoisoningModule
+        creature = VirtualCreature(body_weight_kg=20.0)
+        poisoning = PhosphorusPoisoningModule(severity="moderate")
+        creature.attach_disease(poisoning)
+        for _ in range(6000):
+            creature.step()
+        disease_gfr = creature.history["GFR"][-1]
+
+        assert disease_gfr < baseline_gfr

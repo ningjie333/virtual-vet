@@ -89,7 +89,8 @@ class TestCaseGenerator:
             state = generate_case(difficulty=diff, seed=100)
             assert state.phase == "playing"
             assert state.engine is not None
-            assert state.disease_name in ("pneumonia", "acute_renal_failure")
+            from src.diseases import list_diseases
+            assert state.disease_name in list_diseases()
 
     def test_generate_case_with_seed_is_deterministic(self):
         """Same seed should produce identical cases."""

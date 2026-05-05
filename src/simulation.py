@@ -72,6 +72,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.pH":                   ("blood", "arterial_pH"),
     "blood.temperature":          ("blood", "core_temperature_C"),
     "blood.BUN":                  ("blood", "bun_mg_dL"),
+    "blood.HCO3":                 ("fluid", "vascular_hco3_meq_l"),
 }
 
 

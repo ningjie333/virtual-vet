@@ -134,3 +134,4 @@ class DiseaseModule(ABC):
 from .pneumonia import PneumoniaModule  # noqa: E402, F401
 from .acute_renal_failure import AcuteRenalFailureModule  # noqa: E402, F401
 from .dilated_cardiomyopathy import DilatedCardiomyopathyModule  # noqa: E402, F401
+from .phosphorus_poisoning import PhosphorusPoisoningModule  # noqa: E402, F401
