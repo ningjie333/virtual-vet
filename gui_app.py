@@ -165,9 +165,16 @@ def api_new_game():
     vc.attach_disease(disease)
 
     # 创建游戏状态
+    species = animal.get("species", "犬")
+    # 根据难度设置 AP 上限
+    difficulty = case.get("difficulty", 1)
+    max_ap = {1: 12, 2: 10, 3: 8}.get(difficulty, 10)
     state = GameState(
         engine=vc,
         disease_name=disease_name,
+        species=species,
+        current_ap=max_ap,
+        max_ap=max_ap,
     )
 
     # 用 case_id 作为 session id（单用户原型）
@@ -190,6 +197,10 @@ def api_new_game():
             "game_time": format_game_time(state.game_clock_s),
             "is_night": is_night_time(state.game_clock_s),
             "vitals": _get_vitals(vc),
+            "ap": state.current_ap,
+            "max_ap": state.max_ap,
+            "stress": round(state.stress_level, 1),
+            "pending_reports": len(state.pending_reports),
         }
     )
 
@@ -224,13 +235,22 @@ def api_examine():
         "elapsed_time_s": state.elapsed_time_s,
         "death_timer": state.death_timer,
         "report": result.get("result"),
+        "new_reports": result.get("new_reports", []),
+        "pending_reports": result.get("pending_count", 0),
         "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
+        "ap": result.get("ap_remaining", state.current_ap),
+        "max_ap": state.max_ap,
+        "ap_cost": result.get("ap_cost", 0),
+        "stress": result.get("stress_level", round(state.stress_level, 1)),
+        "combo_bonus": result.get("combo_bonus", None),
     }
 
-    # 如果游戏结束，附加结果信息
+    if not result["success"] and result.get("error"):
+        response["error"] = result["error"]
+
     if state.phase == "lost":
         response["game_over"] = {
             "reason": "患犬未能挺过危机，抢救无效。",
@@ -278,10 +298,15 @@ def api_administer_drug():
         "action_count": state.action_count,
         "elapsed_time_s": state.elapsed_time_s,
         "death_timer": state.death_timer,
+        "new_reports": result.get("new_reports", []),
+        "pending_reports": result.get("pending_count", 0),
         "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
+        "ap": result.get("ap_remaining", state.current_ap),
+        "max_ap": state.max_ap,
+        "stress": result.get("stress_level", round(state.stress_level, 1)),
     }
 
     if not result["success"]:
@@ -320,10 +345,15 @@ def api_diagnose():
         "elapsed_time_s": state.elapsed_time_s,
         "death_timer": state.death_timer,
         "treatment_result": result.get("result"),
+        "new_reports": result.get("new_reports", []),
+        "pending_reports": result.get("pending_count", 0),
         "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
+        "ap": result.get("ap_remaining", state.current_ap),
+        "max_ap": state.max_ap,
+        "stress": result.get("stress_level", round(state.stress_level, 1)),
     }
 
     if state.phase == "won":
@@ -364,10 +394,15 @@ def api_wait():
         "action_count": state.action_count,
         "elapsed_time_s": state.elapsed_time_s,
         "death_timer": state.death_timer,
+        "new_reports": result.get("new_reports", []),
+        "pending_reports": result.get("pending_count", 0),
         "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
+        "ap": result.get("ap_remaining", state.current_ap),
+        "max_ap": state.max_ap,
+        "stress": result.get("stress_level", round(state.stress_level, 1)),
     }
 
     if state.phase == "lost":
@@ -404,7 +439,11 @@ def api_game_state():
             "is_night": is_night_time(state.game_clock_s),
             "vitals": _get_vitals(state.engine, state.game_clock_s),
             "reports_count": len(state.reports),
+            "pending_reports": len(state.pending_reports),
             "game_log": _build_game_log(state),
+            "ap": state.current_ap,
+            "max_ap": state.max_ap,
+            "stress": round(state.stress_level, 1),
         }
     )
 
