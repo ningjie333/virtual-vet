@@ -10,7 +10,9 @@ Treatment — 治疗判定与药物协议执行。
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -18,20 +20,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ── 疾病 → 药物协议映射 ──────────────────────────────────────────────────────
-# 每种疾病对应一个药物列表，按顺序给药
-_DRGUG_PROTOCOL: dict[str, list[dict]] = {
-    "dilated_cardiomyopathy": [
-        {"drug_name": "pimobendan", "dose_mg_kg": 0.25},
-        {"drug_name": "furosemide", "dose_mg_kg": 1.0},
-    ],
-    "pneumonia": [
-        {"drug_name": "fluid_bolus", "volume_ml": 200.0},
-    ],
-    "acute_renal_failure": [
-        {"drug_name": "fluid_bolus", "volume_ml": 300.0},
-    ],
-}
+# ── 从 data/diseases.json 加载治疗协议和消息 ──
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+with open(os.path.join(_DATA_DIR, "diseases.json"), encoding="utf-8") as _f:
+    _DISEASE_DATA: dict = json.load(_f)
+
+_DRUG_PROTOCOL: dict[str, list[dict]] = _DISEASE_DATA["treatment_protocols"]
+_WIN_MESSAGES: dict[str, str] = _DISEASE_DATA["messages"]["win"]
+_LOSS_MESSAGES: dict[str, str] = _DISEASE_DATA["messages"]["loss"]
 
 
 def _ensure_pharmacology(engine) -> None:
@@ -50,7 +46,7 @@ def _administer_protocol(engine, disease_name: str) -> list[str]:
         已给药物名称列表。
     """
     _ensure_pharmacology(engine)
-    protocol = _DRGUG_PROTOCOL.get(disease_name, [])
+    protocol = _DRUG_PROTOCOL.get(disease_name, [])
     given: list[str] = []
     for entry in protocol:
         if "volume_ml" in entry:
@@ -149,20 +145,8 @@ def _apply_supportive_care(game_state: GameState) -> None:
 
 
 def _win_message(disease_name: str) -> str:
-    """治愈消息"""
-    messages = {
-        "pneumonia": "正确诊断！补液治疗后，患犬的循环状态和氧合逐渐改善。",
-        "acute_renal_failure": "正确诊断！积极补液恢复肾灌注后，患犬的肾功能指标开始好转。",
-        "dilated_cardiomyopathy": "正确诊断！强心（匹莫苯丹）+ 利尿（呋塞米）治疗后，患犬心功能逐渐改善，呼吸困难缓解。",
-    }
-    return messages.get(disease_name, f"治疗正确！{disease_name} 得到有效控制。")
+    return _WIN_MESSAGES.get(disease_name, f"治疗正确！{disease_name} 得到有效控制。")
 
 
 def _loss_message(disease_name: str) -> str:
-    """误诊消息 — 不直接暴露疾病名，给出模糊提示"""
-    hints = {
-        "pneumonia": "误诊！患犬的呼吸系统症状提示存在感染性病变，请重新评估肺部检查。",
-        "acute_renal_failure": "误诊！患犬的氮质血症和电解质紊乱提示泌尿系统出了问题，请复查肾功能和尿液。",
-        "dilated_cardiomyopathy": "误诊！患犬的心脏扩大伴收缩功能下降，提示心肌病变，请复查心脏超声和心电图。",
-    }
-    return hints.get(disease_name, "误诊！患者的体征与你的诊断不符，请继续检查。")
+    return _LOSS_MESSAGES.get(disease_name, "误诊！患者的体征与你的诊断不符，请继续检查。")

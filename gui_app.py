@@ -16,12 +16,18 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from src.simulation import VirtualCreature
 from src.parameters import (
     total_blood_volume_ml,
+    base_cardiac_output_ml_min,
+    stroke_volume_ml,
+    gfr_ml_min,
+    baseline_urine_output_ml_min,
     HEART_RATE_REST_BPM,
     MEAN_ARTERIAL_PRESSURE_MMHG,
+    ARTERIAL_SATURATION_NORMAL,
+    RESPIRATORY_RATE_REST,
 )
 from src.diseases import create_disease
 from game.action_system import GameState, process_action
-from game.diagnosis_engine import match_diseases, get_suggested_tests
+from game.diagnosis_engine import match_diseases, get_suggested_tests, CLUE_DESCRIPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -56,28 +62,31 @@ def _load_json(filename: str) -> dict:
 EXAMINATIONS = _load_json("examinations.json")
 TREATMENTS = _load_json("treatments.json")
 CASES_DATA = _load_json("cases.json")
+_DISEASE_NAMES: dict[str, str] = _load_json("diseases.json")["disease_names"]
 
 # ============================================================
 # 游戏会话存储（单用户，内存存储）
 # ============================================================
 # 生产环境应使用 session +数据库，单用户原型用全局变量即可
 _game_sessions: dict[str, GameState] = {}
+_DEFAULT_SESSION_ID = "case_001"
 
 # ============================================================
 # 辅助函数
 # ============================================================
 
 
-def get_normal_value(metric_key: str) -> float:
+def get_normal_value(metric_key: str, weight_kg: float = 20.0) -> float:
+    """返回指定指标的正常值（默认基于 20 kg 犬）。"""
     defaults = {
         "HR_bpm": HEART_RATE_REST_BPM,
         "MAP_mmHg": MEAN_ARTERIAL_PRESSURE_MMHG,
-        "CO_ml_min": HEART_RATE_REST_BPM * 20.0,
-        "blood_volume_ml": total_blood_volume_ml(20.0),
-        "saturation": 0.97,
-        "RR": 18,
-        "GFR": 60.0,
-        "urine_ml_min": 0.4,
+        "CO_ml_min": base_cardiac_output_ml_min(weight_kg),
+        "blood_volume_ml": total_blood_volume_ml(weight_kg),
+        "saturation": ARTERIAL_SATURATION_NORMAL,
+        "RR": RESPIRATORY_RATE_REST,
+        "GFR": gfr_ml_min(weight_kg),
+        "urine_ml_min": baseline_urine_output_ml_min(weight_kg),
         "BUN": 15.0,
         "pH": 7.40,
     }
@@ -133,7 +142,7 @@ def api_new_game():
     返回: 初始游戏状态
     """
     data = request.get_json() or {}
-    case_id = data.get("case_id", "case_001")
+    case_id = data.get("case_id", _DEFAULT_SESSION_ID)
 
     # 查找病例
     case = None
@@ -193,7 +202,7 @@ def api_examine():
     返回: 检查报告 + 更新后的游戏状态
     """
     data = request.get_json() or {}
-    session_id = data.get("session_id", "case_001")
+    session_id = data.get("session_id", _DEFAULT_SESSION_ID)
     test_type = data.get("test_type", "physical")
 
     state = _game_sessions.get(session_id)
@@ -240,7 +249,7 @@ def api_administer_drug():
     返回: 更新后的游戏状态 + 生命体征
     """
     data = request.get_json() or {}
-    session_id = data.get("session_id", "case_001")
+    session_id = data.get("session_id", _DEFAULT_SESSION_ID)
     drug_name = data.get("drug_name", "")
     dose_mg_kg = data.get("dose_mg_kg", 0.0)
     volume_ml = data.get("volume_ml", 0.0)
@@ -289,7 +298,7 @@ def api_diagnose():
     返回: 治疗结果 + 游戏状态
     """
     data = request.get_json() or {}
-    session_id = data.get("session_id", "case_001")
+    session_id = data.get("session_id", _DEFAULT_SESSION_ID)
     diagnosis = data.get("diagnosis", "")
 
     state = _game_sessions.get(session_id)
@@ -339,7 +348,7 @@ def api_wait():
     POST body: {"session_id": "case_001"}
     """
     data = request.get_json() or {}
-    session_id = data.get("session_id", "case_001")
+    session_id = data.get("session_id", _DEFAULT_SESSION_ID)
 
     state = _game_sessions.get(session_id)
     if not state:
@@ -373,7 +382,7 @@ def api_wait():
 @app.route("/api/game-state", methods=["GET"])
 def api_game_state():
     """获取当前游戏状态（用于刷新/轮询）"""
-    session_id = request.args.get("session_id", "case_001")
+    session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
     state = _game_sessions.get(session_id)
     if not state:
         return jsonify({"error": "游戏会话不存在"}), 404
@@ -403,7 +412,7 @@ def api_game_state():
 @app.route("/api/hint", methods=["GET"])
 def api_hint():
     """根据已获取的报告给出诊断提示"""
-    session_id = request.args.get("session_id", "case_001")
+    session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
     state = _game_sessions.get(session_id)
     if not state:
         return jsonify({"error": "游戏会话不存在"}), 404
@@ -416,37 +425,10 @@ def api_hint():
         return jsonify({"hint": "目前检查数据不足以匹配任何已知疾病，建议进一步检查。"})
 
     top = matches[0]
-    disease_names = {
-        "pneumonia": "肺炎（肺部感染）",
-        "acute_renal_failure": "急性肾衰竭",
-        "dilated_cardiomyopathy": "扩张型心肌病（DCM）",
-    }
-    disease_display = disease_names.get(top["disease"], top["disease"])
+    disease_display = _DISEASE_NAMES.get(top["disease"], top["disease"])
 
-    clue_descriptions = {
-        "PaO2_low": "低氧血症",
-        "SpO2_low": "血氧饱和度降低",
-        "wbc_high": "白细胞升高",
-        "hr_high": "心率加快",
-        "rr_high": "呼吸频率加快",
-        "temp_high": "体温升高",
-        "lung_exudate_xray": "X光肺渗出影",
-        "lung_exudate_us": "超声肺实变",
-        "crackles": "湿啰音",
-        "gfr_low": "GFR降低",
-        "bun_high": "BUN升高",
-        "potassium_high": "高钾血症",
-        "ph_low": "酸中毒",
-        "map_high": "血压升高",
-        "map_low": "低血压",
-        "cvp_high": "中心静脉压升高",
-        "cardiomegaly_xray": "心影增大",
-        "cardiomegaly_us": "心腔扩大",
-        "weak_pulse": "脉搏弱",
-    }
-
-    matched_desc = [clue_descriptions.get(c, c) for c in top["matched_clues"][:5]]
-    missed_desc = [clue_descriptions.get(c, c) for c in top["missed_clues"][:3]]
+    matched_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["matched_clues"][:5]]
+    missed_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["missed_clues"][:3]]
 
     hint = f"最可能的疾病：**{disease_display}**（置信度 {top['confidence'] * 100:.0f}%）\n\n"
     hint += f"已匹配线索：{'、'.join(matched_desc)}\n"
@@ -466,7 +448,7 @@ def api_diagnosis():
             "suggested_tests": [...],  # get_suggested_tests() 结果
         }
     """
-    session_id = request.args.get("session_id", "case_001")
+    session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
     state = _game_sessions.get(session_id)
     if not state:
         return jsonify({"error": "游戏会话不存在"}), 404

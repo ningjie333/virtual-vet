@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from src.simulation import VirtualCreature
+from src.parameters import base_cardiac_output_ml_min, ARTERIAL_SATURATION_NORMAL
 from game.time_manager import (
     is_night_time,
     get_night_hr_factor,
@@ -111,11 +112,13 @@ def compute_DO2(engine: VirtualCreature) -> float:
         return vals[-1] if vals else fallback
 
     # 读取当前值
-    co = _last("CO_ml_min", 1700.0)  # 健康犬基础 CO ≈ 1700 mL/min
-    sao2 = _last("saturation", 0.97)  # 健康犬基础 SaO₂ ≈ 97%
+    weight_kg = engine.w
+    normal_co = base_cardiac_output_ml_min(weight_kg)
+    co = _last("CO_ml_min", normal_co)
+    sao2 = _last("saturation", ARTERIAL_SATURATION_NORMAL)
 
     # 归一化 DO₂（健康犬 = 1.0）
-    do2 = (co / 1700.0) * sao2
+    do2 = (co / normal_co) * sao2
     return max(0.0, min(1.0, do2))
 
 

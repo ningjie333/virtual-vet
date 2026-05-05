@@ -1,0 +1,114 @@
+{
+  "disease_names": {
+    "pneumonia": "肺炎（肺部感染）",
+    "acute_renal_failure": "急性肾衰竭",
+    "dilated_cardiomyopathy": "扩张型心肌病（DCM）"
+  },
+  "clues": {
+    "pneumonia": [
+      "PaO2_low",
+      "PaCO2_high",
+      "SpO2_low",
+      "wbc_high",
+      "hr_high",
+      "rr_high",
+      "temp_high",
+      "lung_exudate_xray",
+      "lung_exudate_ct",
+      "lung_exudate_us",
+      "crackles"
+    ],
+    "acute_renal_failure": [
+      "gfr_low",
+      "bun_high",
+      "potassium_high",
+      "ph_low",
+      "hr_low",
+      "map_high"
+    ],
+    "dilated_cardiomyopathy": [
+      "hr_high",
+      "hr_low",
+      "map_low",
+      "cvp_high",
+      "gfr_low",
+      "bun_high",
+      "lung_exudate_us",
+      "cardiomegaly_xray",
+      "cardiomegaly_us",
+      "weak_pulse"
+    ]
+  },
+  "clue_descriptions": {
+    "PaO2_low": "低氧血症",
+    "PaCO2_high": "高碳酸血症",
+    "SpO2_low": "血氧饱和度降低",
+    "wbc_high": "白细胞升高",
+    "hr_high": "心率加快",
+    "hr_low": "心动过缓",
+    "rr_high": "呼吸频率加快",
+    "temp_high": "体温升高",
+    "map_high": "血压升高",
+    "map_low": "低血压",
+    "ph_low": "酸中毒",
+    "gfr_low": "GFR降低",
+    "bun_high": "BUN升高",
+    "potassium_high": "高钾血症",
+    "lung_exudate_xray": "X光肺渗出影",
+    "lung_exudate_ct": "CT肺渗出影",
+    "lung_exudate_us": "超声肺实变",
+    "crackles": "湿啰音",
+    "cvp_high": "中心静脉压升高",
+    "cardiomegaly_xray": "心影增大",
+    "cardiomegaly_us": "心腔扩大",
+    "weak_pulse": "脉搏弱"
+  },
+  "clue_to_test": {
+    "PaO2_low": "blood_gas",
+    "PaCO2_high": "blood_gas",
+    "SpO2_low": "blood_gas",
+    "wbc_high": "blood_routine",
+    "hr_high": "physical",
+    "hr_low": "ecg",
+    "rr_high": "physical",
+    "temp_high": "physical",
+    "lung_exudate_xray": "chest_xray",
+    "lung_exudate_ct": "ct",
+    "lung_exudate_us": "ultrasound",
+    "crackles": "auscultation",
+    "gfr_low": "blood_biochem",
+    "bun_high": "blood_biochem",
+    "potassium_high": "blood_biochem",
+    "ph_low": "blood_gas",
+    "map_high": "physical",
+    "map_low": "physical",
+    "cvp_high": "physical",
+    "cardiomegaly_xray": "chest_xray",
+    "cardiomegaly_us": "ultrasound",
+    "weak_pulse": "physical"
+  },
+  "treatment_protocols": {
+    "dilated_cardiomyopathy": [
+      {"drug_name": "pimobendan", "dose_mg_kg": 0.25},
+      {"drug_name": "furosemide", "dose_mg_kg": 1.0}
+    ],
+    "pneumonia": [
+      {"drug_name": "fluid_bolus", "volume_ml": 200}
+    ],
+    "acute_renal_failure": [
+      {"drug_name": "fluid_bolus", "volume_ml": 300}
+    ]
+  },
+  "messages": {
+    "win": {
+      "pneumonia": "正确诊断！补液治疗后，患犬的循环状态和氧合逐渐改善。",
+      "acute_renal_failure": "正确诊断！积极补液恢复肾灌注后，患犬的肾功能指标开始好转。",
+      "dilated_cardiomyopathy": "正确诊断！强心（匹莫苯丹）+ 利尿（呋塞米）治疗后，患犬心功能逐渐改善，呼吸困难缓解。"
+    },
+    "loss": {
+      "pneumonia": "误诊！患犬的呼吸系统症状提示存在感染性病变，请重新评估肺部检查。",
+      "acute_renal_failure": "误诊！患犬的氮质血症和电解质紊乱提示泌尿系统出了问题，请复查肾功能和尿液。",
+      "dilated_cardiomyopathy": "误诊！患犬的心脏扩大伴收缩功能下降，提示心肌病变，请复查心脏超声和心电图。"
+    }
+  }
+}
