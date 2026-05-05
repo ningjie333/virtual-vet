@@ -1,0 +1,74 @@
+{
+  "cases": [
+    {
+      "id": "case_001",
+      "title": "呕吐与嗜睡",
+      "difficulty": 1,
+      "difficulty_label": "★☆☆",
+      "animal": {
+        "species": "犬",
+        "breed": "金毛寻回犬",
+        "name": "豆豆",
+        "age": "3岁",
+        "weight_kg": 20.0,
+        "sex": "雄性绝育"
+      },
+      "chief_complaint": "呕吐3天，今日食欲废绝，精神沉郁",
+      "history": "3天前开始间歇性呕吐，初为胃内容物，后为黄色黏液。昨日完全拒食。已完成年度免疫。无已知药物过敏。",
+      "disease": "pneumonia",
+      "disease_onset_s": 0,
+      "time_limit_actions": 10,
+      "starting_hints": [
+        "注意听诊肺音",
+        "建议拍摄胸部X光"
+      ]
+    },
+    {
+      "id": "case_002",
+      "title": "无尿与呕吐",
+      "difficulty": 2,
+      "difficulty_label": "★★☆",
+      "animal": {
+        "species": "犬",
+        "breed": "德国牧羊犬",
+        "name": "黑背",
+        "age": "7岁",
+        "weight_kg": 30.0,
+        "sex": "雄性"
+      },
+      "chief_complaint": "呕吐、厌食2天，今日完全无尿",
+      "history": "2天前出现呕吐和厌食，主人发现今日完全无排尿。近期无外伤史。有长期使用NSAIDs治疗关节炎的用药史。",
+      "disease": "acute_renal_failure",
+      "disease_onset_s": 0,
+      "time_limit_actions": 10,
+      "starting_hints": [
+        "注意检查肾功能指标",
+        "NSAIDs长期使用可能导致肾损伤"
+      ]
+    },
+    {
+      "id": "case_003",
+      "title": "运动不耐受与咳嗽",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "犬",
+        "breed": "杜宾犬",
+        "name": "雷霆",
+        "age": "5岁",
+        "weight_kg": 35.0,
+        "sex": "雄性"
+      },
+      "chief_complaint": "近2个月运动不耐受，夜间咳嗽加重，今日突发呼吸困难",
+      "history": "近2个月来运动量明显下降，轻微活动即气喘。近1周夜间咳嗽加重，呈阵发性干咳。今日突发严重呼吸困难，端坐呼吸。无发热，食欲尚可。",
+      "disease": "dilated_cardiomyopathy",
+      "disease_onset_s": 0,
+      "time_limit_actions": 12,
+      "starting_hints": [
+        "注意听诊心律",
+        "建议拍摄胸部X光评估心影",
+        "超声心动图是确诊关键"
+      ]
+    }
+  ]
+}

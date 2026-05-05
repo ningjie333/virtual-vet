@@ -1,0 +1,92 @@
+{
+  "physical": {
+    "name": "体格检查",
+    "name_en": "Physical Examination",
+    "category": "基础检查",
+    "cost": 0,
+    "duration_s": 60,
+    "description": "测量心率、呼吸频率、体温，评估精神状态",
+    "params": ["HR", "RR", "Temp"]
+  },
+  "auscultation": {
+    "name": "听诊",
+    "name_en": "Auscultation",
+    "category": "基础检查",
+    "cost": 0,
+    "duration_s": 60,
+    "description": "听取心音和肺音，判断是否存在湿啰音或心音异常",
+    "params": []
+  },
+  "inspection": {
+    "name": "视诊",
+    "name_en": "Inspection",
+    "category": "基础检查",
+    "cost": 0,
+    "duration_s": 60,
+    "description": "观察黏膜颜色、脱水程度和体温",
+    "params": []
+  },
+  "blood_routine": {
+    "name": "血常规",
+    "name_en": "Complete Blood Count",
+    "category": "实验室检查",
+    "cost": 1,
+    "duration_s": 60,
+    "description": "检测白细胞（WBC）、红细胞比容（HCT）和血小板（PLT）",
+    "params": ["WBC", "HCT", "PLT"]
+  },
+  "blood_biochem": {
+    "name": "生化全项",
+    "name_en": "Blood Biochemistry",
+    "category": "实验室检查",
+    "cost": 3,
+    "duration_s": 60,
+    "description": "检测BUN、肌酐、血糖、电解质（Na、K）和ALT",
+    "params": ["BUN", "Cr", "Glu", "Na", "K", "ALT"]
+  },
+  "blood_gas": {
+    "name": "血气分析",
+    "name_en": "Blood Gas Analysis",
+    "category": "实验室检查",
+    "cost": 3,
+    "duration_s": 60,
+    "description": "检测PaO2、PaCO2、pH、乳酸和SpO2",
+    "params": ["PaO2", "PaCO2", "pH", "Lactate", "SpO2"]
+  },
+  "chest_xray": {
+    "name": "X光胸片",
+    "name_en": "Chest X-Ray",
+    "category": "影像学",
+    "cost": 3,
+    "duration_s": 120,
+    "description": "观察肺野是否存在渗出影或实变",
+    "params": []
+  },
+  "ultrasound": {
+    "name": "超声检查",
+    "name_en": "Ultrasound",
+    "category": "影像学",
+    "cost": 4,
+    "duration_s": 120,
+    "description": "评估心脏功能、肾脏血流、下腔静脉充盈度和肺部B线",
+    "params": []
+  },
+  "ct": {
+    "name": "CT",
+    "name_en": "CT Scan",
+    "category": "影像学",
+    "cost": 5,
+    "duration_s": 180,
+    "description": "高精度断层扫描，识别细微肺实质病变",
+    "params": []
+  },
+  "ecg": {
+    "name": "心电图",
+    "name_en": "Electrocardiogram",
+    "category": "实验室检查",
+    "cost": 1,
+    "duration_s": 60,
+    "description": "记录心率和心律，排查电解质异常对心脏的影响",
+    "params": ["HR", "节律"]
+  }
+}

@@ -1,0 +1,234 @@
+"""
+Lung Module - 肺气体交换系统
+建模肺通气、气体扩散、血气交换
+"""
+
+from parameters import *
+import math
+
+
+class LungModule:
+    """
+    肺气体交换模块：模拟肺通气与气体交换
+
+    核心变量：
+    - alveolar_PO2, alveolar_PCO2: 肺泡气体分压
+    - arterial_PO2, arterial_PCO2: 动脉血气分压
+    - respiratory_rate: 呼吸频率
+    - tidal_volume_ml: 潮气量
+
+    核心方程：
+    - A-a gradient = PAO2 - PaO2
+    - O2 diffusion: VO2 = DL × (PAO2 - PaO2)
+    - CO2 diffusion: VCO2 = DL × (PaCO2 - PACO2)
+    - Alveolar gas equation: PAO2 = FiO2 × (Patm - PH2O) - PACO2/R
+    """
+
+    def __init__(
+        self,
+        weight_kg: float,
+        blood,
+        base_RR: float = RESPIRATORY_RATE_REST,
+        max_RR: float = RESPIRATORY_RATE_STRESS,
+        tidal_vol_ml: float = None,       # 若为 None 则按 12 mL/kg 计算
+        diffusion_coef: float = LUNG_DIFFUSION_COEFFICIENT,
+        pulmonary_compliance: float = PULMONARY_COMPLIANCE,
+        base_minute_vent: float = None,   # 若为 None 则按 TV × RR 计算
+    ):
+        self.w = weight_kg
+        self.blood = blood  # 血液隔室引用
+
+        # 潮气量（外部传入或按 12 mL/kg 计算）
+        _tv = tidal_vol_ml if tidal_vol_ml is not None else 12.0 * weight_kg
+
+        # 通气参数
+        self.base_respiratory_rate = base_RR
+        self.max_respiratory_rate = max_RR
+        self.respiratory_rate = base_RR            # 当前呼吸频率 /min
+        self.base_tidal_volume = _tv
+        self.tidal_volume = _tv                     # 当前潮气量 mL
+        self.base_minute_ventilation = base_minute_vent if base_minute_vent is not None else _tv * base_RR
+
+        # 扩散参数
+        self.diffusion_coefficient = diffusion_coef  # 肺扩散系数 mL O2/min/mmHg
+
+        # 顺应性
+        self.pulmonary_compliance = pulmonary_compliance  # mL/mmHg
+
+        # 肺泡气体分压
+        self.alveolar_PO2 = ALVEOLAR_PO2_NORMAL    # mmHg
+        self.alveolar_PCO2 = ALVEOLAR_PCO2_NORMAL  # mmHg
+
+        # 大气参数
+        self.FiO2 = 0.2093                          # 吸入气氧浓度 21%
+        self.Patm_mmHg = 760.0                      # 大气压
+        self.PH2O_mmHg = 47.0                       # 水蒸气分压
+
+        # 气体交换量
+        self.O2_consumption = 0.0                   # mL O2/min
+        self.CO2_production = 0.0                   # mL CO2/min
+
+        # 呼吸商
+        self.respiratory_quotient = 0.8             # RQ = VCO2/VO2
+
+        # 通气血流比（V/Q matching）
+        self.VQ_ratio = 0.8                         # 正常约 0.8
+
+        # 代偿参数
+        self.respiratory_compensation = 0.0         # 呼吸代偿程度
+
+    def _alveolar_gas_equation(self, RR: float, Vt: float, PACO2: float) -> float:
+        """
+        肺泡气体方程
+        PAO2 = FiO2 × (Patm - PH2O) - PACO2/R
+        """
+        PIO2 = self.FiO2 * (self.Patm_mmHg - self.PH2O_mmHg)  # 吸入气氧分压 ≈ 150 mmHg
+        R = self.respiratory_quotient
+        PAO2 = PIO2 - PACO2 / R
+        return max(50.0, min(150.0, PAO2))
+
+    def _compute_oxygen_diffusion(self):
+        """
+        氧扩散：肺泡 → 动脉血
+        Fick's law: VO2 = DL × (PAO2 - PaO2)
+        """
+        PO2_gradient = self.alveolar_PO2 - self.blood.arterial_PO2_mmHg
+        # 实际扩散量受 V/Q 比调节
+        VO2 = self.diffusion_coefficient * PO2_gradient * self.VQ_ratio
+        VO2 = max(0.0, VO2)
+        self.O2_consumption = VO2
+        return VO2
+
+    def _compute_CO2_diffusion(self):
+        """
+        CO2 扩散：静脉血 → 肺泡
+        Fick's law: VCO2 = DL × (PaCO2 - PACO2)
+        """
+        PCO2_gradient = self.blood.venous_PCO2_mmHg - self.alveolar_PCO2
+        # CO2 扩散系数约为 O2 的 20 倍（但浓度换算后）
+        VCO2 = self.diffusion_coefficient * 0.2 * PCO2_gradient * self.VQ_ratio
+        VCO2 = max(0.0, VCO2)
+        self.CO2_production = VCO2
+        return VCO2
+
+    def _respiratory_compensation(self, arterial_PCO2: float, arterial_PO2: float, dt: float):
+        """
+        呼吸代偿：动脉血 PCO2/PO2 异常时调节通气
+
+        - 代谢性酸中毒 → 呼吸代偿（PCO2 ↓，RR ↑）
+        - 低氧血症 → 呼吸频率 ↑（通过外周化学感受器）
+        - 高碳酸血症 → RR ↑（通过中枢化学感受器）
+        """
+        target_PCO2 = 40.0
+        PCO2_error = arterial_PCO2 - target_PCO2
+
+        # 呼吸频率代偿：PCO2 每升高 1 mmHg，RR 增加约 2/min
+        # RR_delta 单位 /min，乘以 dt/60 转换为每步变化（dt 是秒）
+        RR_delta = 2.0 * PCO2_error
+        self.respiratory_rate = max(
+            self.base_respiratory_rate * 0.5,
+            min(self.max_respiratory_rate, self.respiratory_rate + RR_delta * dt / 60.0)
+        )
+
+        # 低氧代偿：PO2 < 80 时触发过度通气（加法叠加，避免乘法突变）
+        if arterial_PO2 < 80:
+            hypoxia_factor = (80 - arterial_PO2) / 80
+            rr_boost = self.base_respiratory_rate * 0.5 * hypoxia_factor * dt / 60.0
+            self.respiratory_rate = min(self.max_respiratory_rate,
+                                        self.respiratory_rate + rr_boost)
+
+    def compute(self, dt: float, cardiac_output: float):
+        """
+        主计算函数：推进肺部气体交换一个时间步
+
+        Args:
+            dt: 时间步长（秒）
+            cardiac_output: 心输出量 mL/min（来自心脏模块）
+
+        Returns:
+            肺部气体交换状态 dict
+        """
+        # Step 1: 分钟通气量
+        minute_ventilation = self.respiratory_rate * self.tidal_volume  # mL/min
+
+        # Step 2: PACO2 受通气量影响：通气量↑ → PACO2 ↓
+        vent_ratio = minute_ventilation / self.base_minute_ventilation
+        self.alveolar_PCO2 = 40.0 / vent_ratio
+        self.alveolar_PCO2 = max(15.0, min(80.0, self.alveolar_PCO2))
+
+        # 肺泡气体方程计算 PAO2（用计算后的 PACO2）
+        self.alveolar_PO2 = self._alveolar_gas_equation(
+            self.respiratory_rate, self.tidal_volume, self.alveolar_PCO2)
+
+        # Step 3: 气体扩散（肺泡 ↔ 血液）
+        O2_consumed = self._compute_oxygen_diffusion()
+        CO2_produced = self._compute_CO2_diffusion()
+
+        # Step 4: 血气分压更新
+        # A-a gradient 随扩散能力下降而增大（正常 10，严重障碍时可达 40）
+        aa_gradient = 10.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 30.0
+        a_PO2 = self.alveolar_PO2 - aa_gradient
+        a_PCO2 = self.alveolar_PCO2        # 动脉 PCO2 ≈ 肺泡 PCO2
+
+        self.blood.arterial_PO2_mmHg = max(40.0, min(110.0, a_PO2))
+        self.blood.arterial_PCO2_mmHg = max(15.0, min(80.0, a_PCO2))
+
+        # Step 5: 血氧饱和度（基于 PO2，用 Hill 方程近似）
+        self.blood.arterial_saturation = self._oxygen_saturation_curve(
+            self.blood.arterial_PO2_mmHg)
+
+        # Step 6: 静脉血气（由组织代谢决定，下一步由组织交换模块处理）
+        # 这里保持不变，由其他器官模块更新
+
+        # Step 7: 呼吸代偿
+        self._respiratory_compensation(
+            self.blood.arterial_PCO2_mmHg, self.blood.arterial_PO2_mmHg, dt)
+
+        # Step 8: 血液 pH（由 CO2 调节，碳酸氢盐缓冲系统）
+        self._update_arterial_pH()
+
+        return {
+            "alveolar_PO2": self.alveolar_PO2,
+            "alveolar_PCO2": self.alveolar_PCO2,
+            "arterial_PO2": self.blood.arterial_PO2_mmHg,
+            "arterial_PCO2": self.blood.arterial_PCO2_mmHg,
+            "arterial_saturation": self.blood.arterial_saturation,
+            "respiratory_rate": self.respiratory_rate,
+            "minute_ventilation": minute_ventilation,
+            "O2_consumption": self.O2_consumption,
+            "CO2_production": self.CO2_production,
+            "V_Q_ratio": self.VQ_ratio,
+            "tidal_volume_ml": self.tidal_volume,
+        }
+
+    def _oxygen_saturation_curve(self, PO2_mmHg: float) -> float:
+        """
+        氧解离曲线（Hill 方程近似）
+        P50 ≈ 26.6 mmHg（犬）
+        """
+        P50 = 26.6  # mmHg
+        n = 2.8     # Hill 系数
+        sat = PO2_mmHg**n / (P50**n + PO2_mmHg**n)
+        return max(0.0, min(1.0, sat))
+
+    def _update_arterial_pH(self):
+        """
+        Henderson-Hasselbalch 方程近似：
+        pH = 6.1 + log10([HCO3-] / (0.03 × PCO2))
+        简化：假设 [HCO3-] = 24 mEq/L
+        """
+        PCO2 = self.blood.arterial_PCO2_mmHg
+        HCO3 = 24.0  # 假设恒定（真实情况由肾脏调节）
+        pH = 6.1 + math.log10(HCO3 / (0.03 * PCO2)) if PCO2 > 0 else 7.4
+        self.blood.arterial_pH = max(7.0, min(7.8, pH))
+
+    def summary(self) -> dict:
+        return {
+            "alveolar_PO2": round(self.alveolar_PO2, 1),
+            "alveolar_PCO2": round(self.alveolar_PCO2, 1),
+            "arterial_PO2": round(self.blood.arterial_PO2_mmHg, 1),
+            "arterial_PCO2": round(self.blood.arterial_PCO2_mmHg, 1),
+            "saturation": round(self.blood.arterial_saturation, 3),
+            "RR": round(self.respiratory_rate, 1),
+            "pH": round(self.blood.arterial_pH, 3),
+        }
