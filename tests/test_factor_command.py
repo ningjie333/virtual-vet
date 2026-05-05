@@ -191,8 +191,8 @@ class TestFactorCommandIntegration:
 
     def test_pneumonia_returns_commands(self):
         """PneumoniaModule.compute() should return list[FactorCommand]."""
-        from src.diseases import PneumoniaModule
-        pm = PneumoniaModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("pneumonia",severity="moderate")
         pm.activate(current_time_s=0.0)
         commands = pm.compute(0.1, {"heart": {}, "lung": {}, "kidney": {}})
         assert isinstance(commands, list)
@@ -202,8 +202,8 @@ class TestFactorCommandIntegration:
 
     def test_arf_returns_commands(self):
         """AcuteRenalFailureModule.compute() should return list[FactorCommand]."""
-        from src.diseases import AcuteRenalFailureModule
-        arf = AcuteRenalFailureModule(severity="moderate")
+        from src.diseases import create_disease
+        arf = create_disease("acute_renal_failure",severity="moderate")
         arf.activate(current_time_s=0.0)
         commands = arf.compute(0.1, {"heart": {}, "lung": {}, "kidney": {}})
         assert isinstance(commands, list)
@@ -213,8 +213,8 @@ class TestFactorCommandIntegration:
 
     def test_dcm_returns_commands(self):
         """DilatedCardiomyopathyModule.compute() should return list[FactorCommand]."""
-        from src.diseases import DilatedCardiomyopathyModule
-        dcm = DilatedCardiomyopathyModule(severity="moderate")
+        from src.diseases import create_disease
+        dcm = create_disease("dilated_cardiomyopathy",severity="moderate")
         dcm.activate(current_time_s=0.0)
         commands = dcm.compute(0.1, {"heart": {}, "lung": {}, "kidney": {}})
         assert isinstance(commands, list)
@@ -224,20 +224,20 @@ class TestFactorCommandIntegration:
 
     def test_inactive_disease_returns_empty_list(self):
         """Inactive disease should return empty list (not empty dict)."""
-        from src.diseases import PneumoniaModule
-        pm = PneumoniaModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("pneumonia",severity="moderate")
         # Do NOT activate
         commands = pm.compute(0.1, {"heart": {}, "lung": {}, "kidney": {}})
         assert commands == []
 
     def test_commands_applied_to_creature(self):
         """Commands from a disease should modify creature physiology when applied."""
-        from src.diseases import PneumoniaModule
+        from src.diseases import create_disease
 
         v = VirtualCreature(body_weight_kg=20.0)
         initial_spo2 = v.blood.arterial_saturation
 
-        pm = PneumoniaModule(severity="moderate")
+        pm = create_disease("pneumonia",severity="moderate")
         pm.activate(current_time_s=0.0)
 
         # Run 600 steps, applying disease commands each step

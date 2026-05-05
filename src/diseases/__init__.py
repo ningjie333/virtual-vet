@@ -26,20 +26,22 @@ logger = get_logger(__name__)
 _DISEASE_REGISTRY: dict[str, type] = {}
 
 
-def register_disease(name: str, cls: type):
+def register_disease(name: str, cls: type, **extra):
     """
     注册一个疾病模块。
 
     Args:
         name: 疾病唯一标识符（小写，下划线分隔）
-        cls: DiseaseModule 子类
+        cls: DiseaseModule 子类或工厂可调用对象
+        **extra: 额外参数（如 config=dict），存储在注册表中传递给构造函数
 
     Example:
         register_disease("pneumonia", PneumoniaModule)
+        register_disease("pneumonia", ConfigDrivenDiseaseModule, config=conf)
     """
-    if not issubclass(cls, DiseaseModule):
-        raise TypeError(f"{cls.__name__} must be a subclass of DiseaseModule")
-    _DISEASE_REGISTRY[name.lower()] = cls
+    if not (isinstance(cls, type) and issubclass(cls, DiseaseModule)):
+        raise TypeError(f"{cls} must be a DiseaseModule subclass")
+    _DISEASE_REGISTRY[name.lower()] = (cls, extra)
     logger.debug("Registered disease module: %s → %s", name, cls.__name__)
 
 
@@ -54,7 +56,7 @@ def create_disease(name: str, **kwargs) -> "DiseaseModule":
 
     Args:
         name: 疾病名称（必须在注册表中）
-        **kwargs: 传递给构造函数的参数
+        **kwargs: 传递给构造函数的参数（如 severity="moderate"）
 
     Returns:
         DiseaseModule 实例
@@ -62,13 +64,16 @@ def create_disease(name: str, **kwargs) -> "DiseaseModule":
     Raises:
         KeyError: 未注册的疾病
     """
-    cls = _DISEASE_REGISTRY.get(name.lower())
-    if cls is None:
+    entry = _DISEASE_REGISTRY.get(name.lower())
+    if entry is None:
         raise KeyError(
             f"Disease '{name}' not registered. "
             f"Available: {list_diseases()}"
         )
-    return cls(**kwargs)
+    cls, extra = entry
+    # 合并：name + 注册时的 extra（如 config）+ 调用时的 kwargs（如 severity）
+    merged = {"name": name, **extra, **kwargs}
+    return cls(**merged)
 
 
 class DiseaseModule(ABC):
@@ -130,8 +135,5 @@ class DiseaseModule(ABC):
         """工具方法：数值限幅"""
         return max(lo, min(hi, value))
 
-# 必须在模块底部导入，避免循环依赖
-from .pneumonia import PneumoniaModule  # noqa: E402, F401
-from .acute_renal_failure import AcuteRenalFailureModule  # noqa: E402, F401
-from .dilated_cardiomyopathy import DilatedCardiomyopathyModule  # noqa: E402, F401
-from .phosphorus_poisoning import PhosphorusPoisoningModule  # noqa: E402, F401
+# 导入配置驱动引擎（自动注册所有 JSON 中定义的疾病）
+from .config_driven import ConfigDrivenDiseaseModule, register_ode_type  # noqa: E402, F401

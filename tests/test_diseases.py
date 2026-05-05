@@ -17,7 +17,7 @@ import os
 # Ensure src/ is importable
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 
-from src.diseases import PneumoniaModule, AcuteRenalFailureModule
+from src.diseases import create_disease
 from src.simulation import VirtualCreature, FactorCommand
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ class TestPneumonia:
 
     def test_pneumonia_exudate_increases(self):
         """Alveolar exudate should increase over time after activation."""
-        pm = PneumoniaModule(severity="moderate")
+        pm = create_disease("pneumonia",severity="moderate")
         pm.activate(current_time_s=0.0)
         initial_exudate = pm.alveolar_exudate
         run_compute_n_steps(pm, 3600)  # 60 s at dt=0.1
@@ -59,7 +59,7 @@ class TestPneumonia:
 
     def test_pneumonia_bacterial_load_grows(self):
         """Bacterial load should increase (net growth > clearance initially)."""
-        pm = PneumoniaModule(severity="moderate")
+        pm = create_disease("pneumonia",severity="moderate")
         pm.activate(current_time_s=0.0)
         initial_load = pm.bacterial_load
         run_compute_n_steps(pm, 3600)
@@ -67,14 +67,14 @@ class TestPneumonia:
 
     def test_pneumonia_fever_develops(self):
         """After sufficient time, fever_state should be > 0."""
-        pm = PneumoniaModule(severity="moderate")
+        pm = create_disease("pneumonia",severity="moderate")
         pm.activate(current_time_s=0.0)
         run_compute_n_steps(pm, 36000)  # 600 s at dt=0.1
         assert pm.fever_state > 0.0
 
     def test_pneumonia_diffusion_decreases(self):
         """diffusion_coefficient command value should decrease as exudate increases."""
-        pm = PneumoniaModule(severity="moderate")
+        pm = create_disease("pneumonia",severity="moderate")
         pm.activate(current_time_s=0.0)
         initial_cmds = pm.compute(0.1, DUMMY_ENGINE_STATE)
         initial_diffusion = _find_cmd_value(initial_cmds, "lung.diffusion_coefficient")
@@ -86,7 +86,7 @@ class TestPneumonia:
 
     def test_pneumonia_hr_offset_increases(self):
         """heart_rate add value should increase as fever develops."""
-        pm = PneumoniaModule(severity="moderate")
+        pm = create_disease("pneumonia",severity="moderate")
         pm.activate(current_time_s=0.0)
         initial_hr_offset = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "heart.heart_rate")
         assert initial_hr_offset is not None
@@ -96,7 +96,7 @@ class TestPneumonia:
 
     def test_pneumonia_hypoxia_increases(self):
         """tissue_hypoxia should increase over time."""
-        pm = PneumoniaModule(severity="moderate")
+        pm = create_disease("pneumonia",severity="moderate")
         pm.activate(current_time_s=0.0)
         initial_hypoxia = pm.tissue_hypoxia
         run_compute_n_steps(pm, 36000)  # 600 s
@@ -104,8 +104,8 @@ class TestPneumonia:
 
     def test_pneumonia_severe_faster_than_mild(self):
         """Severe pneumonia should progress faster than mild."""
-        mild = PneumoniaModule(severity="mild")
-        severe = PneumoniaModule(severity="severe")
+        mild = create_disease("pneumonia",severity="mild")
+        severe = create_disease("pneumonia",severity="severe")
         mild.activate(current_time_s=0.0)
         severe.activate(current_time_s=0.0)
         run_compute_n_steps(mild, 36000)  # 600 s
@@ -114,14 +114,14 @@ class TestPneumonia:
 
     def test_pneumonia_inactive_returns_empty(self):
         """Inactive disease should return empty list from compute()."""
-        pm = PneumoniaModule(severity="moderate")
+        pm = create_disease("pneumonia",severity="moderate")
         # Do NOT activate
         result = pm.compute(0.1, DUMMY_ENGINE_STATE)
         assert result == []
 
     def test_pneumonia_summary(self):
         """summary() should return dict with expected keys."""
-        pm = PneumoniaModule(severity="moderate")
+        pm = create_disease("pneumonia",severity="moderate")
         pm.activate(current_time_s=0.0)
         s = pm.summary()
         expected_keys = {
@@ -147,7 +147,7 @@ class TestAcuteRenalFailure:
 
     def test_arf_nephron_damage_increases(self):
         """Nephron damage should increase above initial value (0.05)."""
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         arf.activate(current_time_s=0.0)
         initial_damage = arf.nephron_damage
         assert initial_damage == 0.05
@@ -156,7 +156,7 @@ class TestAcuteRenalFailure:
 
     def test_arf_gfr_decline_increases(self):
         """gfr_decline should increase over time."""
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         arf.activate(current_time_s=0.0)
         initial_decline = arf.gfr_decline
         run_compute_n_steps(arf, 3600)
@@ -164,7 +164,7 @@ class TestAcuteRenalFailure:
 
     def test_arf_gfr_decline_nonlinear(self):
         """gfr_decline should follow damage^1.5 relationship."""
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         arf.activate(current_time_s=0.0)
         run_compute_n_steps(arf, 3600)
         expected = min(arf.nephron_damage ** 1.5, 1.0)
@@ -172,14 +172,14 @@ class TestAcuteRenalFailure:
 
     def test_arf_potassium_increases(self):
         """potassium_shift should increase as GFR declines."""
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         arf.activate(current_time_s=0.0)
         run_compute_n_steps(arf, 36000)  # 600 s
         assert arf.potassium_shift > 0.0
 
     def test_arf_acidosis_develops(self):
         """metabolic_acidosis should increase over time."""
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         arf.activate(current_time_s=0.0)
         initial_acidosis = arf.metabolic_acidosis
         run_compute_n_steps(arf, 36000)  # 600 s
@@ -187,7 +187,7 @@ class TestAcuteRenalFailure:
 
     def test_arf_gfr_multiplier_decreases(self):
         """GFR multiplier command value (= 1 - gfr_decline) should decrease."""
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         arf.activate(current_time_s=0.0)
         initial_gfr_mul = _find_cmd_value(arf.compute(0.1, DUMMY_ENGINE_STATE), "kidney._disease_gfr_multiplier")
         assert initial_gfr_mul is not None
@@ -197,8 +197,8 @@ class TestAcuteRenalFailure:
 
     def test_arf_severe_faster_than_mild(self):
         """Severe ARF should progress faster than mild."""
-        mild = AcuteRenalFailureModule(severity="mild")
-        severe = AcuteRenalFailureModule(severity="severe")
+        mild = create_disease("acute_renal_failure",severity="mild")
+        severe = create_disease("acute_renal_failure",severity="severe")
         mild.activate(current_time_s=0.0)
         severe.activate(current_time_s=0.0)
         run_compute_n_steps(mild, 36000)  # 600 s
@@ -207,7 +207,7 @@ class TestAcuteRenalFailure:
 
     def test_arf_hr_bradycardia(self):
         """When potassium_shift > 1.5, heart_rate add value should be negative (bradycardia)."""
-        arf = AcuteRenalFailureModule(severity="severe")
+        arf = create_disease("acute_renal_failure",severity="severe")
         arf.activate(current_time_s=0.0)
         # Run enough steps for potassium to accumulate past 1.5
         run_compute_n_steps(arf, 180000)  # 3000 s (50 min) -- generous time
@@ -223,13 +223,13 @@ class TestAcuteRenalFailure:
 
     def test_arf_inactive_returns_empty(self):
         """Inactive disease should return empty list from compute()."""
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         result = arf.compute(0.1, DUMMY_ENGINE_STATE)
         assert result == []
 
     def test_arf_summary(self):
         """summary() should return dict with expected keys."""
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         arf.activate(current_time_s=0.0)
         s = arf.summary()
         expected_keys = {
@@ -263,7 +263,7 @@ class TestDiseaseIntegrationWithSimulation:
 
         # With pneumonia
         creature = VirtualCreature(body_weight_kg=20.0)
-        pneumonia = PneumoniaModule(severity="moderate")
+        pneumonia = create_disease("pneumonia",severity="moderate")
         creature.attach_disease(pneumonia)
         for _ in range(600):
             creature.step()
@@ -282,7 +282,7 @@ class TestDiseaseIntegrationWithSimulation:
 
         # With ARF
         creature = VirtualCreature(body_weight_kg=20.0)
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         creature.attach_disease(arf)
         for _ in range(600):
             creature.step()
@@ -307,7 +307,7 @@ class TestDiseaseIntegrationWithSimulation:
         pre_gfr = creature.history["GFR"][-1]
 
         # Now attach ARF (activates immediately)
-        arf = AcuteRenalFailureModule(severity="moderate")
+        arf = create_disease("acute_renal_failure",severity="moderate")
         creature.attach_disease(arf)
 
         # Run another 600 steps with disease active
@@ -328,8 +328,8 @@ class TestPhosphorusPoisoning:
 
     def test_toxicity_increases(self):
         """Cellular toxicity should increase over time after activation."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="moderate")
         pm.activate(current_time_s=0.0)
         initial = pm.cellular_toxicity
         run_compute_n_steps(pm, 3600)
@@ -337,40 +337,40 @@ class TestPhosphorusPoisoning:
 
     def test_toxicity_clamped_to_1(self):
         """Cellular toxicity should never exceed 1.0."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="severe")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="severe")
         pm.activate(current_time_s=0.0)
         run_compute_n_steps(pm, 360000)
         assert pm.cellular_toxicity <= 1.0
 
     def test_myocardial_depression_increases(self):
         """Myocardial depression should increase over time."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="moderate")
         pm.activate(current_time_s=0.0)
         run_compute_n_steps(pm, 3600)
         assert pm.myocardial_depression > 0.0
 
     def test_acidosis_develops(self):
         """Metabolic acidosis should develop after sufficient time."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="moderate")
         pm.activate(current_time_s=0.0)
         run_compute_n_steps(pm, 36000)
         assert pm.metabolic_acidosis > 0.0
 
     def test_renal_injury_develops(self):
         """Renal injury should develop over time."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="moderate")
         pm.activate(current_time_s=0.0)
         run_compute_n_steps(pm, 36000)
         assert pm.renal_injury > 0.0
 
     def test_contractility_factor_decreases(self):
         """Contractility factor command value should decrease as toxicity rises."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="moderate")
         pm.activate(current_time_s=0.0)
         initial_cmds = pm.compute(0.1, DUMMY_ENGINE_STATE)
         initial_ctr = _find_cmd_value(initial_cmds, "heart.contractility_factor")
@@ -382,8 +382,8 @@ class TestPhosphorusPoisoning:
 
     def test_gfr_multiplier_decreases(self):
         """GFR multiplier command should decrease as renal injury progresses."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="moderate")
         pm.activate(current_time_s=0.0)
         initial_gfr = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "kidney._disease_gfr_multiplier")
         assert initial_gfr is not None
@@ -393,8 +393,8 @@ class TestPhosphorusPoisoning:
 
     def test_hco3_decreases(self):
         """Blood HCO3 command value should decrease (metabolic acidosis)."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="severe")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="severe")
         pm.activate(current_time_s=0.0)
         initial_hco3 = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "blood.HCO3")
         assert initial_hco3 is not None
@@ -404,9 +404,9 @@ class TestPhosphorusPoisoning:
 
     def test_severe_faster_than_mild(self):
         """Severe phosphorus poisoning should progress faster than mild."""
-        from src.diseases import PhosphorusPoisoningModule
-        mild = PhosphorusPoisoningModule(severity="mild")
-        severe = PhosphorusPoisoningModule(severity="severe")
+        from src.diseases import create_disease
+        mild = create_disease("phosphorus_poisoning", severity="mild")
+        severe = create_disease("phosphorus_poisoning", severity="severe")
         mild.activate(current_time_s=0.0)
         severe.activate(current_time_s=0.0)
         run_compute_n_steps(mild, 36000)
@@ -415,15 +415,15 @@ class TestPhosphorusPoisoning:
 
     def test_inactive_returns_empty(self):
         """Inactive disease should return empty list from compute()."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="moderate")
         result = pm.compute(0.1, DUMMY_ENGINE_STATE)
         assert result == []
 
     def test_summary(self):
         """summary() should return dict with expected keys."""
-        from src.diseases import PhosphorusPoisoningModule
-        pm = PhosphorusPoisoningModule(severity="moderate")
+        from src.diseases import create_disease
+        pm = create_disease("phosphorus_poisoning", severity="moderate")
         pm.activate(current_time_s=0.0)
         s = pm.summary()
         expected_keys = {
@@ -455,9 +455,9 @@ class TestPhosphorusPoisoningIntegration:
         baseline_map = baseline.history["MAP_mmHg"][-1]
         baseline_ph = baseline.history["pH"][-1]
 
-        from src.diseases import PhosphorusPoisoningModule
+        from src.diseases import create_disease
         creature = VirtualCreature(body_weight_kg=20.0)
-        poisoning = PhosphorusPoisoningModule(severity="moderate")
+        poisoning = create_disease("phosphorus_poisoning", severity="moderate")
         creature.attach_disease(poisoning)
         for _ in range(6000):
             creature.step()
@@ -474,9 +474,9 @@ class TestPhosphorusPoisoningIntegration:
             baseline.step()
         baseline_gfr = baseline.history["GFR"][-1]
 
-        from src.diseases import PhosphorusPoisoningModule
+        from src.diseases import create_disease
         creature = VirtualCreature(body_weight_kg=20.0)
-        poisoning = PhosphorusPoisoningModule(severity="moderate")
+        poisoning = create_disease("phosphorus_poisoning", severity="moderate")
         creature.attach_disease(poisoning)
         for _ in range(6000):
             creature.step()
