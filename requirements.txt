@@ -1,9 +1,0 @@
-# Virtual Creature - 项目依赖
-# 核心依赖
-numpy>=1.21.0
-
-# Web GUI（Flask 后端）
-flask>=2.3.0
-
-# 可选（用于本地图表生成）
-matplotlib>=3.5.0
