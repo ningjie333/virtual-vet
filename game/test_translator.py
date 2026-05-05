@@ -644,20 +644,360 @@ def _ecg(state: dict, creature: VirtualCreature) -> dict:
     }
 
 
+def _urinalysis(state: dict, creature: VirtualCreature) -> dict:
+    """尿液分析 — USG, UPCR, 沉渣"""
+    results = []
+
+    # 尿比重（基于血容量和 GFR 估算）
+    total_bv = creature.blood.total_volume_ml
+    bv_ratio = state["BV"] / total_bv if total_bv > 0 else 1.0
+    if bv_ratio < 0.9:
+        usg = 1.035  # 浓缩尿（脱水时代偿）
+    elif state["GFR"] < 30:
+        usg = 1.015  # 等渗尿（肾衰失去浓缩能力）
+    else:
+        usg = 1.025
+    usg_flag = "normal" if 1.015 <= usg <= 1.040 else ("low" if usg < 1.015 else "high")
+    results.append({"param": "USG", "value": usg, "unit": "", "normal_range": "1.015-1.040", "flag": usg_flag})
+
+    # 尿蛋白/肌酐比
+    if state["GFR"] < 50:
+        upcr = 1.5
+        upcr_flag = "high"
+    else:
+        upcr = 0.3
+        upcr_flag = "normal"
+    results.append({"param": "UPCR", "value": upcr, "unit": "", "normal_range": "<0.5", "flag": upcr_flag})
+
+    # 沉渣
+    if state["GFR"] < 30:
+        sediment = "颗粒管型、肾上皮细胞"
+        sediment_flag = "abnormal"
+    else:
+        sediment = "阴性"
+        sediment_flag = "normal"
+    results.append({"param": "沉渣", "value": sediment, "unit": "", "normal_range": "阴性", "flag": sediment_flag})
+
+    abnormal = [r for r in results if r["flag"] not in ("normal",)]
+    if not abnormal:
+        summary = "尿液分析正常。"
+    else:
+        parts = [f"{r['param']}异常（{r['value']}）" for r in abnormal]
+        summary = "，".join(parts) + "。"
+
+    return {
+        "name": "尿液分析",
+        "test_type": "urinalysis",
+        "results": results,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _blood_pressure(state: dict, creature: VirtualCreature) -> dict:
+    """血压测量 — 直接测量 SBP/DBP/MAP"""
+    results = []
+    map_val = state["MAP"]
+    sbp = map_val * 1.4
+    dbp = map_val * 0.8
+
+    results.append({"param": "SBP", "value": round(sbp, 1), "unit": "mmHg", "normal_range": "110-160",
+                     "flag": "normal" if 110 <= sbp <= 160 else ("low" if sbp < 110 else "high")})
+    results.append({"param": "DBP", "value": round(dbp, 1), "unit": "mmHg", "normal_range": "60-90",
+                     "flag": "normal" if 60 <= dbp <= 90 else ("low" if dbp < 60 else "high")})
+    results.append(_result_entry("MAP", map_val, _flag(map_val, "MAP")))
+
+    abnormal = [r for r in results if r["flag"] != "normal"]
+    if not abnormal:
+        summary = f"血压正常（{sbp:.0f}/{dbp:.0f} mmHg）。"
+    else:
+        parts = [f"{r['param']}{'偏低' if r['flag'] == 'low' else '偏高'}" for r in abnormal]
+        summary = "血压异常：" + "，".join(parts) + "。"
+
+    return {
+        "name": "血压测量",
+        "test_type": "blood_pressure",
+        "results": results,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _cytology(state: dict, creature: VirtualCreature) -> dict:
+    """细胞学检查 — 鉴别炎症与肿瘤"""
+    findings = []
+    disease = creature.disease
+
+    if disease and disease.active and hasattr(disease, 'bacterial_load'):
+        if disease.bacterial_load > 0.3:
+            findings.append("大量中性粒细胞，可见细菌吞噬现象")
+            findings.append("化脓性炎症表现，符合细菌性肺炎")
+        else:
+            findings.append("轻度炎性细胞浸润")
+    elif disease and disease.active and hasattr(disease, 'ventricular_dilation'):
+        findings.append("未见明显异常细胞")
+        findings.append("排除肿瘤性病变")
+    else:
+        findings.append("细胞学未见明显异常")
+
+    summary = "；".join(findings) + "。"
+    return {
+        "name": "细胞学检查",
+        "test_type": "cytology",
+        "results": findings,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _snap_test(state: dict, creature: VirtualCreature) -> dict:
+    """快速 SNAP 检测 — 特异性识别特定病原"""
+    findings = []
+    disease = creature.disease
+
+    if disease and disease.active and hasattr(disease, 'bacterial_load'):
+        if disease.bacterial_load > 0.3:
+            findings.append("犬瘟热/副流感快速检测：阳性")
+            findings.append("提示病毒性呼吸道感染合并细菌感染")
+        else:
+            findings.append("快速检测：阴性")
+    else:
+        findings.append("快速检测：阴性")
+        findings.append("未检测到常见病原标志物")
+
+    summary = "；".join(findings) + "。"
+    return {
+        "name": "快速检测（SNAP）",
+        "test_type": "snap_test",
+        "results": findings,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _fna(state: dict, creature: VirtualCreature) -> dict:
+    """细针穿刺（FNA）— 采集细胞样本"""
+    findings = []
+    disease = creature.disease
+
+    if disease and disease.active and hasattr(disease, 'alveolar_exudate'):
+        if disease.alveolar_exudate > 0.3:
+            findings.append("肺组织穿刺：大量炎性细胞")
+            findings.append("符合感染性肺炎细胞学表现")
+        else:
+            findings.append("少量炎性细胞")
+    else:
+        findings.append("细胞学样本未见明显异常")
+        findings.append("少量正常间皮细胞")
+
+    summary = "；".join(findings) + "。"
+    return {
+        "name": "细针穿刺（FNA）",
+        "test_type": "fna",
+        "results": findings,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _abdominocentesis(state: dict, creature: VirtualCreature) -> dict:
+    """腹腔穿刺 — 抽取腹腔积液"""
+    findings = []
+    disease = creature.disease
+
+    if disease and disease.active and hasattr(disease, 'fluid_retention'):
+        if disease.fluid_retention > 0.3:
+            findings.append("腹腔穿刺获淡黄色漏出液")
+            findings.append("蛋白含量低（<2.5 g/dL），符合漏出液")
+            findings.append("提示心源性腹水")
+        else:
+            findings.append("腹腔未见明显积液")
+    else:
+        findings.append("腹腔未见明显积液")
+        findings.append("穿刺阴性")
+
+    summary = "；".join(findings) + "。"
+    return {
+        "name": "腹腔穿刺",
+        "test_type": "abdominocentesis",
+        "results": findings,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _thoracocentesis(state: dict, creature: VirtualCreature) -> dict:
+    """胸腔穿刺 — 抽取胸腔积液"""
+    findings = []
+    disease = creature.disease
+
+    if disease and disease.active and hasattr(disease, 'alveolar_exudate'):
+        if disease.alveolar_exudate > 0.5:
+            findings.append("胸腔穿刺获浑浊液体")
+            findings.append("细胞计数升高，蛋白含量高")
+            findings.append("符合渗出液，提示感染性胸膜炎")
+        elif disease.alveolar_exudate > 0.1:
+            findings.append("少量胸腔积液，淡黄色")
+        else:
+            findings.append("胸腔未见明显积液")
+    elif disease and disease.active and hasattr(disease, 'fluid_retention'):
+        if disease.fluid_retention > 0.3:
+            findings.append("双侧少量胸腔积液，漏出液性质")
+        else:
+            findings.append("胸腔未见明显积液")
+    else:
+        findings.append("胸腔未见明显积液")
+        findings.append("穿刺阴性")
+
+    summary = "；".join(findings) + "。"
+    return {
+        "name": "胸腔穿刺",
+        "test_type": "thoracocentesis",
+        "results": findings,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _echocardiography(state: dict, creature: VirtualCreature) -> dict:
+    """超声心动图 — 专业心脏超声"""
+    findings = []
+    disease = creature.disease
+
+    if disease and disease.active and hasattr(disease, 'ventricular_dilation'):
+        vd = disease.ventricular_dilation
+        cl = disease.contractility_loss if hasattr(disease, 'contractility_loss') else 0
+        if vd > 0.3:
+            findings.append(f"左室舒张末期内径增大（LVIDd ↑）")
+            findings.append(f"缩短分数（FS）显著减低（{25 - cl * 30:.0f}%）")
+            findings.append("室壁运动弥漫性减弱")
+            findings.append("符合扩张型心肌病（DCM）表现")
+        else:
+            findings.append("心脏结构正常")
+            findings.append("缩短分数正常范围")
+    else:
+        findings.append("心脏结构正常，各房室大小在正常范围")
+        findings.append("室壁运动良好，缩短分数正常")
+        findings.append("瓣膜启闭正常，未见明显反流")
+
+    # 估测肺动脉压
+    if state["PaO2"] < 60:
+        findings.append("估测肺动脉收缩压升高（肺动脉高压）")
+
+    summary = "；".join(findings) + "。"
+    return {
+        "name": "超声心动图",
+        "test_type": "echocardiography",
+        "results": findings,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _endoscopy(state: dict, creature: VirtualCreature) -> dict:
+    """内窥镜检查 — 直视下观察"""
+    findings = []
+    disease = creature.disease
+
+    if disease and disease.active and hasattr(disease, 'alveolar_exudate'):
+        findings.append("气管内可见脓性分泌物")
+        findings.append("支气管黏膜充血水肿")
+        if disease.alveolar_exudate > 0.5:
+            findings.append("叶支气管内可见渗出物")
+        findings.append("符合感染性气道病变")
+    else:
+        findings.append("食道黏膜正常，未见异物或溃疡")
+        findings.append("胃黏膜正常，未见肿物")
+        findings.append("十二指肠黏膜正常")
+
+    summary = "；".join(findings) + "。"
+    return {
+        "name": "内窥镜",
+        "test_type": "endoscopy",
+        "results": findings,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _mri(state: dict, creature: VirtualCreature) -> dict:
+    """MRI — 磁共振成像"""
+    findings = []
+    disease = creature.disease
+
+    if disease and disease.active and hasattr(disease, 'ventricular_dilation'):
+        findings.append("心脏 MRI：左室扩张，心肌变薄")
+        findings.append("延迟增强扫描：心肌中层强化（纤维化表现）")
+        findings.append("确诊扩张型心肌病")
+    else:
+        findings.append("MRI 扫描未见明显异常信号")
+        findings.append("脑部和脊髓结构正常")
+
+    summary = "；".join(findings) + "。"
+    return {
+        "name": "MRI",
+        "test_type": "mri",
+        "results": findings,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
+def _histopathology(state: dict, creature: VirtualCreature) -> dict:
+    """组织病理学 — 金标准诊断"""
+    findings = []
+    disease = creature.disease
+
+    if disease and disease.active and hasattr(disease, 'alveolar_exudate'):
+        if disease.alveolar_exudate > 0.3:
+            findings.append("肺泡腔内大量中性粒细胞浸润")
+            findings.append("肺泡壁充血，纤维素渗出")
+            findings.append("细菌菌落可见")
+            findings.append("病理诊断：化脓性肺炎")
+        else:
+            findings.append("轻度肺泡炎性细胞浸润")
+    elif disease and disease.active and hasattr(disease, 'ventricular_dilation'):
+        findings.append("心肌细胞变性，排列紊乱")
+        findings.append("间质纤维化")
+        findings.append("病理诊断：扩张型心肌病")
+    else:
+        findings.append("组织学未见明显异常")
+
+    summary = "；".join(findings) + "。"
+    return {
+        "name": "组织病理学",
+        "test_type": "histopathology",
+        "results": findings,
+        "summary": summary,
+        "timestamp_s": creature.current_time_s,
+    }
+
+
 # ──────────────────────────────────────────────
 # 检查类型 → 生成函数映射
 # ──────────────────────────────────────────────
 _TEST_DISPATCH = {
-    "physical":      _physical,
-    "auscultation":  _auscultation,
-    "inspection":    _inspection,
-    "blood_routine": _blood_routine,
-    "blood_biochem": _blood_biochem,
-    "blood_gas":     _blood_gas,
-    "chest_xray":    _chest_xray,
-    "ultrasound":    _ultrasound,
-    "ct":            _ct,
-    "ecg":           _ecg,
+    "physical":          _physical,
+    "auscultation":      _auscultation,
+    "inspection":        _inspection,
+    "blood_routine":     _blood_routine,
+    "blood_biochem":     _blood_biochem,
+    "blood_gas":         _blood_gas,
+    "chest_xray":        _chest_xray,
+    "ultrasound":        _ultrasound,
+    "ct":                _ct,
+    "ecg":               _ecg,
+    "urinalysis":        _urinalysis,
+    "blood_pressure":    _blood_pressure,
+    "cytology":          _cytology,
+    "snap_test":         _snap_test,
+    "fna":               _fna,
+    "abdominocentesis":  _abdominocentesis,
+    "thoracocentesis":   _thoracocentesis,
+    "echocardiography":  _echocardiography,
+    "endoscopy":         _endoscopy,
+    "mri":               _mri,
+    "histopathology":    _histopathology,
 }
 
 
