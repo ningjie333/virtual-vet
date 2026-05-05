@@ -15,6 +15,12 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from src.simulation import VirtualCreature
+from game.time_manager import (
+    is_night_time,
+    get_night_hr_factor,
+    get_night_progression_factor,
+    format_game_time,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +89,7 @@ class GameState:
     death_timer: Optional[int] = None  # 濒死倒计时（剩余行动次数）
     reports: list = field(default_factory=list)
     treatment_applied: Optional[str] = None
+    game_clock_s: float = 0.0  # 游戏内时间（秒），用于夜间判定
 
 
 def compute_DO2(engine: VirtualCreature) -> float:
@@ -243,7 +250,7 @@ def check_death(state: GameState, medical_phase: str) -> GameState:
     return state
 
 
-def _engine_summary(engine: VirtualCreature) -> dict:
+def _engine_summary(engine: VirtualCreature, game_clock_s: float = 0.0) -> dict:
     """返回引擎当前状态的简要摘要"""
     hist = engine.history
 
@@ -260,6 +267,8 @@ def _engine_summary(engine: VirtualCreature) -> dict:
         "pH": round(_last("pH", engine.blood.arterial_pH), 3),
         "GFR": round(_last("GFR", engine.kidney.GFR), 1),
         "RR": round(_last("RR", engine.lung.respiratory_rate), 1),
+        "game_time": format_game_time(game_clock_s),
+        "is_night": is_night_time(game_clock_s),
     }
 
 
@@ -291,7 +300,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
             "result": None,
             "phase": state.phase,
             "medical_phase": determine_phase(state.engine),
-            "engine_summary": _engine_summary(state.engine),
+            "engine_summary": _engine_summary(state.engine, state.game_clock_s),
         }
 
     params = params or {}
@@ -355,7 +364,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
                 "action_cost_min": 0.0,
                 "result": None,
                 "phase": state.phase,
-                "engine_summary": _engine_summary(state.engine),
+                "engine_summary": _engine_summary(state.engine, state.game_clock_s),
             }
 
     elif action_type == "wait":
@@ -368,15 +377,20 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
             "action_cost_min": 0.0,
             "result": None,
             "phase": state.phase,
-            "engine_summary": _engine_summary(state.engine),
+            "engine_summary": _engine_summary(state.engine, state.game_clock_s),
         }
 
     # ── 推进引擎 ──
     # 行动消耗：cost=0 → 1 行动，cost>0 → cost 行动（高 cost 检查耗时更长）
     cost = _get_examine_cost(action_type, params)
-    state.engine.simulate(K_SECONDS_PER_ACTION / 60.0 * cost)
+    sim_seconds = K_SECONDS_PER_ACTION * cost
+    state.engine.simulate(sim_seconds / 60.0)
     state.action_count += cost
-    state.elapsed_time_s += K_SECONDS_PER_ACTION * cost
+    state.elapsed_time_s += sim_seconds
+    state.game_clock_s += sim_seconds
+
+    # ── 夜间修正 ──
+    _apply_night_modifiers(state)
 
     # ── 阶段判定（医学状态） ──
     medical_phase = determine_phase(state.engine)
@@ -384,7 +398,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
     # ── 死亡检测（基于医学状态更新游戏阶段） ──
     check_death(state, medical_phase)
 
-    engine_summary = _engine_summary(state.engine)
+    engine_summary = _engine_summary(state.engine, state.game_clock_s)
 
     logger.info(
         "行动 #%d 完成: phase=%s, HR=%.0f, MAP=%.0f, SpO2=%.1f%%",
@@ -403,3 +417,48 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
         "medical_phase": medical_phase,
         "engine_summary": engine_summary,
     }
+
+
+def _apply_night_modifiers(state: GameState) -> None:
+    """
+    应用夜间修正到引擎状态
+
+    夜间效应：
+      1. HR 生理性降低（迷走神经张力增加）— 可逆，白天恢复
+      2. 疾病进展速度略降（代谢率降低）
+    """
+    clock_s = state.game_clock_s
+    engine = state.engine
+    hr_factor = get_night_hr_factor(clock_s)
+
+    # 保存原始 HR_rest（首次进入夜间时）
+    if not hasattr(state, '_original_hr_rest'):
+        state._original_hr_rest = engine.heart.HR_rest
+
+    if is_night_time(clock_s):
+        # 夜间：降低 HR 基线
+        night_hr_rest = max(50.0, state._original_hr_rest * hr_factor)
+        engine.heart.HR_rest = night_hr_rest
+        # 如果当前 HR 高于夜间基线，逐步降低
+        if engine.heart.heart_rate > night_hr_rest:
+            engine.heart.heart_rate = max(
+                night_hr_rest,
+                engine.heart.heart_rate * 0.95,  # 每步最多降 5%
+            )
+    else:
+        # 白天：恢复原始 HR 基线
+        engine.heart.HR_rest = state._original_hr_rest
+        # 如果当前 HR 低于基线，逐步恢复
+        if engine.heart.heart_rate < state._original_hr_rest:
+            engine.heart.heart_rate = min(
+                state._original_hr_rest,
+                engine.heart.heart_rate * 1.05,  # 每步最多升 5%
+            )
+
+    logger.debug(
+        "夜间修正已应用: is_night=%s, HR_factor=%.2f, HR_rest=%.1f, clock=%s",
+        is_night_time(clock_s),
+        hr_factor,
+        engine.heart.HR_rest,
+        format_game_time(clock_s),
+    )

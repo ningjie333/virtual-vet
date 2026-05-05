@@ -91,7 +91,7 @@ def get_normal_value(metric_key: str) -> float:
 
 @app.route("/")
 def index():
-    return render_template("game.html")
+    return send_from_directory(app.static_folder, "index.html")
 
 
 # ============================================================
@@ -176,6 +176,8 @@ def api_new_game():
                 "medical_phase": "stable",
                 "death_timer": state.death_timer,
             },
+            "game_time": "08:00",
+            "is_night": False,
             "vitals": _get_vitals(vc),
         }
     )
@@ -210,7 +212,7 @@ def api_examine():
         "elapsed_time_s": state.elapsed_time_s,
         "death_timer": state.death_timer,
         "report": result.get("result"),
-        "vitals": _get_vitals(state.engine),
+        "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
     }
 
@@ -261,7 +263,7 @@ def api_administer_drug():
         "action_count": state.action_count,
         "elapsed_time_s": state.elapsed_time_s,
         "death_timer": state.death_timer,
-        "vitals": _get_vitals(state.engine),
+        "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
     }
 
@@ -300,7 +302,7 @@ def api_diagnose():
         "elapsed_time_s": state.elapsed_time_s,
         "death_timer": state.death_timer,
         "treatment_result": result.get("result"),
-        "vitals": _get_vitals(state.engine),
+        "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
     }
 
@@ -341,7 +343,7 @@ def api_wait():
         "action_count": state.action_count,
         "elapsed_time_s": state.elapsed_time_s,
         "death_timer": state.death_timer,
-        "vitals": _get_vitals(state.engine),
+        "vitals": _get_vitals(state.engine, state.game_clock_s),
         "game_log": _build_game_log(state),
     }
 
@@ -366,6 +368,8 @@ def api_game_state():
 
     medical_phase = determine_phase(state.engine)
 
+    from game.time_manager import format_game_time, is_night_time
+
     return jsonify(
         {
             "phase": state.phase,
@@ -373,7 +377,9 @@ def api_game_state():
             "action_count": state.action_count,
             "elapsed_time_s": state.elapsed_time_s,
             "death_timer": state.death_timer,
-            "vitals": _get_vitals(state.engine),
+            "game_time": format_game_time(state.game_clock_s),
+            "is_night": is_night_time(state.game_clock_s),
+            "vitals": _get_vitals(state.engine, state.game_clock_s),
             "reports_count": len(state.reports),
             "game_log": _build_game_log(state),
         }
@@ -467,13 +473,15 @@ def api_diagnosis():
 # ============================================================
 
 
-def _get_vitals(vc: VirtualCreature) -> dict:
+def _get_vitals(vc: VirtualCreature, game_clock_s: float = 0.0) -> dict:
     """从引擎提取当前生命体征"""
     h = vc.history
 
     def _last(key, fallback):
         vals = h.get(key, [])
         return vals[-1] if vals else fallback
+
+    from game.time_manager import format_game_time, is_night_time
 
     return {
         "HR_bpm": round(_last("HR_bpm", vc.heart.heart_rate), 1),
@@ -484,6 +492,8 @@ def _get_vitals(vc: VirtualCreature) -> dict:
         "GFR": round(_last("GFR", vc.kidney.GFR), 1),
         "pH": round(_last("pH", vc.blood.arterial_pH), 3),
         "action_count": 0,  # 由调用方填充
+        "game_time": format_game_time(game_clock_s),
+        "is_night": is_night_time(game_clock_s),
     }
 
 
