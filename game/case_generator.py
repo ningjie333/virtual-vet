@@ -119,8 +119,6 @@ def generate_case(difficulty: str = "normal", seed: int = None) -> GameState:
     state = GameState(
         engine=engine,
         disease_name=disease_name,
-        action_count=0,
-        elapsed_time_s=engine.current_time_s,
         phase="playing",
         death_timer=None,
         reports=[],

@@ -24,13 +24,16 @@ AP 系统设计:
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 from src.simulation import VirtualCreature
 from src.parameters import base_cardiac_output_ml_min, ARTERIAL_SATURATION_NORMAL
+from src.exam_registry import get_exam_registry
 from game.time_manager import (
     is_night_time,
     get_night_hr_factor,
@@ -40,106 +43,65 @@ from game.time_manager import (
 
 logger = logging.getLogger(__name__)
 
+# ── 游戏配置（从 data/game_config.json 加载） ──
+_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+
+
+def _load_game_config() -> dict:
+    """加载 data/game_config.json，返回原始 dict。"""
+    with open(_DATA_DIR / "game_config.json", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+_GC = _load_game_config()
+
 # ── 基础常量 ──
-K_SECONDS_PER_ACTION = 60  # 1 次基础行动 = 60 秒 ODE 仿真
-MORIBUND_ACTIONS_REMAINING = 3  # 进入濒死后还能做的行动次数
+_K = _GC["time"]
+K_SECONDS_PER_ACTION = _K["seconds_per_action"]
+MORIBUND_ACTIONS_REMAINING = _K["moribund_actions_remaining"]
 
 # ── AP 系统常量 ──
-AP_DEFAULT_MAX = 10  # 默认 AP 上限
-AP_REGEN_PER_WAIT = 2  # 每次等待恢复 AP 数
-AP_REGEN_PER_TURN = 1  # 每回合（任何行动后）自动恢复 AP 数
-AP_COMBO_WINDOW = 3  # 组合折扣窗口（连续 N 次检查内）
+_AP = _GC["ap_system"]
+AP_DEFAULT_MAX = _AP["default_max"]
+AP_REGEN_PER_WAIT = _AP["regen_per_wait"]
+AP_REGEN_PER_TURN = _AP["regen_per_turn"]
+AP_COMBO_WINDOW = _AP["combo_window"]
 
-# ── Tier 定义 ──
-# cost=0 的检查仍消耗 1 行动次数，但不消耗 AP
-_TIER_COSTS: dict[int, int] = {
-    1: 0,   # 基础观察
-    2: 2,   # 快速检查
-    3: 3,   # 核心诊断
-    4: 4,   # 影像学（超声）
-    5: 8,   # 金标准
-}
+# ── 检查类型注册表（从 data/examinations.json 加载） ──
+_exam_reg = get_exam_registry()
 
-# ── 检查项目 AP cost 表（与 data/examinations.json 同步） ──
-# 格式: test_type -> (ap_cost, tier, latency_turns)
-# latency_turns: 报告延迟几个行动后出现（0=即时）
-_EXAM_CONFIG: dict[str, tuple[int, int, int]] = {
-    # Tier 1: 基础观察，即时出结果，不耗 AP
-    "physical":      (0, 1, 0),
-    "auscultation":  (0, 1, 0),
-    "inspection":    (0, 1, 0),
-    # Tier 2: 快速检查，即时出结果，2 AP
-    "ecg":           (2, 2, 0),
-    "blood_routine": (2, 2, 0),
-    "urinalysis":    (2, 2, 0),
-    "blood_pressure":(2, 2, 0),
-    # Tier 3: 核心诊断，1 回合延迟，3 AP
-    "blood_biochem": (3, 3, 1),
-    "blood_gas":     (3, 3, 1),
-    "chest_xray":    (3, 3, 1),
-    # Tier 4: 影像学，2 回合延迟
-    "ultrasound":    (4, 4, 2),
-    "ct":            (5, 4, 2),
-    # Tier 5: 金标准，3 回合延迟，8 AP
-    "cytology":          (8, 5, 3),
-    "snap_test":         (8, 5, 3),
-    "fna":               (8, 5, 3),
-    "abdominocentesis":  (8, 5, 3),
-    "thoracocentesis":   (8, 5, 3),
-    "echocardiography":  (8, 5, 3),
-    "endoscopy":         (8, 5, 3),
-    "mri":               (8, 5, 3),
-    "histopathology":    (8, 5, 3),
-}
-
-# ── 组合折扣规则 ──
-# 格式: (test_type_set, discount_ap, description)
-# 当窗口期内同时做了集合内的所有检查时，最便宜的一个减免 discount_ap
+# ── 组合折扣规则（从 game_config.json 加载） ──
 _COMBO_BONUSES: list[tuple[set[str], int, str]] = [
-    ({"chest_xray", "ultrasound"}, 1, "影像组合：X光+超声"),
-    ({"blood_routine", "blood_biochem"}, 1, "血液组合：血常规+生化"),
-    ({"blood_routine", "blood_biochem", "blood_gas"}, 2, "全面血液：血常规+生化+血气"),
-    ({"ecg", "echocardiography"}, 1, "心脏组合：心电图+超声心动"),
-    ({"physical", "auscultation", "inspection"}, 0, "基础体格套餐（无折扣，仅标记）"),
-    ({"ct", "chest_xray"}, 1, "进阶影像：替代X光，CT减免"),
+    (set(cb["tests"]), cb["discount"], cb["description"])
+    for cb in _GC["combo_bonuses"]
 ]
 
-# ── 压力系统常量 ──
-_STRESS_PER_TIER: dict[int, int] = {
-    1: 0,   # 基础：无压力
-    2: 2,   # 快速：轻微压力
-    3: 5,   # 核心：中等压力
-    4: 10,  # 影像：显著压力
-    5: 15,  # 金标：高压力
-}
-_STRESS_RECOVERY_PER_WAIT = 8  # 每次等待恢复压力
-_STRESS_DANGER_THRESHOLD = 50  # 压力 > 50 时体征不可靠
-_STRESS_CRITICAL_THRESHOLD = 80  # 压力 > 80 时加速恶化
-_STRESS_DECOMPENSATION_RATE = 0.05  # 超高压力下每回合额外恶化概率
+# ── 压力系统常量（从 game_config.json 加载） ──
+_ST = _GC["stress"]
+_STRESS_PER_TIER: dict[int, int] = {int(k): v for k, v in _ST["per_tier"].items()}
+_STRESS_RECOVERY_PER_WAIT = _ST["recovery_per_wait"]
+_STRESS_DANGER_THRESHOLD = _ST["danger_threshold"]
+_STRESS_CRITICAL_THRESHOLD = _ST["critical_threshold"]
+_STRESS_DECOMPENSATION_RATE = _ST["decompensation_rate"]
 
-# ── 物种修正系数 ──
-# 格式: species -> {tier -> ap_modifier}
-# 猫：小体型，高 tier 检查更难（+1 AP for tier >= 3）
-# 马：大体型，基础检查更难但影像更容易
+# ── 物种修正系数（从 game_config.json 加载） ──
 _SPECIES_AP_MODIFIERS: dict[str, dict[int, int]] = {
-    "犬": {},  # 基准，无修正
-    "猫": {3: 1, 4: 1, 5: 2},  # 高 tier 更难
-    "马": {1: 1, 2: 1, 4: -1, 5: -1},  # 基础更难，影像更易
+    sp: {int(k): v for k, v in mods.items()}
+    for sp, mods in _GC["species_ap_modifiers"].items()
 }
 
 
 def _get_exam_config(test_type: str) -> tuple[int, int, int]:
     """返回 (ap_cost, tier, latency_turns)，未知检查默认 (2, 2, 0)。"""
-    return _EXAM_CONFIG.get(test_type, (2, 2, 0))
+    return _exam_reg.get_exam(test_type)
 
 
 def _get_examine_cost(action_type: str, params: dict, species: str = "犬") -> int:
     """返回行动消耗 AP 数。cost=0 返回 1（至少消耗 1 行动次数）。"""
     if action_type in ("treat", "wait", "administer_drug"):
-        return 1  # 行动次数消耗，不消耗 AP
+        return 1
     test_type = params.get("test_type", "physical")
     ap_cost, tier, _ = _get_exam_config(test_type)
-    # 物种修正
     species_mods = _SPECIES_AP_MODIFIERS.get(species, {})
     ap_cost += species_mods.get(tier, 0)
     return max(1, ap_cost)
@@ -160,27 +122,40 @@ def _calc_combo_discount(recent_exams: list[str]) -> tuple[int, str]:
     return best_discount, best_desc
 
 
-# ── 病情阶段判定阈值 ──
-# 元组格式: (low_moribund, low_critical, low_worsening, high_worsening, high_critical, high_moribund)
+# ── 病情阶段判定阈值（从 game_config.json 加载） ──
+_PT = _GC["phase_thresholds"]
 _THRESHOLDS = {
-    "MAP": (40, 50, 60, 150, 160, 180),
-    "SpO2": (70, 80, 90, 100, 100, 100),
-    "HR": (40, 50, 60, 160, 180, 200),
-    "pH": (7.0, 7.1, 7.2, 7.6, 7.7, 7.8),
+    "MAP": (
+        _PT["MAP"]["low_moribund"], _PT["MAP"]["low_critical"],
+        _PT["MAP"]["low_worsening"], _PT["MAP"]["high_worsening"],
+        _PT["MAP"]["high_critical"], _PT["MAP"]["high_moribund"],
+    ),
+    "SpO2": (
+        _PT["SpO2"]["low_moribund"], _PT["SpO2"]["low_critical"],
+        _PT["SpO2"]["low_worsening"], _PT["SpO2"]["high_worsening"],
+        _PT["SpO2"]["high_critical"], _PT["SpO2"]["high_moribund"],
+    ),
+    "HR": (
+        _PT["HR"]["low_moribund"], _PT["HR"]["low_critical"],
+        _PT["HR"]["low_worsening"], _PT["HR"]["high_worsening"],
+        _PT["HR"]["high_critical"], _PT["HR"]["high_moribund"],
+    ),
+    "pH": (
+        _PT["pH"]["low_moribund"], _PT["pH"]["low_critical"],
+        _PT["pH"]["low_worsening"], _PT["pH"]["high_worsening"],
+        _PT["pH"]["high_critical"], _PT["pH"]["high_moribund"],
+    ),
 }
 
-# ── DO₂ 阶段判定阈值（相对值，健康犬归一化 ≈ 1.0） ──
-_DO2_WARN = 0.6
-_DO2_CRIT = 0.4
-_DO2_MORIB = 0.25
+_DO2_WARN = _PT["DO2"]["warn"]
+_DO2_CRIT = _PT["DO2"]["critical"]
+_DO2_MORIB = _PT["DO2"]["moribund"]
 
-# 乳酸阈值（mmol/L）
-_LACTATE_WARN = 3.0
-_LACTATE_CRIT = 5.0
+_LACTATE_WARN = _PT["lactate"]["warn"]
+_LACTATE_CRIT = _PT["lactate"]["critical"]
 
-# 尿量阈值（mL/min/kg），低于此值为少尿
-_URINE_OLIGURIA = 0.008
-_URINE_ANURIA = 0.002
+_URINE_OLIGURIA = _PT["urine"]["oliguria"]
+_URINE_ANURIA = _PT["urine"]["anuria"]
 
 
 @dataclass
@@ -197,17 +172,15 @@ class GameState:
 
     engine: VirtualCreature
     disease_name: str
-    action_count: int = 0
-    elapsed_time_s: float = 0.0
     phase: str = "playing"  # "playing" | "won" | "lost"
     death_timer: Optional[int] = None
     reports: list = field(default_factory=list)
     treatment_applied: Optional[str] = None
-    game_clock_s: float = 0.0
 
-    # ── AP 系统 ──
+    # ── AP 系统（AP = 时间预算）──
     current_ap: int = AP_DEFAULT_MAX
     max_ap: int = AP_DEFAULT_MAX
+    total_ap_spent: int = 0  # 累计消耗 AP → 游戏时间 = total_ap_spent × 60s
     species: str = "犬"
 
     # ── 压力系统 ──
@@ -348,14 +321,15 @@ def check_death(state: GameState, medical_phase: str) -> GameState:
     return state
 
 
-def _engine_summary(engine: VirtualCreature, game_clock_s: float = 0.0) -> dict:
-    """返回引擎当前状态的简要摘要。"""
+def _engine_summary(engine: VirtualCreature, total_ap_spent: int = 0) -> dict:
+    """返回引擎当前状态的简要摘要。游戏时间从累计 AP 消耗计算。"""
     hist = engine.history
 
     def _last(key: str, fallback):
         vals = hist.get(key, [])
         return vals[-1] if vals else fallback
 
+    game_clock_s = total_ap_spent * K_SECONDS_PER_ACTION
     return {
         "HR_bpm": round(_last("HR_bpm", engine.heart.heart_rate), 1),
         "MAP_mmHg": round(_last("MAP_mmHg", engine.heart.mean_arterial_pressure), 1),
@@ -413,7 +387,7 @@ def _recover_stress(state: GameState) -> None:
 
 def _apply_night_modifiers(state: GameState) -> None:
     """应用夜间修正到引擎状态。"""
-    clock_s = state.game_clock_s
+    clock_s = state.total_ap_spent * K_SECONDS_PER_ACTION
     engine = state.engine
     hr_factor = get_night_hr_factor(clock_s)
 
@@ -480,7 +454,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
             "pending_count": len(state.pending_reports),
             "phase": state.phase,
             "medical_phase": determine_phase(state.engine),
-            "engine_summary": _engine_summary(state.engine, state.game_clock_s),
+            "engine_summary": _engine_summary(state.engine, state.total_ap_spent),
             "combo_bonus": None,
         }
 
@@ -510,7 +484,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
                 "pending_count": len(state.pending_reports),
                 "phase": state.phase,
                 "medical_phase": determine_phase(state.engine),
-                "engine_summary": _engine_summary(state.engine, state.game_clock_s),
+                "engine_summary": _engine_summary(state.engine, state.total_ap_spent),
                 "combo_bonus": None,
                 "error": f"AP 不足（需要 {ap_cost}，剩余 {state.current_ap}）",
             }
@@ -546,8 +520,8 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
         result = report
         ap_cost = actual_ap
         state.current_ap -= ap_cost
-        logger.info("行动 #%d: 检查 %s (AP -%d, 剩余 %d)",
-                     state.action_count + 1, test_type, ap_cost, state.current_ap)
+        logger.info("检查 %s (AP -%d, 剩余 %d)",
+                     test_type, ap_cost, state.current_ap)
 
     elif action_type == "treat":
         from game.treatment import apply_treatment
@@ -557,8 +531,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
         result = treatment_result
         if treatment_result["correct"]:
             state.phase = "won"
-        logger.info("行动 #%d: 治疗 %s → %s",
-                     state.action_count + 1, disease_guess, state.phase)
+        logger.info("治疗 %s → %s", disease_guess, state.phase)
 
     elif action_type == "administer_drug":
         drug_name = params.get("drug_name", "")
@@ -575,8 +548,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
                 state.engine.pharmacology.administer_drug(drug_name, volume_ml=volume_ml)
             else:
                 state.engine.pharmacology.administer_drug(drug_name, dose_mg_kg=dose_mg_kg)
-            logger.info("行动 #%d: 给药 %s (%.2f mg/kg)",
-                         state.action_count + 1, drug_name, dose_mg_kg)
+            logger.info("给药 %s (%.2f mg/kg)", drug_name, dose_mg_kg)
         except KeyError:
             logger.warning("未知药物: %s", drug_name)
             return {
@@ -590,13 +562,13 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
                 "pending_count": len(state.pending_reports),
                 "phase": state.phase,
                 "medical_phase": determine_phase(state.engine),
-                "engine_summary": _engine_summary(state.engine, state.game_clock_s),
+                "engine_summary": _engine_summary(state.engine, state.total_ap_spent),
                 "combo_bonus": None,
                 "error": f"未知药物: {drug_name}",
             }
 
     elif action_type == "wait":
-        logger.info("行动 #%d: 等待", state.action_count + 1)
+        logger.info("等待")
         # 等待恢复 AP 和压力
         state.current_ap = min(state.max_ap, state.current_ap + AP_REGEN_PER_WAIT)
         _recover_stress(state)
@@ -613,18 +585,17 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
             "pending_count": len(state.pending_reports),
             "phase": state.phase,
             "medical_phase": determine_phase(state.engine),
-            "engine_summary": _engine_summary(state.engine, state.game_clock_s),
+            "engine_summary": _engine_summary(state.engine, state.total_ap_spent),
             "combo_bonus": None,
         }
 
     # ── 推进引擎时间 ──
-    # 行动次数消耗：0 AP 检查仍消耗 1 次，高 AP 检查消耗更多
-    action_cost = _get_examine_cost(action_type, params, state.species)
-    sim_seconds = K_SECONDS_PER_ACTION * action_cost
+    # AP = 时间预算：任何行动都消耗时间（total_ap_spent += time_cost）
+    # examine 同时消耗 AP 资源（已在上面扣除），非 examine 只消耗时间
+    time_cost = _get_examine_cost(action_type, params, state.species)
+    sim_seconds = K_SECONDS_PER_ACTION * time_cost
     state.engine.simulate(sim_seconds / 60.0)
-    state.action_count += action_cost
-    state.elapsed_time_s += sim_seconds
-    state.game_clock_s += sim_seconds
+    state.total_ap_spent += time_cost
 
     # ── 每回合自动恢复少量 AP ──
     if action_type != "wait":  # wait 已经恢复过了
@@ -642,14 +613,14 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
     # ── 死亡检测 ──
     check_death(state, medical_phase)
 
-    engine_summary = _engine_summary(state.engine, state.game_clock_s)
+    engine_summary = _engine_summary(state.engine, state.total_ap_spent)
 
     logger.info(
-        "行动 #%d 完成: phase=%s, AP=%d/%d, 压力=%.0f, HR=%.0f, MAP=%.0f",
-        state.action_count,
+        "完成: phase=%s, AP=%d/%d, 已用时间=%d, 压力=%.0f, HR=%.0f, MAP=%.0f",
         state.phase,
         state.current_ap,
         state.max_ap,
+        state.total_ap_spent,
         state.stress_level,
         engine_summary["HR_bpm"],
         engine_summary["MAP_mmHg"],
