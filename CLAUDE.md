@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working on this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
 
 ## Project Overview
 
@@ -16,17 +16,28 @@ uv sync
 
 # Backend (from project root)
 python gui_app.py                    # Start Flask at http://127.0.0.1:5000
-python -m pytest tests/ -v           # All tests (566 tests)
+python -m pytest tests/ -v           # All tests (586 tests)
 python -m pytest tests/test_game.py -v  # Specific test file
+
+# Lint / Format (Python)
+ruff check .                         # Lint
+ruff format .                        # Format
 
 # Frontend (from vite-project/)
 cd vet-game-frontend/vite-project
-vp build                             # Build to ../static/ (Flask serves from there)
+vp build                             # Build to ../../static/ (Flask serves from there)
 vp dev                               # Dev server at http://127.0.0.1:5173 (optional)
-vp check                             # Format + lint + type-check
+vp check                             # Format + lint + type-check (Oxfmt + Oxlint + vue-tsc)
+
+# Gate check (pre-commit / CI)
+python tools/dev/gate_check.py --quick   # Fast check: API + data consistency (<5s)
+python tools/dev/gate_check.py --full    # Full check: + type consistency (<10s)
+python tools/dev/gate_check.py --fix     # Auto-fix: data + type sync
 ```
 
 **Critical**: After every frontend code change, run `vp build` to update `static/`. Flask serves the built files — the dev server is only for hot-reload during development.
+
+**Git pre-commit hook** is installed. It runs `gate_check.py --quick` before each commit. Skip with `GATE_SKIP=1 git commit ...` or `git commit --no-verify`.
 
 ## Architecture
 
@@ -46,6 +57,7 @@ Frontend → POST /api/diagnose {diagnosis} → apply_treatment() → drug proto
 **`VirtualCreature`** (`src/simulation.py`): Main engine integrating all organ modules. Each `step(dt)` advances all organs + disease effects.
 
 **FactorCommand pattern** (`src/simulation.py:32`): Unified write interface for all physiological modifications:
+
 ```python
 @dataclass(frozen=True)
 class FactorCommand:
@@ -53,11 +65,14 @@ class FactorCommand:
     op: Literal["multiply", "add", "set"]
     value: float
 ```
+
 All diseases, drugs, and treatments modify engine state exclusively through `apply_factor(cmd)` which resolves targets via `_PARAM_PATHS` mapping table.
 
 **Organ modules**: `heart.py` (HR, SV, CO, SVR), `lung.py` (ventilation, gas exchange), `kidney.py` (GFR, urine, RAAS), `blood.py` (chemistry), `fluid.py` (3-compartment + pH via Henderson-Hasselbalch).
 
-**Disease modules** (`src/diseases/`): Config-driven ODE system. All disease logic is defined declaratively in `data/ode_diseases.json` and executed by a single universal engine (`ConfigDrivenDiseaseModule`). Four diseases: pneumonia, acute renal failure, dilated cardiomyopathy, phosphorus poisoning.
+**Additional modules**: `cardiac_electrophysiology.py` (detailed cardiac EP), `respiratory_rhythm.py` (respiratory rhythm generator with chemoreceptor drive), `noble_purkinje.py` (Purkinje fiber model), `toxicology.py` (cocaine kinetics), `pharmacology.py` (drug PK/PD), `organ_health.py` (irreversible damage tracking).
+
+**Config-driven report pipeline**: `exam_registry.py` loads exam definitions from `data/examinations.json`; `report_engine.py` generates reports from `data/exam_templates.json`; `vitals_config.py` loads parameter ranges from `data/vitals_ranges.json`. No Python code needed for new exam types.
 
 ### Disease System (Config-Driven)
 
@@ -69,17 +84,20 @@ data/ode_diseases.json  →  ConfigDrivenDiseaseModule  →  list[FactorCommand]
 ```
 
 **`data/ode_diseases.json`**: Each disease entry contains:
+
 - `severity_presets`: `mild` / `moderate` / `severe` parameter sets (ODE rate constants)
 - `state_variables`: Named ODE variables with `ode_type`, `params`, `clamp` bounds, and expression strings (`fn`, `derivative_fn`, `target_fn`)
 - `outputs`: FactorCommand declarations mapping state variables to engine parameter modifications
 
 **Built-in ODE types** (extensible via `register_ode_type(name, solver_fn)`):
+
 - `logistic`: dS/dt = rate · S · (1 − S/K) + seed_boost
 - `algebraic`: S = fn(other_vars) — pure algebraic mapping
 - `first_order_lag`: dS/dt = (target − S) / τ
 - `custom`: dS/dt = arbitrary fn(state_vars, params)
 
 **Factory pattern**:
+
 ```python
 from src.diseases import create_disease
 disease = create_disease("pneumonia", severity="moderate")
@@ -91,6 +109,7 @@ creature.attach_disease(disease)
 ### Game Layer (`game/`)
 
 **`action_system.py`**: `GameState` dataclass + `process_action()` — the central game loop. Implements:
+
 - **5-tier AP system**: Tier 1 (0 AP, free exams) → Tier 5 (8 AP, gold-standard tests)
 - **AP budget**: `current_ap`/`max_ap` on GameState; regenerates on wait (+2) and per-turn (+1)
 - **Combo bonuses**: Related exam groups give AP discounts (e.g., X-ray + ultrasound = -1 AP)
@@ -100,7 +119,7 @@ creature.attach_disease(disease)
 
 **`diagnosis_engine.py`**: Clue extraction from reports → disease matching via confidence scoring. All disease data loaded from `data/diseases.json`.
 
-**`test_translator.py`**: Converts engine state → human-readable exam reports. 21 exam types across 5 tiers.
+**`test_translator.py`**: Converts engine state → human-readable exam reports. Delegates to `report_engine.py` (config-driven via `data/exam_templates.json`).
 
 **`treatment.py`**: Validates diagnosis + executes drug protocols via `data/diseases.json`.
 
@@ -134,15 +153,15 @@ class GameState:
 ### Data Files (`data/`)
 
 | File | Content |
-|------|---------|
-| `cases.json` | 4 cases (pneumonia/ARF/DCM/phosphorus poisoning), difficulty 1-3, species/weight |
+| --- | --- |
+| `cases.json` | Clinical cases (pneumonia/ARF/DCM/phosphorus poisoning/etc.), difficulty 1-3, species/weight |
 | `examinations.json` | 21 exam types with tier (1-5), AP cost, latency, category |
 | `diseases.json` | Disease names, clue definitions, clue→test mapping, treatment protocols, win/loss messages |
-| `ode_diseases.json` | Declarative ODE definitions for all 4 diseases (state variables, severity presets, output mappings) |
-| `treatments.json` | Treatment options |
+| `ode_diseases.json` | Declarative ODE definitions for all diseases (state variables, severity presets, output mappings) |
+| `exam_templates.json` | Report generation templates (vitals, extra_params, findings_rules, tag_rules) — fully config-driven |
 | `vitals_ranges.json` | Physiological parameter normal ranges, critical thresholds, and clue_flags |
-| `exam_templates.json` | Report generation templates (vitals, extra_params, findings_rules, tag_rules) — replaces 21 hardcoded `_gen_*` functions |
 | `game_config.json` | Game design constants: AP system, stress, species modifiers, combo bonuses, phase thresholds |
+| `treatments.json` | Treatment options |
 
 ## Key Conventions
 
@@ -152,6 +171,7 @@ class GameState:
 - **Comments**: Explain "why", not "what". Hack workarounds must have `# TODO(YYYY-MM-DD):`
 - **Data externalization**: Disease ODE models, clues, treatment protocols, and exam definitions live in `data/*.json` — not hardcoded in Python
 - **Config-driven diseases**: New diseases are added by editing `data/ode_diseases.json` — no Python class needed
+- **Config-driven exams**: New exam types are added by editing `data/examinations.json` + `data/exam_templates.json` — no Python code needed
 
 ## Known Issues
 
@@ -178,15 +198,18 @@ class GameState:
 4. No Python code needed — `ConfigDrivenDiseaseModule` handles everything automatically
 
 **Custom ODE types**: If built-in types are insufficient, register a custom solver:
+
 ```python
 from src.diseases import register_ode_type
 register_ode_type("my_ode", lambda value, params, state_vars, engine_state, dt: new_value)
 ```
 
-## Game 层重构计划
+## Gate Check System (`tools/dev/`)
 
-Game 层（translator / diagnosis_engine / action_system）仍存在大量硬编码，新增疾病/检查类型需要改多个 Python 文件。
+Three static analysis scripts run pre-commit and can be invoked manually:
 
-详见 [`docs/refactor_game_layer.md`](docs/refactor_game_layer.md) — 包含问题诊断、配置文件设计、解耦机制、分阶段迁移路径。
+- **`gate_check.py`**: Unified entry point. `--quick` (API + data), `--full` (+ types), `--fix` (auto-fix), `--install-hook`
+- **`check_api_consistency.py`**: AST-based Flask route vs `api.ts` call validation. `--fix` syncs missing fields to `types.ts`
+- **`check_data_consistency.py`**: Cross-validates 7 JSON data files (cases→diseases→clues→exams→vitals→ODE paths). `--fix` auto-generates missing `clue_descriptions`
 
-**目标**：新增疾病/检查类型只改 `data/*.json`，不改任何 Python 代码。
+Auto-fixable issues: missing `clue_descriptions` (pattern-based Chinese generation), missing `types.ts` interface fields (backend response field sync).
