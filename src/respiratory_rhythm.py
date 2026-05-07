@@ -54,7 +54,7 @@ MU_SHALLOW = 0.8                   # 浅快呼吸（肺顺应性降低时）
 # 化学感受器驱动增益
 PCO2_DRIVE_GAIN = 0.04             # PCO2 每升高 1 mmHg → 频率增加 4%（中枢化学感受器高敏感）
 PO2_DRIVE_THRESHOLD = 80.0         # 低氧驱动阈值 (mmHg)
-PO2_DRIVE_GAIN = 0.015             # PO2 每降低 1 mmHg → 频率增加 1.5%
+PO2_DRIVE_GAIN = 0.04              # PO2 每降低 1 mmHg → 频率增加 4%（外周化学感受器）
 PH_DRIVE_GAIN = 0.8                # pH 每降低 0.1 → 频率增加 80%（Kussmaul 呼吸）
 
 # 呼气/吸气时间比（正常 I:E ≈ 1:1.5）
