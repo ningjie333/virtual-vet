@@ -10,9 +10,14 @@ Heart Module - 心血管循环系统（修正版）
 压力感受器反馈：
   MAP ↓ → 交感神经 ↑ → HR ↑ + SVR ↑（代偿）
   MAP ↑ → 副交感神经 ↑ → HR ↓（降压）
+
+电生理（Hodgkin-Huxley）：
+  心率由 HH 模块从第一性原理推导，替代线性查表。
+  K⁺ 毒性由 HH 的 h∞ 稳态推导，替代 _potassium_cardiac_effect()。
 """
 
 from parameters import *
+from src.cardiac_electrophysiology import CardiacElectrophysiology
 
 
 class HeartModule:
@@ -75,6 +80,9 @@ class HeartModule:
         # 失血/输液累计
         self.blood_loss_ml = 0.0
         self.fluid_infused_ml = 0.0
+
+        # 电生理计算器（基于 HH 第一性原理）
+        self.hh = CardiacElectrophysiology()
 
     def blood_volume_change(self, delta_ml: float):
         """外部调用：改变血容量"""
@@ -203,24 +211,23 @@ class HeartModule:
 
     def _baroreceptor_feedback(self, MAP: float, dt: float):
         """
-        压力感受器反馈（动态版）
+        压力感受器反馈（动态版）+ HH 电生理耦合
 
         核心生理：MAP ↓ → 交感 ↑ + 副交感 ↓ → HR ↑（协同代偿）
         正常犬：HR 范围 60-180 bpm，稳态 85 bpm
 
-        交感/副交感活动根据 MAP 误差动态更新：
-        - 低 MAP → 交感上升（快速）、副交感下降 → HR ↑ + SVR ↑
-        - 高 MAP → 交感下降、副交感上升 → HR ↓
+        HH 耦合：
+        - 心率由 baroreceptor 反馈决定（传统路径）
+        - HH 电生理模块接收心率和 [K⁺]，计算 K⁺ 毒性因子
+        - K⁺ 毒性由 HH 的 h∞ 稳态推导（替代 _potassium_cardiac_effect 线性查表）
         """
-        error = (self.MAP_target - MAP) / self.MAP_target  # MAP 偏离目标的归一化量
+        error = (self.MAP_target - MAP) / self.MAP_target
 
-        # 交感活动动态更新：MAP 低时上升，MAP 高时下降
-        # 时间常数约 2s（快速响应）
+        # 交感活动动态更新
         sym_target = self._clamp(SYMPATHETIC_BASELINE + 0.7 * max(0.0, error), 0.0, 1.0)
         self.sympathetic += (sym_target - self.sympathetic) * min(1.0, dt / 2.0)
 
-        # 副交感活动动态更新：与交感反向
-        # 时间常数约 5s（慢速响应）
+        # 副交感活动动态更新
         para_target = self._clamp(0.7 - 0.5 * error, 0.0, 1.0)
         self.parasympathetic += (para_target - self.parasympathetic) * min(1.0, dt / 5.0)
 
@@ -230,12 +237,17 @@ class HeartModule:
         HR_delta = (HR_para + HR_symp) * dt
         self.heart_rate = max(60.0, min(self.HR_max, self.heart_rate + HR_delta))
 
-        # 高钾血症心脏毒性：K⁺ 升高直接抑制心率（独立于压力感受器）
-        k_factor = self._potassium_cardiac_effect(self.blood.potassium_mEq_L)
-        self.heart_rate *= k_factor
-        self.heart_rate = max(5.0, self.heart_rate)  # 最低 5 bpm（接近停搏）
+        # ── HH 电生理耦合 ──────────────────────────────────────────────
+        # 推进电生理计算器（接收当前心率和 [K⁺]）
+        self.hh.update(dt, self.heart_rate, self.blood.potassium_mEq_L)
 
-        # SVR 代偿：交感高时增加外周阻力
+        # K⁺ 毒性：从 HH 第一性原理推导的毒性因子
+        # 替代原有的 _potassium_cardiac_effect() 线性查表
+        k_factor = self.hh.k_toxicity_factor
+        self.heart_rate *= k_factor
+        self.heart_rate = max(5.0, self.heart_rate)
+
+        # SVR 代偿
         SVR_increase = 1.0 + 2.0 * self.sympathetic * max(0.0, error)
         self.SVR = min(self.SVR_max, self.SVR_baseline * SVR_increase)
 
@@ -304,6 +316,12 @@ class HeartModule:
                 * self._coronary_perfusion_effect(self.mean_arterial_pressure), 3),
             "blood_volume_ml": round(self.circulating_volume_ml, 1),
             "blood_volume_ratio": round(vol_ratio, 3),
+            # HH 电生理数据
+            "hh_heart_rate_bpm": round(self.hh.heart_rate, 1),
+            "hh_k_toxicity_factor": round(self.hh.k_toxicity_factor, 3),
+            "hh_h_inf": round(self.hh._h_inf, 3),
+            "hh_e_k": round(self.hh._nernst_k(self.blood.potassium_mEq_L), 1),
+            "ecg_interpretation": self.hh.get_ecg_interpretation(self.blood.potassium_mEq_L),
         }
 
     def summary(self):

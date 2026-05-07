@@ -98,7 +98,7 @@ def get_state(creature: VirtualCreature) -> dict:
     ctr = _last("contractility_factor", h.contractility_factor)
     urine = _last("urine_ml_min", creature.kidney.urine_output)
 
-    return {
+    state = {
         "HR": hr,
         "MAP": map_val,
         "CVP": cvp,
@@ -121,6 +121,22 @@ def get_state(creature: VirtualCreature) -> dict:
         "contractility": ctr,
         "Urine": urine,
     }
+
+    # HH 电生理数据（如果 heart 模块有 HH 集成）
+    if hasattr(creature.heart, 'hh') and creature.heart.hh is not None:
+        hh = creature.heart.hh
+        ecg_interp = hh.get_ecg_interpretation(b.potassium_mEq_L)
+        state["hh_heart_rate"] = round(hh.heart_rate, 1)
+        state["hh_k_toxicity"] = round(hh.k_toxicity_factor, 3)
+        state["hh_h_inf"] = round(hh._h_inf, 3)
+        state["hh_e_k"] = round(hh._nernst_k(b.potassium_mEq_L), 1)
+        # ECG 波形解读字段（供 extra_params 引用）
+        state["T波"] = ecg_interp.get("t_wave_amplitude", "normal")
+        state["QRS宽度"] = ecg_interp.get("qrs_width", "normal")
+        state["P波"] = ecg_interp.get("p_wave", "present")
+        state["K_toxicity_stage"] = ecg_interp.get("k_toxicity_stage", "none")
+
+    return state
 
 
 def flag(value: float, param: str) -> str:
@@ -225,6 +241,11 @@ def _resolve_extra_param(param_cfg: dict, state: dict, ctx: dict[str, Any], crea
                 return text_values.get(key, str(result))
             return result
         return param_cfg.get("default_value", 0.0)
+
+    # 来源: HH ECG 解读（state 中已注入的 ecg_interpretation 字段）
+    if source == "hh_ecg_interpretation":
+        field = param_cfg.get("field", "")
+        return state.get(field, param_cfg.get("default_value", ""))
 
     # 来源: 直接在 state 中用 param 名查找
     param_name = param_cfg.get("param", "")
@@ -775,6 +796,12 @@ def _generate_quantitative_report(meta: dict, state: dict, creature: VirtualCrea
             clue = _vc.get_clue_id("K", "low")
             if clue and clue not in tags:
                 tags.append(clue)
+
+        # 注入 ECG 波形数据（如果 HH 模块可用）
+        if hasattr(creature.heart, 'hh') and creature.heart.hh is not None:
+            ecg_waveform = creature.heart.hh.get_ecg_waveform(duration_ms=2000.0, dt=0.01)
+            return _build_report(meta, results, summary, tags, creature,
+                                 ecg_waveform=ecg_waveform)
 
     return _build_report(meta, results, summary, tags, creature)
 

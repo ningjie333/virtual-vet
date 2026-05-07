@@ -638,6 +638,27 @@
         "unit": "",
         "normal_range": "窦性心律",
         "source": "computed"
+      },
+      {
+        "param": "T波",
+        "unit": "",
+        "normal_range": "正常",
+        "source": "hh_ecg_interpretation",
+        "field": "t_wave_amplitude"
+      },
+      {
+        "param": "QRS宽度",
+        "unit": "",
+        "normal_range": "正常",
+        "source": "hh_ecg_interpretation",
+        "field": "qrs_width"
+      },
+      {
+        "param": "P波",
+        "unit": "",
+        "normal_range": "存在",
+        "source": "hh_ecg_interpretation",
+        "field": "p_wave"
       }
     ],
     "thresholds": {
@@ -667,6 +688,18 @@
       {
         "clue_id": "potassium_low",
         "condition": "state.K < thresholds.k_low"
+      },
+      {
+        "clue_id": "t_wave_tall",
+        "condition": "state.T波 == 'tall' or state.T波 == 'tall_peaked'"
+      },
+      {
+        "clue_id": "qrs_wide",
+        "condition": "state.QRS宽度 == 'wide' or state.QRS宽度 == 'very_wide'"
+      },
+      {
+        "clue_id": "p_wave_absent",
+        "condition": "state.P波 == 'absent'"
       }
     ],
     "findings_rules": {
@@ -680,8 +713,10 @@
       "fever_note": [
         {"if": "disease.fever_state > thresholds.fever_state", "text": "；发热相关心率增快"}
       ],
-      "k_note": [
-        {"if": "state.K > thresholds.k_high", "text": "；高钾血症相关T波高尖"},
+      "hh_ecg_findings": [
+        {"if": "state.K > thresholds.k_high and (state.T波 == 'tall' or state.T波 == 'tall_peaked')", "text": "；T波高尖（高钾血症典型ECG表现）"},
+        {"if": "state.K > thresholds.k_high and state.QRS宽度 == 'wide'", "text": "；QRS增宽（高钾血症进展期）"},
+        {"if": "state.K > thresholds.k_high and state.P波 == 'absent'", "text": "；P波消失（严重高钾血症）"},
         {"if": "state.K < thresholds.k_low", "text": "；低钾血症相关U波"}
       ],
       "arrhythmia_note": [
