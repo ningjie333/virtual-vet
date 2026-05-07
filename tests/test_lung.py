@@ -262,3 +262,96 @@ class TestVQRatioEffect:
         assert VCO2_low < VCO2_normal, (
             f"VCO2 at low V/Q ({VCO2_low}) should be < VCO2 at normal V/Q ({VCO2_normal})"
         )
+
+
+# ---------------------------------------------------------------------------
+# Van der Pol respiratory rhythm tests
+# ---------------------------------------------------------------------------
+
+class TestVanDerPolRhythm:
+    """Test the Van der Pol oscillator-based respiratory rhythm generator."""
+
+    def test_normal_baseline(self, lung):
+        """At normal blood gases, RR should be close to baseline (~18 /min)."""
+        blood = lung.blood
+        blood.arterial_PCO2_mmHg = 40.0
+        blood.arterial_PO2_mmHg = 95.0
+        blood.arterial_pH = 7.40
+        # Run a few steps to let VdP stabilize
+        for _ in range(50):
+            lung._respiratory_compensation(40.0, 95.0, 0.1)
+        assert 16.0 <= lung.respiratory_rate <= 20.0, \
+            f"RR={lung.respiratory_rate}, expected ~18 /min at normal blood gases"
+
+    def test_hypercapnia_increases_rr(self, lung):
+        """PCO2=60 should significantly increase RR."""
+        blood = lung.blood
+        blood.arterial_PCO2_mmHg = 60.0
+        blood.arterial_PO2_mmHg = 95.0
+        blood.arterial_pH = 7.40
+        for _ in range(300):
+            lung._respiratory_compensation(60.0, 95.0, 0.1)
+        assert lung.respiratory_rate > 28.0, \
+            f"RR={lung.respiratory_rate}, expected > 28 /min at PCO2=60"
+
+    def test_hypoxia_increases_rr(self, lung):
+        """PO2=60 should increase RR (hypoxic drive)."""
+        blood = lung.blood
+        blood.arterial_PCO2_mmHg = 40.0
+        blood.arterial_PO2_mmHg = 60.0
+        blood.arterial_pH = 7.40
+        for _ in range(300):
+            lung._respiratory_compensation(40.0, 60.0, 0.1)
+        # Hypoxic drive is weaker than CO2 drive; expect modest increase
+        assert lung.respiratory_rate > 18.2, \
+            f"RR={lung.respiratory_rate}, expected > 18.2 /min at PO2=60"
+
+    def test_acidosis_increases_rr(self, lung):
+        """pH=7.1 (metabolic acidosis) should trigger Kussmaul-like deep breathing."""
+        blood = lung.blood
+        blood.arterial_PCO2_mmHg = 40.0
+        blood.arterial_PO2_mmHg = 95.0
+        blood.arterial_pH = 7.10
+        # Run more steps: VdP smooths parameter changes with 500ms time constant
+        for _ in range(500):
+            lung._respiratory_compensation(40.0, 95.0, 0.1)
+        assert lung.respiratory_rate > 22.0, \
+            f"RR={lung.respiratory_rate}, expected > 22 /min at pH=7.1"
+
+    def test_hypocapnia_decreases_rr(self, lung):
+        """PCO2=25 (hyperventilation) should decrease RR."""
+        blood = lung.blood
+        blood.arterial_PCO2_mmHg = 25.0
+        blood.arterial_PO2_mmHg = 95.0
+        blood.arterial_pH = 7.40
+        for _ in range(100):
+            lung._respiratory_compensation(25.0, 95.0, 0.1)
+        assert lung.respiratory_rate < 18.0, \
+            f"RR={lung.respiratory_rate}, expected < 18 /min at PCO2=25"
+
+    def test_vdp_state_properties(self, lung):
+        """VdP oscillator should produce valid state values."""
+        vdp = lung._vdp
+        for _ in range(50):
+            vdp.update(pco2=40.0, po2=95.0, ph=7.40)
+        state = vdp.get_state()
+        assert state["respiratory_rate"] > 0, "RR must be positive"
+        assert 0.0 <= state["phase"] <= 1.0, f"Phase={state['phase']} not in [0,1]"
+        assert state["amplitude"] > 0, "Amplitude must be positive"
+        assert 0.3 <= state["inspiration_fraction"] <= 0.6, \
+            f"Inspiration fraction={state['inspiration_fraction']} not in [0.3, 0.6]"
+
+    def test_vdp_oscillation(self, lung):
+        """VdP should produce oscillatory x values (alternating inspiration/expiration)."""
+        vdp = lung._vdp
+        signs = []
+        for _ in range(200):
+            vdp.update(pco2=40.0, po2=95.0, ph=7.40)
+            signs.append(1 if vdp.x >= 0 else -1)
+        # Should have both positive and negative values
+        assert 1 in signs, "VdP x should have positive values (inspiration)"
+        assert -1 in signs, "VdP x should have negative values (expiration)"
+        # Should have sign changes (oscillation)
+        sign_changes = sum(1 for i in range(1, len(signs)) if signs[i] != signs[i-1])
+        assert sign_changes >= 3, \
+            f"Only {sign_changes} sign changes in 200 steps, expected oscillatory behavior"

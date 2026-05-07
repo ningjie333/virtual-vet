@@ -1,9 +1,15 @@
 """
 Lung Module - 肺气体交换系统
 建模肺通气、气体扩散、血气交换
+
+呼吸节律由 Van der Pol 振荡器驱动（替代线性化学感受器反馈）：
+  - 呼吸频率和深度由 VdP 极限环振荡产生
+  - 化学感受器（PCO2/PO2/pH）调制 VdP 的 ω 和 μ 参数
+  - 产生自然的呼吸性窦性心律不齐（吸气相 RR 轻微加快）
 """
 
 from parameters import *
+from src.respiratory_rhythm import VanDerPolRespiratoryRhythm
 import math
 
 
@@ -77,6 +83,13 @@ class LungModule:
         # 代偿参数
         self.respiratory_compensation = 0.0         # 呼吸代偿程度
 
+        # Van der Pol 呼吸节律振荡器（替代线性反馈）
+        dt = DT_SECONDS  # 与仿真步长一致
+        self._vdp = VanDerPolRespiratoryRhythm(
+            dt=dt,
+            rr_rest=base_RR / 60.0,  # 转换为 Hz
+        )
+
     def _alveolar_gas_equation(self, RR: float, Vt: float, PACO2: float) -> float:
         """
         肺泡气体方程
@@ -113,29 +126,43 @@ class LungModule:
 
     def _respiratory_compensation(self, arterial_PCO2: float, arterial_PO2: float, dt: float):
         """
-        呼吸代偿：动脉血 PCO2/PO2 异常时调节通气
+        呼吸代偿：通过 Van der Pol 振荡器驱动
 
-        - 代谢性酸中毒 → 呼吸代偿（PCO2 ↓，RR ↑）
-        - 低氧血症 → 呼吸频率 ↑（通过外周化学感受器）
-        - 高碳酸血症 → RR ↑（通过中枢化学感受器）
+        化学感受器（PCO2/PO2/pH）调制 VdP 的 ω（频率）和 μ（幅度）参数，
+        振荡器自然产生节律性呼吸驱动，替代原有的线性反馈。
+
+        - 高碳酸血症 → VdP ω↑ + μ↑ → RR 加快 + 深度增大
+        - 低氧血症  → VdP ω↑ → RR 加快
+        - 酸中毒    → VdP ω↑ + μ↑ → Kussmaul 呼吸
         """
-        target_PCO2 = 40.0
-        PCO2_error = arterial_PCO2 - target_PCO2
+        # 获取当前 pH
+        arterial_pH = self.blood.arterial_pH
 
-        # 呼吸频率代偿：PCO2 每升高 1 mmHg，RR 增加约 2/min
-        # RR_delta 单位 /min，乘以 dt/60 转换为每步变化（dt 是秒）
-        RR_delta = 2.0 * PCO2_error
+        # 推进 VdP 振荡器
+        self._vdp.update(pco2=arterial_PCO2, po2=arterial_PO2, ph=arterial_pH)
+
+        # 从 VdP 输出获取目标呼吸频率
+        target_rr = self._vdp.respiratory_rate
+
+        # 平滑过渡（避免数值振荡）
+        alpha = min(1.0, dt / 0.5)  # 500ms 时间常数
+        self.respiratory_rate += (target_rr - self.respiratory_rate) * alpha
+
+        # 限幅
         self.respiratory_rate = max(
             self.base_respiratory_rate * 0.5,
-            min(self.max_respiratory_rate, self.respiratory_rate + RR_delta * dt / 60.0)
+            min(self.max_respiratory_rate, self.respiratory_rate)
         )
 
-        # 低氧代偿：PO2 < 80 时触发过度通气（加法叠加，避免乘法突变）
-        if arterial_PO2 < 80:
-            hypoxia_factor = (80 - arterial_PO2) / 80
-            rr_boost = self.base_respiratory_rate * 0.5 * hypoxia_factor * dt / 60.0
-            self.respiratory_rate = min(self.max_respiratory_rate,
-                                        self.respiratory_rate + rr_boost)
+        # 潮气量随 VdP 幅度调制（深度呼吸时 TV 增大）
+        vdp_amplitude = self._vdp.amplitude
+        if vdp_amplitude > 0.8:
+            # 深快呼吸（如酸中毒）→ TV 增大
+            tv_factor = min(1.5, 0.8 + 0.7 * (vdp_amplitude - 0.8) / 1.2)
+            self.tidal_volume = self.base_tidal_volume * tv_factor
+        else:
+            # 恢复正常 TV
+            self.tidal_volume += (self.base_tidal_volume - self.tidal_volume) * alpha
 
     def compute(self, dt: float, cardiac_output: float):
         """
@@ -199,6 +226,11 @@ class LungModule:
             "CO2_production": self.CO2_production,
             "V_Q_ratio": self.VQ_ratio,
             "tidal_volume_ml": self.tidal_volume,
+            # Van der Pol 振荡器状态
+            "vdp_amplitude": self._vdp.amplitude,
+            "vdp_phase": self._vdp.phase,
+            "vdp_is_inspiration": self._vdp.is_inspiration,
+            "vdp_inspiration_fraction": self._vdp.inspiration_fraction,
         }
 
     def _oxygen_saturation_curve(self, PO2_mmHg: float) -> float:
@@ -231,4 +263,6 @@ class LungModule:
             "saturation": round(self.blood.arterial_saturation, 3),
             "RR": round(self.respiratory_rate, 1),
             "pH": round(self.blood.arterial_pH, 3),
+            "vdp_amplitude": round(self._vdp.amplitude, 3),
+            "vdp_phase": round(self._vdp.phase, 3),
         }
