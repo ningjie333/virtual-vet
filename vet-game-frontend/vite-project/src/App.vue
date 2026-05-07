@@ -17,21 +17,20 @@ const tab = ref<"exam" | "report" | "diag">("exam");
 const sessionId = ref("");
 const caseData = ref<Case | null>(null);
 const cases = ref<Case[]>([]);
-const examinations = ref<Record<string, { name: string; name_en: string; category: string; cost: number; description: string }>>({});
+const examinations = ref<Record<string, { name: string; name_en: string; category: string; tier: number; cost: number; description: string }>>({});
 const treatments = ref<Record<string, { name: string; description: string; correct_for: string | null }>>({});
 const drugs = ref<Record<string, { name: string; half_life_h: number; description: string }>>({});
 const examsDone = reactive(new Set<string>());
 const reports = ref<Report[]>([]);
 const vitals = reactive<Vitals>({ HR_bpm: 0, MAP_mmHg: 0, SpO2: 0, RR: 0, Temp: 0, GFR: 0, pH: 0 });
-const actionCount = ref(0);
+const timeUsed = ref(0);
 const medicalPhase = ref("stable");
 const deathTimer = ref<number | null>(null);
 const loading = ref(false);
 const hint = ref("");
 const hintClass = ref("");
 const gameLog = ref<string[]>([]);
-const gameOverData = ref<{ reason: string; actual_disease: string; score?: { total: number; grade: string; actions_used: number } }>({ reason: "", actual_disease: "" });
-const maxActions = ref(10);
+const gameOverData = ref<{ reason: string; actual_disease: string; score?: { total: number; grade: string; time_used: number } }>({ reason: "", actual_disease: "" });
 const isNight = ref(false);
 const gameTime = ref("08:00");
 const apStress = reactive<ApStressState>({ ap: 10, max_ap: 10, stress: 0, pending_reports: 0 });
@@ -59,7 +58,7 @@ const actualDiseaseName = computed(() => diseaseNameMap[gameOverData.value.actua
 // ── Helpers ──
 function updateFrom(d: Record<string, unknown>) {
   if (d.vitals) Object.assign(vitals, d.vitals);
-  if (d.action_count !== undefined) actionCount.value = d.action_count as number;
+  if (d.time_used !== undefined) timeUsed.value = d.time_used as number;
   if (d.medical_phase) medicalPhase.value = d.medical_phase as string;
   if (d.death_timer !== undefined) deathTimer.value = d.death_timer as number | null;
   if (d.game_log) gameLog.value = d.game_log as string[];
@@ -113,7 +112,7 @@ async function startGame(caseId: string) {
   caseData.value = d.case;
   phase.value = "game";
   Object.assign(vitals, d.vitals);
-  actionCount.value = 0;
+  timeUsed.value = 0;
   medicalPhase.value = d.game_state?.medical_phase || "stable";
   deathTimer.value = null;
   reports.value = [];
@@ -121,7 +120,6 @@ async function startGame(caseId: string) {
   gameLog.value = [];
   hint.value = "";
   tab.value = "exam";
-  maxActions.value = d.case.time_limit_actions || 10;
   gameTime.value = d.game_time || "08:00";
   isNight.value = d.is_night || false;
 }
@@ -270,10 +268,10 @@ function restart() {
         </button>
       </div>
       <div class="top-right" v-if="phase !== 'select'">
-        <span class="badge badge-ap" :class="{ 'ap-low': apStress.ap <= 3 }">⚡ AP: {{ apStress.ap }}/{{ apStress.max_ap }}</span>
+        <span class="badge badge-ap" :class="{ 'ap-low': apStress.ap <= 3 }">⏱ 时间预算: {{ apStress.ap }}/{{ apStress.max_ap }}</span>
         <span class="badge badge-stress" :class="{ 'stress-high': apStress.stress >= 50, 'stress-crit': apStress.stress >= 80 }">😰 压力: {{ apStress.stress }}</span>
         <span v-if="apStress.pending_reports > 0" class="badge badge-pending">📋 待出报告: {{ apStress.pending_reports }}</span>
-        <span class="badge badge-turn">行动: {{ actionCount }}/{{ maxActions }}</span>
+        <span class="badge badge-turn">已用: {{ timeUsed }}</span>
         <span :class="['clock-display', { night: isNight }]">{{ isNight ? '🌙' : '🕐' }} {{ gameTime }}</span>
         <span v-if="isNight" class="badge badge-night">夜间模式</span>
         <span :class="['badge', phaseClass]">{{ phaseLabel }}</span>

@@ -27,7 +27,7 @@ const emit = defineEmits<{
 
       <!-- 评分 -->
       <div class="score-big" v-if="data.score">{{ data.score.total }} 分</div>
-      <div class="score-gr" v-if="data.score">评级: {{ data.score.grade }}（消耗 {{ data.score.actions_used }} 行动）</div>
+      <div class="score-gr" v-if="data.score">评级: {{ data.score.grade }}（用时 {{ data.score.time_used }}）</div>
 
       <div class="btn-row" style="justify-content: center; margin-top: 8px">
         <button class="btn btn-primary" @click="emit('restart')">再来一局</button>

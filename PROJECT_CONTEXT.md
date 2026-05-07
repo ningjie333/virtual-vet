@@ -117,10 +117,10 @@ class GameState:
     engine: VirtualCreature      # 仿真引擎实例
     disease_name: str            # 真实疾病名称
     phase: str                   # "playing" / "won" / "lost"
-    action_count: int            # 已用行动点数
-    elapsed_time_s: float        # 经过的仿真秒数
     death_timer: int | None      # 濒死倒计时（进入 moribund 后）
-    game_clock_s: float          # 游戏时钟（秒，0 = 08:00）
+    current_ap: int              # 剩余时间预算（AP = 时间单位）
+    max_ap: int                  # 时间预算上限
+    total_ap_spent: int          # 累计消耗 AP → 游戏时间 = total_ap_spent × 60s
 ```
 
 ### 病情阶段判定（自动涌现，非硬编码时间表）

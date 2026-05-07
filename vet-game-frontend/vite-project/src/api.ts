@@ -15,7 +15,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   getCases: (): Promise<Case[]> => request("GET", "/cases"),
 
-  getExaminations: () => request<Record<string, { name: string; name_en: string; category: string; cost: number; description: string }>>("GET", "/examinations"),
+  getExaminations: () => request<Record<string, { name: string; name_en: string; category: string; tier: number; cost: number; description: string }>>("GET", "/examinations"),
 
   getTreatments: () => request<Record<string, { name: string; description: string; correct_for: string | null }>>("GET", "/treatments"),
 
@@ -26,8 +26,7 @@ export const api = {
     success: boolean;
     phase: string;
     medical_phase: string;
-    action_count: number;
-    elapsed_time_s: number;
+    time_used: number;
     death_timer: number | null;
     report: Report;
     vitals: Vitals;
@@ -39,8 +38,7 @@ export const api = {
     success: boolean;
     phase: string;
     medical_phase: string;
-    action_count: number;
-    elapsed_time_s: number;
+    time_used: number;
     death_timer: number | null;
     treatment_result: TreatmentResult;
     vitals: Vitals;
@@ -52,8 +50,7 @@ export const api = {
     success: boolean;
     phase: string;
     medical_phase: string;
-    action_count: number;
-    elapsed_time_s: number;
+    time_used: number;
     death_timer: number | null;
     vitals: Vitals;
     game_log: string[];
@@ -63,8 +60,7 @@ export const api = {
   getGameState: (sessionId: string): Promise<{
     phase: string;
     medical_phase: string;
-    action_count: number;
-    elapsed_time_s: number;
+    time_used: number;
     death_timer: number | null;
     vitals: Vitals;
     reports_count: number;

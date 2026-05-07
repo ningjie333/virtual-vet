@@ -189,13 +189,12 @@ def api_new_game():
             "case": case,
             "game_state": {
                 "phase": state.phase,
-                "action_count": state.action_count,
-                "elapsed_time_s": state.elapsed_time_s,
+                "time_used": state.total_ap_spent,
                 "medical_phase": "stable",
                 "death_timer": state.death_timer,
             },
-            "game_time": format_game_time(state.game_clock_s),
-            "is_night": is_night_time(state.game_clock_s),
+            "game_time": format_game_time(state.total_ap_spent * 60),
+            "is_night": is_night_time(state.total_ap_spent * 60),
             "vitals": _get_vitals(vc),
             "ap": state.current_ap,
             "max_ap": state.max_ap,
@@ -231,13 +230,12 @@ def api_examine():
         "success": result["success"],
         "phase": result["phase"],
         "medical_phase": result.get("medical_phase", "stable"),
-        "action_count": state.action_count,
-        "elapsed_time_s": state.elapsed_time_s,
+        "time_used": state.total_ap_spent,
         "death_timer": state.death_timer,
         "report": result.get("result"),
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.game_clock_s),
+        "vitals": _get_vitals(state.engine, state.total_ap_spent * 60),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
@@ -295,12 +293,11 @@ def api_administer_drug():
         "success": result["success"],
         "phase": result["phase"],
         "medical_phase": result.get("medical_phase", "stable"),
-        "action_count": state.action_count,
-        "elapsed_time_s": state.elapsed_time_s,
+        "time_used": state.total_ap_spent,
         "death_timer": state.death_timer,
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.game_clock_s),
+        "vitals": _get_vitals(state.engine, state.total_ap_spent * 60),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
@@ -341,13 +338,12 @@ def api_diagnose():
         "success": result["success"],
         "phase": result["phase"],
         "medical_phase": result.get("medical_phase", "stable"),
-        "action_count": state.action_count,
-        "elapsed_time_s": state.elapsed_time_s,
+        "time_used": state.total_ap_spent,
         "death_timer": state.death_timer,
         "treatment_result": result.get("result"),
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.game_clock_s),
+        "vitals": _get_vitals(state.engine, state.total_ap_spent * 60),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
@@ -391,12 +387,11 @@ def api_wait():
         "success": result["success"],
         "phase": result["phase"],
         "medical_phase": result.get("medical_phase", "stable"),
-        "action_count": state.action_count,
-        "elapsed_time_s": state.elapsed_time_s,
+        "time_used": state.total_ap_spent,
         "death_timer": state.death_timer,
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.game_clock_s),
+        "vitals": _get_vitals(state.engine, state.total_ap_spent * 60),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
@@ -432,12 +427,11 @@ def api_game_state():
         {
             "phase": state.phase,
             "medical_phase": medical_phase,
-            "action_count": state.action_count,
-            "elapsed_time_s": state.elapsed_time_s,
+            "time_used": state.total_ap_spent,
             "death_timer": state.death_timer,
-            "game_time": format_game_time(state.game_clock_s),
-            "is_night": is_night_time(state.game_clock_s),
-            "vitals": _get_vitals(state.engine, state.game_clock_s),
+            "game_time": format_game_time(state.total_ap_spent * 60),
+            "is_night": is_night_time(state.total_ap_spent * 60),
+            "vitals": _get_vitals(state.engine, state.total_ap_spent),
             "reports_count": len(state.reports),
             "pending_reports": len(state.pending_reports),
             "game_log": _build_game_log(state),
@@ -508,7 +502,7 @@ def api_diagnosis():
 # ============================================================
 
 
-def _get_vitals(vc: VirtualCreature, game_clock_s: float = 0.0) -> dict:
+def _get_vitals(vc: VirtualCreature, time_spent_s: float = 0.0) -> dict:
     """从引擎提取当前生命体征"""
     h = vc.history
 
@@ -526,19 +520,20 @@ def _get_vitals(vc: VirtualCreature, game_clock_s: float = 0.0) -> dict:
         "Temp": round(_last("Temp", vc.blood.core_temperature_C), 1),
         "GFR": round(_last("GFR", vc.kidney.GFR), 1),
         "pH": round(_last("pH", vc.blood.arterial_pH), 3),
-        "action_count": 0,  # 由调用方填充
-        "game_time": format_game_time(game_clock_s),
-        "is_night": is_night_time(game_clock_s),
+        "time_used": 0,  # 由调用方填充
+        "game_time": format_game_time(time_spent_s),
+        "is_night": is_night_time(time_spent_s),
     }
 
 
 def _build_game_log(state: GameState) -> list[str]:
     """构建可读的诊疗日志"""
+    from game.time_manager import format_game_time
     log = []
     for i, report in enumerate(state.reports):
         name = report.get("name", "未知检查")
         summary = report.get("summary", "")
-        log.append(f"[行动{i + 1}] {name}：{summary[:80]}")
+        log.append(f"[{format_game_time(i * 60)}] {name}：{summary[:80]}")
     return log
 
 
@@ -557,9 +552,9 @@ _GRADE_DEFAULT = "D"
 
 
 def _calc_score(state: GameState) -> dict:
-    """计算最终评分"""
-    action_penalty = min(_SCORE_MAX_PENALTY, state.action_count * _SCORE_ACTION_PENALTY)
-    score = max(_SCORE_MIN, _SCORE_BASE - action_penalty)
+    """计算最终评分（时间越少越好）"""
+    time_penalty = min(_SCORE_MAX_PENALTY, state.total_ap_spent * _SCORE_ACTION_PENALTY)
+    score = max(_SCORE_MIN, _SCORE_BASE - time_penalty)
 
     grade = _GRADE_DEFAULT
     for threshold, g in _GRADE_THRESHOLDS:
@@ -570,7 +565,7 @@ def _calc_score(state: GameState) -> dict:
     return {
         "total": score,
         "grade": grade,
-        "actions_used": state.action_count,
+        "time_used": state.total_ap_spent,
     }
 
 

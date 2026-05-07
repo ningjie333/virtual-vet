@@ -28,7 +28,7 @@ export interface Vitals {
   Temp: number;
   GFR: number;
   pH: number;
-  action_count?: number;
+  time_used?: number;
   game_time?: string;
   is_night?: boolean;
 }
@@ -61,8 +61,7 @@ export interface Report {
 
 export interface GameState {
   phase: string;
-  action_count: number;
-  elapsed_time_s: number;
+  time_used: number;
   medical_phase: string;
   death_timer: number | null;
   game_time?: string;
@@ -90,7 +89,7 @@ export interface TreatmentResult {
 export interface GameOverData {
   reason: string;
   actual_disease: string;
-  score?: { total: number; grade: string; actions_used: number };
+  score?: { total: number; grade: string; time_used: number };
 }
 
 export interface DrugEntry {
@@ -103,8 +102,7 @@ export interface AdministerDrugResponse {
   success: boolean;
   phase: string;
   medical_phase: string;
-  action_count: number;
-  elapsed_time_s: number;
+  time_used: number;
   death_timer: number | null;
   vitals: Vitals;
   game_log: string[];
