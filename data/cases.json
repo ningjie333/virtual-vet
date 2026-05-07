@@ -69,6 +69,174 @@
         "建议拍摄胸部X光评估心影",
         "超声心动图是确诊关键"
       ]
+    },
+    {
+      "id": "case_004",
+      "title": "误食灭鼠药后呕吐抽搐",
+      "difficulty": 2,
+      "difficulty_label": "★★☆",
+      "animal": {
+        "species": "犬",
+        "breed": "中华田园犬",
+        "name": "旺财",
+        "age": "2岁",
+        "weight_kg": 15.0,
+        "sex": "雄性"
+      },
+      "chief_complaint": "误食灭鼠药约2小时后出现呕吐、精神沉郁",
+      "history": "主人发现约2小时前有误食磷化锌灭鼠药的可能。随后出现呕吐，初为胃内容物，后带血丝。逐渐精神沉郁，四肢无力。无既往重大疾病史。",
+      "disease": "phosphorus_poisoning",
+      "disease_onset_s": 0,
+      "time_limit_actions": 8,
+      "starting_hints": [
+        "注意心律和血压",
+        "磷化锌中毒可导致多器官损伤",
+        "建议血液检查评估全身状况"
+      ]
+    },
+    {
+      "id": "case_005",
+      "title": "突发腹部膨隆与干呕",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "犬",
+        "breed": "大丹犬",
+        "name": "泰坦",
+        "age": "6岁",
+        "weight_kg": 55.0,
+        "sex": "雄性"
+      },
+      "chief_complaint": "餐后突发腹部急剧膨隆，多次干呕无法吐出",
+      "history": "晚餐后约1小时，患犬腹部急剧膨隆，多次尝试干呕但无法吐出任何物质。烦躁不安，无法站立。呼吸急促，黏膜苍白。既往有进食过快习惯。",
+      "disease": "gastric_dilatation_volvulus",
+      "disease_onset_s": 0,
+      "time_limit_actions": 6,
+      "starting_hints": [
+        "这是紧急情况！需要快速评估",
+        "腹部X光可确认胃扩张",
+        "注意心律（室性心律失常是常见并发症）"
+      ]
+    },
+    {
+      "id": "case_006",
+      "title": "虚弱与黄疸",
+      "difficulty": 2,
+      "difficulty_label": "★★☆",
+      "animal": {
+        "species": "犬",
+        "breed": "美国可卡犬",
+        "name": "可可",
+        "age": "4岁",
+        "weight_kg": 12.0,
+        "sex": "雌性未绝育"
+      },
+      "chief_complaint": "近3天精神食欲差，今日发现尿液呈深黄色",
+      "history": "3天前开始食欲下降，活动减少。今日主人发现尿液呈深茶色，黏膜发黄。无呕吐腹泻。已完成免疫。无用药史。",
+      "disease": "immune_mediated_hemolytic_anemia",
+      "disease_onset_s": 0,
+      "time_limit_actions": 9,
+      "starting_hints": [
+        "注意黏膜颜色（黄疸？）",
+        "血常规和细胞学检查很重要",
+        "可能需要超声排除脾脏肿物"
+      ]
+    },
+    {
+      "id": "case_007",
+      "title": "公猫无尿与呕吐",
+      "difficulty": 2,
+      "difficulty_label": "★★☆",
+      "animal": {
+        "species": "猫",
+        "breed": "家养短毛猫",
+        "name": "咪咪",
+        "age": "3岁",
+        "weight_kg": 4.5,
+        "sex": "雄性已绝育"
+      },
+      "chief_complaint": "24小时未见排尿，频繁去猫砂盆但无尿，今日开始呕吐",
+      "history": "主人发现已超过24小时未见排尿，患犬频繁去猫砂盆但无尿液排出。今日开始呕吐，精神沉郁，食欲废绝。触诊腹部可触及膨大膀胱。",
+      "disease": "urinary_obstruction",
+      "disease_onset_s": 0,
+      "time_limit_actions": 7,
+      "starting_hints": [
+        "触诊膀胱大小",
+        "注意血钾（尿道梗阻可致致命性高钾）",
+        "血气分析评估酸中毒"
+      ]
+    },
+    {
+      "id": "case_008",
+      "title": "多饮多饮后精神沉郁",
+      "difficulty": 2,
+      "difficulty_label": "★★☆",
+      "animal": {
+        "species": "犬",
+        "breed": "迷你雪纳瑞",
+        "name": "小胡子",
+        "age": "8岁",
+        "weight_kg": 8.0,
+        "sex": "雄性已绝育"
+      },
+      "chief_complaint": "近1个月多饮多尿，近2天精神沉郁、呕吐、呼吸急促",
+      "history": "近1个月来饮尿量明显增多，近2天精神沉郁，呕吐多次，呼吸急促且深大。食欲废绝。未绝育。既往体健。",
+      "disease": "diabetic_ketoacidosis",
+      "disease_onset_s": 0,
+      "time_limit_actions": 8,
+      "starting_hints": [
+        "呼吸模式深大提示代谢性酸中毒",
+        "急需血糖和血气分析",
+        "注意脱水程度"
+      ]
+    },
+    {
+      "id": "case_009",
+      "title": "颈静脉怒张与晕厥",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "犬",
+        "breed": "金毛寻回犬",
+        "name": "阳光",
+        "age": "9岁",
+        "weight_kg": 32.0,
+        "sex": "雄性已绝育"
+      },
+      "chief_complaint": "近1周活动减少，今日突发晕厥约30秒",
+      "history": "近1周活动耐量明显下降，不愿运动。今日突然晕厥约30秒后自行恢复。呼吸急促，腹部轻度膨隆。颈静脉明显怒张。",
+      "disease": "pericardial_effusion",
+      "disease_onset_s": 0,
+      "time_limit_actions": 7,
+      "starting_hints": [
+        "注意听诊心音是否遥远",
+        "颈静脉怒张+低血压提示心脏填塞",
+        "超声心动图是确诊关键"
+      ]
+    },
+    {
+      "id": "case_010",
+      "title": "发热后全身瘀斑",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "犬",
+        "breed": "法国斗牛犬",
+        "name": "法法",
+        "age": "5岁",
+        "weight_kg": 12.0,
+        "sex": "雄性"
+      },
+      "chief_complaint": "发热5天，今日发现全身多处瘀斑和便血",
+      "history": "5天前开始发热（40°C+），在外院诊断为\"上呼吸道感染\"，给予抗生素治疗。今日发现全身多处皮肤瘀斑，牙龈出血，排黑色大便。精神极度沉郁。",
+      "disease": "disseminated_intravascular_coagulation",
+      "disease_onset_s": 0,
+      "time_limit_actions": 8,
+      "starting_hints": [
+        "全身出血倾向+血小板减少提示凝血障碍",
+        "需要凝血功能检查（PT/aPTT/D-二聚体）",
+        "寻找潜在诱因（感染/肿瘤）"
+      ]
     }
   ]
 }

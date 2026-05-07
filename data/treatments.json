@@ -42,6 +42,104 @@
       }
     }
   },
+  "phosphorus_poisoning": {
+    "name": "补液支持治疗（磷中毒）",
+    "name_en": "Supportive Fluid Therapy (Phosphorus Poisoning)",
+    "description": "静脉补液维持循环，配合对症支持治疗",
+    "correct_for": "phosphorus_poisoning",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 250}
+        ]
+      }
+    }
+  },
+  "gastric_dilatation_volvulus": {
+    "name": "紧急补液+手术准备（GDV）",
+    "name_en": "Emergency Fluid Resuscitation (GDV)",
+    "description": "大剂量快速补液稳定循环，为紧急手术复位做准备",
+    "correct_for": "gastric_dilatation_volvulus",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 500}
+        ]
+      }
+    }
+  },
+  "immune_mediated_hemolytic_anemia": {
+    "name": "输血+免疫抑制（IMHA）",
+    "name_en": "Transfusion & Immunosuppression (IMHA)",
+    "description": "输血纠正严重贫血，免疫抑制治疗控制溶血",
+    "correct_for": "immune_mediated_hemolytic_anemia",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 200}
+        ]
+      }
+    }
+  },
+  "urinary_obstruction": {
+    "name": "紧急导尿+补液（尿道梗阻）",
+    "name_en": "Emergency Catheterization & Fluid (Urinary Obstruction)",
+    "description": "紧急导尿排除膀胱蓄积尿液，补液纠正电解质紊乱和酸中毒",
+    "correct_for": "urinary_obstruction",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 300}
+        ]
+      }
+    }
+  },
+  "diabetic_ketoacidosis": {
+    "name": "积极补液+胰岛素（DKA）",
+    "name_en": "Aggressive Fluid & Insulin (DKA)",
+    "description": "积极补液纠正脱水，胰岛素输注控制血糖和酮体",
+    "correct_for": "diabetic_ketoacidosis",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 400}
+        ]
+      }
+    }
+  },
+  "pericardial_effusion": {
+    "name": "心包穿刺引流（心包积液）",
+    "name_en": "Pericardiocentesis (Pericardial Effusion)",
+    "description": "心包穿刺引流积液解除心脏填塞，配合补液维持循环",
+    "correct_for": "pericardial_effusion",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 150}
+        ]
+      }
+    }
+  },
+  "disseminated_intravascular_coagulation": {
+    "name": "补液+输血+抗凝（DIC）",
+    "name_en": "Fluid, Transfusion & Anticoagulation (DIC)",
+    "description": "积极补液维持灌注，输血补充凝血因子，抗凝治疗阻断微血栓形成",
+    "correct_for": "disseminated_intravascular_coagulation",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 350}
+        ]
+      }
+    }
+  },
   "supportive_care": {
     "name": "支持治疗",
     "name_en": "Supportive Care",

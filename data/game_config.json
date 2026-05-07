@@ -1,0 +1,147 @@
+{
+  "_comment": "游戏层配置 — 替代 action_system.py 中的硬编码常量",
+  "_version": "1.0",
+  "time": {
+    "seconds_per_action": 60,
+    "moribund_actions_remaining": 3
+  },
+  "ap_system": {
+    "default_max": 10,
+    "regen_per_wait": 2,
+    "regen_per_turn": 1,
+    "combo_window": 3,
+    "tier_costs": {
+      "1": 0,
+      "2": 2,
+      "3": 3,
+      "4": 4,
+      "5": 8
+    }
+  },
+  "stress": {
+    "per_tier": {
+      "1": 0,
+      "2": 2,
+      "3": 5,
+      "4": 10,
+      "5": 15
+    },
+    "recovery_per_wait": 8,
+    "danger_threshold": 50,
+    "critical_threshold": 80,
+    "decompensation_rate": 0.05
+  },
+  "species_ap_modifiers": {
+    "犬": {},
+    "猫": {
+      "3": 1,
+      "4": 1,
+      "5": 2
+    },
+    "马": {
+      "1": 1,
+      "2": 1,
+      "4": -1,
+      "5": -1
+    }
+  },
+  "phase_thresholds": {
+    "MAP": {
+      "low_moribund": 40,
+      "low_critical": 50,
+      "low_worsening": 60,
+      "high_worsening": 150,
+      "high_critical": 160,
+      "high_moribund": 180
+    },
+    "SpO2": {
+      "low_moribund": 70,
+      "low_critical": 80,
+      "low_worsening": 90,
+      "high_worsening": 100,
+      "high_critical": 100,
+      "high_moribund": 100
+    },
+    "HR": {
+      "low_moribund": 40,
+      "low_critical": 50,
+      "low_worsening": 60,
+      "high_worsening": 160,
+      "high_critical": 180,
+      "high_moribund": 200
+    },
+    "pH": {
+      "low_moribund": 7.0,
+      "low_critical": 7.1,
+      "low_worsening": 7.2,
+      "high_worsening": 7.6,
+      "high_critical": 7.7,
+      "high_moribund": 7.8
+    },
+    "DO2": {
+      "warn": 0.6,
+      "critical": 0.4,
+      "moribund": 0.25
+    },
+    "lactate": {
+      "warn": 3.0,
+      "critical": 5.0
+    },
+    "urine": {
+      "oliguria": 0.008,
+      "anuria": 0.002
+    }
+  },
+  "combo_bonuses": [
+    {
+      "tests": [
+        "chest_xray",
+        "ultrasound"
+      ],
+      "discount": 1,
+      "description": "影像组合：X光+超声"
+    },
+    {
+      "tests": [
+        "blood_routine",
+        "blood_biochem"
+      ],
+      "discount": 1,
+      "description": "血液组合：血常规+生化"
+    },
+    {
+      "tests": [
+        "blood_routine",
+        "blood_biochem",
+        "blood_gas"
+      ],
+      "discount": 2,
+      "description": "全面血液：血常规+生化+血气"
+    },
+    {
+      "tests": [
+        "ecg",
+        "echocardiography"
+      ],
+      "discount": 1,
+      "description": "心脏组合：心电图+超声心动"
+    },
+    {
+      "tests": [
+        "physical",
+        "auscultation",
+        "inspection"
+      ],
+      "discount": 0,
+      "description": "基础体格套餐（无折扣，仅标记）"
+    },
+    {
+      "tests": [
+        "ct",
+        "chest_xray"
+      ],
+      "discount": 1,
+      "description": "进阶影像：替代X光，CT减免"
+    }
+  ]
+}

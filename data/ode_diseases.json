@@ -155,5 +155,259 @@
       { "target": "blood.HCO3", "op": "set", "fn": "max(6.0, 24.0 - metabolic_acidosis * 16.0)" },
       { "target": "blood.temperature", "op": "set", "fn": "(38.5 + cellular_toxicity * 1.5) if cellular_toxicity < 0.5 else (38.5 + 0.75 - 2.0 * (cellular_toxicity - 0.5))" }
     ]
+  },
+
+  "gastric_dilatation_volvulus": {
+    "display_name": "胃扩张扭转（GDV）",
+    "severity_presets": {
+      "mild": { "distension_rate": 0.003, "distension_K": 0.4, "ischemia_rate": 0.002 },
+      "moderate": { "distension_rate": 0.006, "distension_K": 0.75, "ischemia_rate": 0.005 },
+      "severe": { "distension_rate": 0.012, "distension_K": 0.95, "ischemia_rate": 0.01 }
+    },
+    "state_variables": {
+      "gastric_distension": {
+        "initial": 0.1, "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": { "rate_key": "distension_rate", "K_key": "distension_K", "seed_threshold": 0.05, "seed_boost": 0.001 }
+      },
+      "gastric_ischemia": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 300.0, "target_fn": "min(gastric_distension * 1.2, 1.0)" }
+      },
+      "systemic_shock": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 600.0, "target_fn": "gastric_ischemia * 0.9" }
+      },
+      "arrhythmia_severity": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 400.0, "target_fn": "gastric_ischemia * 0.7" }
+      },
+      "lactate_accumulation": {
+        "initial": 0.0, "clamp": [0, 15],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 500.0, "target_fn": "gastric_ischemia * 12.0" }
+      }
+    },
+    "outputs": [
+      { "target": "heart.heart_rate", "op": "add", "fn": "max(-10.0, min(50.0, systemic_shock * 50.0 + arrhythmia_severity * 20.0))" },
+      { "target": "heart.SVR", "op": "multiply", "fn": "max(0.3, 1.0 - systemic_shock * 0.7)" },
+      { "target": "heart.CVP", "op": "add", "fn": "-gastric_distension * 5.0" },
+      { "target": "blood.pH", "op": "set", "fn": "max(7.0, 7.40 - lactate_accumulation * 0.025)" },
+      { "target": "blood.lactate", "op": "set", "fn": "max(0.5, lactate_accumulation)" },
+      { "target": "blood.temperature", "op": "set", "fn": "38.5 - systemic_shock * 1.5" }
+    ]
+  },
+
+  "immune_mediated_hemolytic_anemia": {
+    "display_name": "免疫介导性溶血性贫血（IMHA）",
+    "severity_presets": {
+      "mild": { "destruction_rate": 0.004, "destruction_K": 0.3 },
+      "moderate": { "destruction_rate": 0.008, "destruction_K": 0.6 },
+      "severe": { "destruction_rate": 0.015, "destruction_K": 0.9 }
+    },
+    "state_variables": {
+      "antibody_activity": {
+        "initial": 0.05, "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": { "rate_key": "destruction_rate", "K_key": "destruction_K", "seed_threshold": 0.01, "seed_boost": 0.0005 }
+      },
+      "rbc_destruction": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 600.0, "target_fn": "min(antibody_activity * 1.1, 1.0)" }
+      },
+      "bilirubin_load": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 900.0, "target_fn": "rbc_destruction * 0.9" }
+      },
+      "compensatory_tachycardia": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 300.0, "target_fn": "rbc_destruction * 0.8" }
+      },
+      "hypoxia_from_anemia": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "max(0.0, min(1.0, (rbc_destruction - 0.2) / 0.6))" }
+    },
+    "outputs": [
+      { "target": "blood.red_cell_volume_ml", "op": "set", "fn": "max(300.0, 2000.0 * (1.0 - rbc_destruction * 0.85))" },
+      { "target": "heart.heart_rate", "op": "add", "fn": "compensatory_tachycardia * 40.0" },
+      { "target": "blood.bilirubin_mg_dL", "op": "set", "fn": "max(0.1, bilirubin_load * 8.0)" },
+      { "target": "lung.diffusion_coefficient", "op": "multiply", "fn": "max(0.5, 1.0 - hypoxia_from_anemia * 0.3)" }
+    ]
+  },
+
+  "urinary_obstruction": {
+    "display_name": "尿道梗阻",
+    "severity_presets": {
+      "mild": { "obstruction_rate": 0.003, "obstruction_K": 0.4 },
+      "moderate": { "obstruction_rate": 0.007, "obstruction_K": 0.75 },
+      "severe": { "obstruction_rate": 0.012, "obstruction_K": 0.95 }
+    },
+    "state_variables": {
+      "urethral_blockage": {
+        "initial": 0.1, "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": { "rate_key": "obstruction_rate", "K_key": "obstruction_K", "seed_threshold": 0.05, "seed_boost": 0.001 }
+      },
+      "bladder_distension": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 300.0, "target_fn": "min(urethral_blockage * 1.1, 1.0)" }
+      },
+      "post_renal_azotemia": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 900.0, "target_fn": "urethral_blockage * 0.9" }
+      },
+      "hyperkalemia": {
+        "initial": 0.0, "clamp": [0, 4.0],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 600.0, "target_fn": "urethral_blockage * 3.5" }
+      },
+      "metabolic_acidosis": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 1200.0, "target_fn": "urethral_blockage * 0.7" }
+      }
+    },
+    "outputs": [
+      { "target": "kidney.urine_output", "op": "set", "fn": "max(0.0, 0.02 * (1.0 - urethral_blockage))" },
+      { "target": "kidney._disease_gfr_multiplier", "op": "set", "fn": "max(0.05, 1.0 - post_renal_azotemia)" },
+      { "target": "blood.potassium", "op": "set", "fn": "4.2 + hyperkalemia" },
+      { "target": "blood.pH", "op": "set", "fn": "max(7.0, 7.40 - metabolic_acidosis * 0.35)" },
+      { "target": "heart.heart_rate", "op": "add", "fn": "-20.0 * (hyperkalemia / 4.0) if hyperkalemia > 1.5 else (10.0 if post_renal_azotemia > 0.3 else 0.0)" },
+      { "target": "blood.BUN", "op": "set", "fn": "max(7.0, 7.0 + post_renal_azotemia * 60.0)" }
+    ]
+  },
+
+  "diabetic_ketoacidosis": {
+    "display_name": "糖尿病酮症酸中毒（DKA）",
+    "severity_presets": {
+      "mild": { "hyperglycemia_rate": 0.003, "ketone_rate": 0.004, "dehydration_rate": 0.002 },
+      "moderate": { "hyperglycemia_rate": 0.006, "ketone_rate": 0.007, "dehydration_rate": 0.004 },
+      "severe": { "hyperglycemia_rate": 0.012, "ketone_rate": 0.012, "dehydration_rate": 0.008 }
+    },
+    "state_variables": {
+      "hyperglycemia": {
+        "initial": 0.1, "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": { "rate_key": "hyperglycemia_rate", "K_key": "1.0", "seed_threshold": 0.05, "seed_boost": 0.001 }
+      },
+      "ketone_accumulation": {
+        "initial": 0.05, "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": { "rate_key": "ketone_rate", "K_key": "0.95", "seed_threshold": 0.01, "seed_boost": 0.0005 }
+      },
+      "kussmaul_respiration": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 400.0, "target_fn": "min(ketone_accumulation * 0.9, 1.0)" }
+      },
+      "dehydration": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": { "rate_key": "dehydration_rate", "K_key": "0.9", "seed_threshold": 0.05, "seed_boost": 0.0003 }
+      },
+      "anion_gap_acidosis": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 800.0, "target_fn": "ketone_accumulation * 0.85" }
+      }
+    },
+    "outputs": [
+      { "target": "blood.glucose_mmol_L", "op": "set", "fn": "max(5.0, 5.0 + hyperglycemia * 30.0)" },
+      { "target": "blood.pH", "op": "set", "fn": "max(6.95, 7.40 - anion_gap_acidosis * 0.4)" },
+      { "target": "blood.HCO3", "op": "set", "fn": "max(5.0, 24.0 - anion_gap_acidosis * 18.0)" },
+      { "target": "lung.respiratory_rate", "op": "add", "fn": "kussmaul_respiration * 15.0" },
+      { "target": "heart.blood_volume", "op": "multiply", "fn": "max(0.6, 1.0 - dehydration * 0.35)" },
+      { "target": "heart.heart_rate", "op": "add", "fn": "dehydration * 15.0 - kussmaul_respiration * 5.0" },
+      { "target": "blood.ketone_mmol_L", "op": "set", "fn": "max(0.0, ketone_accumulation * 6.0)" }
+    ]
+  },
+
+  "pericardial_effusion": {
+    "display_name": "心包积液/心脏填塞",
+    "severity_presets": {
+      "mild": { "effusion_rate": 0.003, "effusion_K": 0.35 },
+      "moderate": { "effusion_rate": 0.007, "effusion_K": 0.65 },
+      "severe": { "effusion_rate": 0.015, "effusion_K": 0.9 }
+    },
+    "state_variables": {
+      "pericardial_volume": {
+        "initial": 0.05, "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": { "rate_key": "effusion_rate", "K_key": "effusion_K", "seed_threshold": 0.01, "seed_boost": 0.0005 }
+      },
+      "tamponade_severity": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "max(0.0, min(1.0, (pericardial_volume - 0.2) / 0.5))" },
+      "venous_congestion": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 300.0, "target_fn": "tamponade_severity * 0.9" }
+      },
+      "pulsus_paradoxus": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 400.0, "target_fn": "tamponade_severity * 0.8" }
+      }
+    },
+    "outputs": [
+      { "target": "heart.contractility_factor", "op": "multiply", "fn": "max(0.3, 1.0 - tamponade_severity * 0.6)" },
+      { "target": "heart.SVR", "op": "multiply", "fn": "1.0 + tamponade_severity * 0.8" },
+      { "target": "heart.CVP", "op": "add", "fn": "venous_congestion * 12.0" },
+      { "target": "heart.heart_rate", "op": "add", "fn": "tamponade_severity * 35.0" },
+      { "target": "lung.diffusion_coefficient", "op": "multiply", "fn": "max(0.6, 1.0 - tamponade_severity * 0.25)" }
+    ]
+  },
+
+  "disseminated_intravascular_coagulation": {
+    "display_name": "弥散性血管内凝血（DIC）",
+    "severity_presets": {
+      "mild": { "coagulation_rate": 0.004, "coagulation_K": 0.35, "consumption_rate": 0.003 },
+      "moderate": { "coagulation_rate": 0.008, "coagulation_K": 0.65, "consumption_rate": 0.006 },
+      "severe": { "coagulation_rate": 0.015, "coagulation_K": 0.9, "consumption_rate": 0.012 }
+    },
+    "state_variables": {
+      "microthrombus_formation": {
+        "initial": 0.05, "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": { "rate_key": "coagulation_rate", "K_key": "coagulation_K", "seed_threshold": 0.01, "seed_boost": 0.0005 }
+      },
+      "coagulation_consumption": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 500.0, "target_fn": "min(microthrombus_formation * 1.1, 1.0)" }
+      },
+      "hemorrhage_risk": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "max(0.0, min(1.0, coagulation_consumption * 0.8 - microthrombus_formation * 0.2))" },
+      "organ_ischemia": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 800.0, "target_fn": "microthrombus_formation * 0.7" }
+      },
+      "shock_from_dIC": {
+        "initial": 0.0, "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": { "tau": 600.0, "target_fn": "max(hemorrhage_risk, organ_ischemia) * 0.8" }
+      }
+    },
+    "outputs": [
+      { "target": "blood.PLT", "op": "set", "fn": "max(10.0, 300.0 * (1.0 - coagulation_consumption * 0.9))" },
+      { "target": "heart.heart_rate", "op": "add", "fn": "shock_from_dIC * 30.0 + hemorrhage_risk * 15.0" },
+      { "target": "heart.SVR", "op": "multiply", "fn": "max(0.3, 1.0 - shock_from_dIC * 0.6)" },
+      { "target": "kidney._disease_gfr_multiplier", "op": "set", "fn": "max(0.1, 1.0 - organ_ischemia * 0.8)" },
+      { "target": "blood.pH", "op": "set", "fn": "max(7.05, 7.40 - shock_from_dIC * 0.3)" },
+      { "target": "lung.diffusion_coefficient", "op": "multiply", "fn": "max(0.4, 1.0 - organ_ischemia * 0.4)" }
+    ]
   }
 }

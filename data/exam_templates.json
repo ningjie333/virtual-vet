@@ -1,0 +1,1050 @@
+{
+  "_comment": "检查类型模板 — 驱动 report_engine 生成检查报告的配置",
+  "_version": "1.1",
+  "_schema": {
+    "name": "显示名称",
+    "test_type": "检查类型 ID（与 examinations.json 一致）",
+    "handler": "生成器函数名（对应 report_engine._HANDLERS key）",
+    "vitals": "定量参数列表（从 vitals_ranges.json 读取参考范围）",
+    "extra_params": "非标准定量参数（如 Cr、ALT、USG 等自定义结果条目）",
+    "tag_rules": "结构化标签规则 — 满足条件时 emit clue_id",
+    "thresholds": "判断阈值 — 可在 tag_rules 和 findings_rules 中引用",
+    "findings_rules": "叙述性检查的发现规则（仅叙述性检查使用）"
+  },
+  "physical": {
+    "name": "体格检查",
+    "test_type": "physical",
+    "handler": "physical",
+    "vitals": ["HR", "RR", "Temp", "MAP"],
+    "extra_params": [],
+    "thresholds": {
+      "hr_tachy": 140,
+      "hr_brady": 60,
+      "map_low_severe": 50,
+      "map_low_moderate": 65,
+      "spo2_low_severe": 85,
+      "spo2_low_moderate": 90,
+      "mental_normal": "警觉/正常"
+    },
+    "tag_rules": [
+      {
+        "clue_id": "hr_high",
+        "condition": "state.HR > thresholds.hr_tachy"
+      },
+      {
+        "clue_id": "hr_low",
+        "condition": "state.HR < thresholds.hr_brady"
+      },
+      {
+        "clue_id": "rr_high",
+        "condition": "state.RR > 30"
+      },
+      {
+        "clue_id": "temp_high",
+        "condition": "state.Temp > 39.2"
+      },
+      {
+        "clue_id": "map_low",
+        "condition": "state.MAP < thresholds.map_low_moderate"
+      },
+      {
+        "clue_id": "SpO2_low",
+        "condition": "state.Spo2 < thresholds.spo2_low_moderate"
+      }
+    ],
+    "findings_rules": {
+      "mental_status": [
+        {"if": "state.MAP < thresholds.map_low_severe or state.SpO2 < thresholds.spo2_low_severe", "text": "昏迷"},
+        {"if": "state.MAP < thresholds.map_low_moderate or state.SpO2 < thresholds.spo2_low_moderate", "text": "嗜睡/沉郁"},
+        {"if": "state.HR > thresholds.hr_tachy", "text": "烦躁不安"},
+        {"else": true, "text": "警觉/正常"}
+      ]
+    }
+  },
+  "auscultation": {
+    "name": "听诊",
+    "test_type": "auscultation",
+    "handler": "auscultation",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "hr_tachy": 140,
+      "hr_brady": 50,
+      "hr_very_high": 160,
+      "rr_high": 35,
+      "pao2_crackles_severe": 60,
+      "pao2_crackles_mild": 80,
+      "contractility_high": 1.3,
+      "contractility_low": 0.7,
+      "gdv_distension_severe": 0.7,
+      "gdv_distension_moderate": 0.4,
+      "gdv_distension_mild": 0.1,
+      "kussmaul_moderate": 0.5,
+      "kussmaul_mild": 0.2,
+      "pericardial_muffled": 0.3,
+      "arrhythmia_severe": 0.5
+    },
+    "tag_rules": [
+      {
+        "clue_id": "crackles",
+        "condition": "state.PaO2 < thresholds.pao2_crackles_mild"
+      },
+      {
+        "clue_id": "hr_high",
+        "condition": "state.HR > thresholds.hr_tachy"
+      },
+      {
+        "clue_id": "rr_high",
+        "condition": "state.RR > thresholds.rr_high"
+      },
+      {
+        "clue_id": "muffled_heart_sounds",
+        "condition": "disease.tamponade_severity > thresholds.pericardial_muffled",
+        "requires": "disease.tamponade_severity"
+      },
+      {
+        "clue_id": "arrhythmia",
+        "condition": "disease.arrhythmia_severity > thresholds.arrhythmia_severe",
+        "requires": "disease.arrhythmia_severity"
+      }
+    ],
+    "findings_rules": {
+      "heart_rate_desc": [
+        {"if": "state.HR > thresholds.hr_tachy", "text": "心动过速，心音增强"},
+        {"if": "state.HR < thresholds.hr_brady", "text": "心动过缓，心音减弱"},
+        {"else": true, "text": "心率正常，心音清晰"}
+      ],
+      "contractility_desc": [
+        {"if": "state.contractility > thresholds.contractility_high", "text": "心音增强（高动力状态）"},
+        {"if": "state.contractility < thresholds.contractility_low", "text": "心音低沉（收缩力减弱）"}
+      ],
+      "lung_desc": [
+        {"if": "state.PaO2 < thresholds.pao2_crackles_severe", "text": "双肺湿啰音（肺泡渗出）"},
+        {"if": "state.PaO2 < thresholds.pao2_crackles_mild", "text": "肺底细湿啰音"},
+        {"if": "state.RR > thresholds.rr_high", "text": "呼吸音粗粝（呼吸急促）"},
+        {"else": true, "text": "肺音清晰，呼吸音正常"}
+      ],
+      "rhythm_note": [
+        {"if": "state.HR > thresholds.hr_very_high", "text": "节律不齐待排（建议心电图）"}
+      ],
+      "gdv_findings": [
+        {"if": "disease.gastric_distension > thresholds.gdv_distension_severe", "text": "心音遥远（胃扩张压迫膈肌），可闻及振水音"},
+        {"if": "disease.gastric_distension > thresholds.gdv_distension_moderate", "text": "心音轻度遥远"},
+        {"if": "disease.arrhythmia_severity > thresholds.arrhythmia_severe", "text": "室性早搏（胃扩张扭转常见并发症）"}
+      ],
+      "dka_kussmaul": [
+        {"if": "disease.kussmaul_respiration > thresholds.kussmaul_moderate", "text": "深大呼吸（Kussmaul呼吸），呼气有酮味"},
+        {"if": "disease.kussmaul_respiration > thresholds.kussmaul_mild", "text": "呼吸深快"}
+      ],
+      "pericardial_findings": [
+        {"if": "disease.tamponade_severity > thresholds.pericardial_muffled", "text": "心音遥远、低沉（心脏填塞征象）"},
+        {"if": "disease.pulsus_paradoxus > 0.3", "text": "奇脉（吸气时心音明显减弱）"}
+      ],
+      "dic_hemorrhage": [
+        {"if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_moderate", "text": "黏膜出血点，静脉穿刺部位渗血不止"},
+        {"if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_mild", "text": "散在瘀点瘀斑"}
+      ],
+      "icterus_note": [
+        {"if": "disease.bilirubin_load > thresholds.icterus_moderate", "text": "黏膜黄染（重度黄疸）"},
+        {"if": "disease.bilirubin_load > thresholds.icterus_mild", "text": "黏膜轻度黄染"}
+      ],
+      "pericardial_jvd": [
+        {"if": "disease.venous_congestion > thresholds.jvd_moderate", "text": "颈静脉怒张（平卧位仍明显）"},
+        {"if": "disease.venous_congestion > thresholds.jvd_mild", "text": "颈静脉轻度充盈"}
+      ]
+    }
+  },
+  "inspection": {
+    "name": "视诊",
+    "test_type": "inspection",
+    "handler": "inspection",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "spo2_cyanosis_severe": 85,
+      "spo2_cyanosis_mild": 92,
+      "map_low": 60,
+      "bv_dehydration_severe": 0.85,
+      "bv_dehydration_moderate": 0.92,
+      "bv_dehydration_mild": 0.97,
+      "temp_high": 39.5,
+      "temp_very_high": 40.0,
+      "temp_low": 37.5,
+      "gdv_distension_severe": 0.7,
+      "gdv_distension_moderate": 0.4,
+      "gdv_distension_mild": 0.1,
+      "kussmaul_moderate": 0.5,
+      "kussmaul_mild": 0.2,
+      "icterus_moderate": 0.5,
+      "icterus_mild": 0.15,
+      "jvd_moderate": 0.5,
+      "jvd_mild": 0.2,
+      "dic_hemorrhage_moderate": 0.5,
+      "dic_hemorrhage_mild": 0.2
+    },
+    "tag_rules": [
+      {
+        "clue_id": "SpO2_low",
+        "condition": "state.SpO2 < thresholds.spo2_cyanosis_mild"
+      },
+      {
+        "clue_id": "dehydration",
+        "condition": "bv_ratio < thresholds.bv_dehydration_moderate"
+      },
+      {
+        "clue_id": "icterus",
+        "condition": "disease.bilirubin_load > thresholds.icterus_mild",
+        "requires": "disease.bilirubin_load"
+      },
+      {
+        "clue_id": "jugular_distension",
+        "condition": "disease.venous_congestion > thresholds.jvd_mild",
+        "requires": "disease.venous_congestion"
+      },
+      {
+        "clue_id": "petechiae",
+        "condition": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_mild",
+        "requires": "disease.hemorrhage_risk"
+      }
+    ],
+    "findings_rules": {
+      "mucosa_color": [
+        {"if": "state.SpO2 < thresholds.spo2_cyanosis_severe", "text": "黏膜发绀（严重低氧）"},
+        {"if": "state.SpO2 < thresholds.spo2_cyanosis_mild", "text": "黏膜轻度发绀"},
+        {"if": "state.MAP < thresholds.map_low", "text": "黏膜苍白（低灌注）"},
+        {"else": true, "text": "黏膜颜色正常，粉红色"}
+      ],
+      "hydration": [
+        {"if": "bv_ratio < thresholds.bv_dehydration_severe", "text": "重度脱水（皮肤弹性差，眼球凹陷）"},
+        {"if": "bv_ratio < thresholds.bv_dehydration_moderate", "text": "中度脱水（皮肤弹性下降）"},
+        {"if": "bv_ratio < thresholds.bv_dehydration_mild", "text": "轻度脱水"},
+        {"else": true, "text": "水合状态正常"}
+      ],
+      "temperature_note": [
+        {"if": "state.Temp > thresholds.temp_very_high", "text": "高热（体温 {state.Temp:.1f}°C）"},
+        {"if": "state.Temp > thresholds.temp_high", "text": "发热（体温 {state.Temp:.1f}°C）"},
+        {"if": "state.Temp < thresholds.temp_low", "text": "低体温（体温 {state.Temp:.1f}°C）"}
+      ],
+      "gdv_abdomen": [
+        {"if": "disease.gastric_distension > thresholds.gdv_distension_severe", "text": "腹部极度膨隆如鼓，腹壁紧张"},
+        {"if": "disease.gastric_distension > thresholds.gdv_distension_moderate", "text": "腹部明显膨隆，叩诊呈鼓音"},
+        {"if": "disease.gastric_distension > thresholds.gdv_distension_mild", "text": "上腹部轻度膨隆"}
+      ],
+      "icterus_findings": [
+        {"if": "disease.bilirubin_load > thresholds.icterus_moderate", "text": "黏膜重度黄染（黄疸）"},
+        {"if": "disease.bilirubin_load > thresholds.icterus_mild", "text": "黏膜轻度黄染"},
+        {"else": true, "text": "黏膜颜色正常，无黄疸"}
+      ],
+      "dic_hemorrhage_findings": [
+        {"if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_moderate", "text": "全身多处瘀斑，穿刺部位渗血不止，可见血便"},
+        {"if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_mild", "text": "散在瘀点瘀斑"}
+      ],
+      "jvd_findings": [
+        {"if": "disease.venous_congestion > thresholds.jvd_moderate", "text": "颈静脉怒张（平卧位仍明显）"},
+        {"if": "disease.venous_congestion > thresholds.jvd_mild", "text": "颈静脉轻度充盈"}
+      ],
+      "kussmaul_finding": [
+        {"if": "disease.kussmaul_respiration > thresholds.kussmaul_moderate", "text": "深大呼吸（Kussmaul呼吸），呼气有酮味"},
+        {"if": "disease.kussmaul_respiration > thresholds.kussmaul_mild", "text": "呼吸深快"}
+      ]
+    }
+  },
+  "blood_routine": {
+    "name": "血常规",
+    "test_type": "blood_routine",
+    "handler": "blood_routine",
+    "vitals": ["HCT"],
+    "extra_params": [
+      {
+        "param": "WBC",
+        "unit": "×10⁹/L",
+        "normal_range": "6.0-17.0",
+        "source": "computed",
+        "value_formula": "thresholds.wbc_base + (disease.bacterial_load * thresholds.wbc_bacterial_factor if getattr(disease, 'active', False) and hasattr(disease, 'bacterial_load') else 0)"
+      },
+      {
+        "param": "PLT",
+        "unit": "×10⁹/L",
+        "normal_range": "150-500",
+        "source": "creature.blood.PLT"
+      }
+    ],
+    "thresholds": {
+      "wbc_base": 12.0,
+      "wbc_bacterial_factor": 8.0
+    },
+    "tag_rules": [
+      {
+        "clue_id": "wbc_high",
+        "condition": "state.WBC > 17.0"
+      },
+      {
+        "clue_id": "hct_low",
+        "condition": "state.HCT < 37.0"
+      },
+      {
+        "clue_id": "plt_low",
+        "condition": "state.PLT < 150.0"
+      }
+    ],
+    "findings_rules": {}
+  },
+  "blood_biochem": {
+    "name": "生化全项",
+    "test_type": "blood_biochem",
+    "handler": "blood_biochem",
+    "vitals": ["BUN", "Glu", "Na", "K"],
+    "extra_params": [
+      {
+        "param": "Cr",
+        "unit": "mg/dL",
+        "normal_range": "0.5-1.5",
+        "source": "creature.blood.creatinine_mg_dL"
+      },
+      {
+        "param": "ALT",
+        "unit": "U/L",
+        "normal_range": "10-100",
+        "source": "hardcoded",
+        "default_value": 45.0
+      },
+      {
+        "param": "Bilirubin",
+        "unit": "mg/dL",
+        "normal_range": "<0.5",
+        "source": "creature.blood.bilirubin_mg_dL"
+      },
+      {
+        "param": "Ketone",
+        "unit": "mmol/L",
+        "normal_range": "<0.5",
+        "source": "creature.blood.ketone_mmol_L"
+      }
+    ],
+    "thresholds": {},
+    "tag_rules": [
+      {
+        "clue_id": "bun_high",
+        "condition": "state.BUN > 30.0"
+      },
+      {
+        "clue_id": "gfr_low",
+        "condition": "state.GFR < 60.0",
+        "note": "GFR 来自 vitals 而非 extra_params"
+      },
+      {
+        "clue_id": "potassium_high",
+        "condition": "state.K > 5.5"
+      },
+      {
+        "clue_id": "potassium_low",
+        "condition": "state.K < 3.5"
+      },
+      {
+        "clue_id": "cr_high",
+        "condition": "creature.blood.creatinine_mg_dL > 1.5"
+      },
+      {
+        "clue_id": "glucose_high",
+        "condition": "state.Glu > 10.0"
+      },
+      {
+        "clue_id": "bilirubin_high",
+        "condition": "creature.blood.bilirubin_mg_dL > 0.5"
+      },
+      {
+        "clue_id": "ketone_high",
+        "condition": "creature.blood.ketone_mmol_L > 0.5"
+      }
+    ]
+  },
+  "blood_gas": {
+    "name": "血气分析",
+    "test_type": "blood_gas",
+    "handler": "blood_gas",
+    "vitals": ["PaO2", "PaCO2", "pH", "Lactate", "SpO2", "HCO3"],
+    "extra_params": [],
+    "thresholds": {
+      "ph_acidosis": 7.35,
+      "ph_alkalosis": 7.45,
+      "paco2_high": 45,
+      "paco2_low": 35,
+      "lactate_high": 2.5,
+      "hco3_low": 18,
+      "hco3_very_low": 12,
+      "paco2_kussmaul_low": 30
+    },
+    "tag_rules": [
+      {
+        "clue_id": "PaO2_low",
+        "condition": "state.PaO2 < 80.0"
+      },
+      {
+        "clue_id": "PaCO2_high",
+        "condition": "state.PaCO2 > thresholds.paco2_high"
+      },
+      {
+        "clue_id": "SpO2_low",
+        "condition": "state.SpO2 < 95.0"
+      },
+      {
+        "clue_id": "ph_low",
+        "condition": "state.pH < thresholds.ph_acidosis"
+      },
+      {
+        "clue_id": "ph_high",
+        "condition": "state.pH > thresholds.ph_alkalosis"
+      },
+      {
+        "clue_id": "lactate_high",
+        "condition": "state.Lactate > thresholds.lactate_high"
+      },
+      {
+        "clue_id": "hco3_low",
+        "condition": "state.HCO3 < thresholds.hco3_low"
+      }
+    ],
+    "findings_rules": {
+      "acidosis_type": [
+        {"if": "state.pH < thresholds.ph_acidosis and state.PaCO2 > thresholds.paco2_high", "text": "呼吸性酸中毒"},
+        {"if": "state.pH < thresholds.ph_acidosis and state.Lactate > thresholds.lactate_high", "text": "代谢性酸中毒（乳酸酸中毒）"},
+        {"if": "state.pH < thresholds.ph_acidosis and state.HCO3 < thresholds.hco3_very_low", "text": "代谢性酸中毒（酮症酸中毒可能）"},
+        {"if": "state.pH < thresholds.ph_acidosis and state.HCO3 < thresholds.hco3_low", "text": "代谢性酸中毒"},
+        {"if": "state.pH < thresholds.ph_acidosis", "text": "酸中毒"}
+      ],
+      "alkalosis_type": [
+        {"if": "state.pH > thresholds.ph_alkalosis and state.PaCO2 < thresholds.paco2_low", "text": "呼吸性碱中毒"},
+        {"if": "state.pH > thresholds.ph_alkalosis", "text": "碱中毒"}
+      ],
+      "kussmaul_compensation": [
+        {"if": "state.pH < thresholds.ph_acidosis and state.PaCO2 < thresholds.paco2_kussmaul_low", "text": "呼吸代偿（Kussmaul呼吸，CO2代偿性降低）"}
+      ]
+    }
+  },
+  "chest_xray": {
+    "name": "X光胸片",
+    "test_type": "chest_xray",
+    "handler": "chest_xray",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "exudate_severe": 0.7,
+      "exudate_moderate": 0.3,
+      "exudate_mild": 0.05,
+      "hypoxia_severe": 0.5,
+      "dcm_dilation": 0.3,
+      "dcm_fluid": 0.3,
+      "rr_high": 35,
+      "pao2_low": 80
+    },
+    "tag_rules": [
+      {
+        "clue_id": "lung_exudate_xray",
+        "condition": "disease.alveolar_exudate > thresholds.exudate_mild",
+        "requires": "disease.alveolar_exudate"
+      },
+      {
+        "clue_id": "cardiomegaly_xray",
+        "condition": "disease.ventricular_dilation > thresholds.dcm_dilation",
+        "requires": "disease.ventricular_dilation"
+      }
+    ],
+    "findings_rules": {
+      "pneumonia_findings": [
+        {"if": "disease.alveolar_exudate > thresholds.exudate_severe", "texts": ["双肺大面积实变影，空气支气管征可见", "肺泡渗出严重，呈大叶性肺炎表现"]},
+        {"if": "disease.alveolar_exudate > thresholds.exudate_moderate", "texts": ["肺野斑片状渗出影，以下叶为主", "提示支气管肺炎"]},
+        {"if": "disease.alveolar_exudate > thresholds.exudate_mild", "texts": ["肺纹理增粗，散在少量渗出"]}
+      ],
+      "non_pneumonia_findings": [
+        {"if": "state.PaO2 < thresholds.pao2_low", "text": "肺野散在斑片影（非特异性渗出）"},
+        {"else": true, "texts": ["肺野清晰", "未见明显渗出或占位性病变"]}
+      ],
+      "dcm_findings": [
+        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "text": "心影普遍增大（心胸比 > 0.7）"},
+        {"if": "disease.fluid_retention > thresholds.dcm_fluid", "text": "肺静脉扩张，肺纹理增粗（肺淤血）"}
+      ],
+      "rr_finding": [
+        {"if": "state.RR > thresholds.rr_high", "text": "膈肌低平（过度通气）"}
+      ],
+      "gdv_xray": [
+        {"if": "disease.gastric_distension > thresholds.gdv_distension_severe", "text": "胃极度扩张，可见\"双气泡\"征（胃扭转典型表现），膈肌前移"},
+        {"if": "disease.gastric_distension > thresholds.gdv_distension_moderate", "text": "胃明显扩张，胃大弯越过体中线"},
+        {"if": "disease.gastric_distension > thresholds.gdv_distension_mild", "text": "胃轻度扩张"}
+      ],
+      "pericardial_xray": [
+        {"if": "disease.tamponade_severity > thresholds.pericardial_muffled", "text": "心影普遍增大呈\"烧瓶\"状（心包积液）"},
+        {"if": "disease.pericardial_volume > 0.1", "text": "心影轻度增大"}
+      ]
+    }
+  },
+  "ultrasound": {
+    "name": "超声检查",
+    "test_type": "ultrasound",
+    "handler": "ultrasound",
+    "vitals": ["GFR", "CVP"],
+    "extra_params": [
+      {
+        "param": "Urine",
+        "unit": "mL/min",
+        "normal_range": ">0.008×BW",
+        "source": "state.Urine"
+      }
+    ],
+    "thresholds": {
+      "contractility_high": 1.3,
+      "contractility_low": 0.7,
+      "bv_low": 0.85,
+      "cvp_high": 8,
+      "gfr_low_severe": 30,
+      "gfr_low_moderate": 50,
+      "dcm_dilation": 0.3,
+      "dcm_contractility_loss": 0.3,
+      "pneumonia_exudate": 0.3,
+      "dcm_fluid": 0.3,
+      "urine_oliguria": "0.008 * creature.w",
+      "urine_anuria": "0.002 * creature.w",
+      "bladder_severe": 0.7,
+      "bladder_moderate": 0.4,
+      "bladder_mild": 0.1,
+      "pericardial_muffled": 0.3,
+      "dic_organ_moderate": 0.5,
+      "dic_organ_mild": 0.2
+    },
+    "tag_rules": [
+      {
+        "clue_id": "gfr_low",
+        "condition": "state.GFR < thresholds.gfr_low_moderate"
+      },
+      {
+        "clue_id": "lung_exudate_us",
+        "condition": "disease.alveolar_exudate > thresholds.pneumonia_exudate",
+        "requires": "disease.alveolar_exudate"
+      },
+      {
+        "clue_id": "lung_exudate_us",
+        "condition": "disease.fluid_retention > thresholds.dcm_fluid",
+        "requires": "disease.fluid_retention"
+      },
+      {
+        "clue_id": "cardiomegaly_us",
+        "condition": "disease.ventricular_dilation > thresholds.dcm_dilation",
+        "requires": "disease.ventricular_dilation"
+      },
+      {
+        "clue_id": "bladder_distension",
+        "condition": "disease.bladder_distension > thresholds.bladder_mild",
+        "requires": "disease.bladder_distension"
+      },
+      {
+        "clue_id": "anuria",
+        "condition": "state.Urine < thresholds.urine_anuria"
+      }
+    ],
+    "findings_rules": {
+      "heart_function": [
+        {"if": "state.contractility > thresholds.contractility_high", "text": "左室收缩功能增强（高动力状态）"},
+        {"if": "state.contractility < thresholds.contractility_low", "text": "左室收缩功能减低，室壁运动减弱"},
+        {"else": true, "text": "心脏结构正常，室壁运动良好"}
+      ],
+      "ivc_status": [
+        {"if": "bv_ratio < thresholds.bv_low", "text": "下腔静脉塌陷（低血容量）"},
+        {"if": "state.CVP > thresholds.cvp_high", "text": "下腔静脉扩张（容量过负荷/右心衰）"}
+      ],
+      "kidney_findings": [
+        {"if": "state.GFR < thresholds.gfr_low_severe", "text": "双肾皮质回声增强（肾功能受损）"},
+        {"if": "state.GFR < thresholds.gfr_low_moderate", "text": "肾血流灌注减少"},
+        {"else": true, "text": "双肾大小正常，皮髓质分界清晰"}
+      ],
+      "dcm_heart": [
+        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "text": "左室扩张，室壁运动弥漫性减弱（DCM 表现）"},
+        {"if": "disease.contractility_loss > thresholds.dcm_contractility_loss", "text": "左室缩短分数减低（收缩功能不全）"}
+      ],
+      "lung_findings": [
+        {"if": "disease.alveolar_exudate > thresholds.pneumonia_exudate", "text": "肺实质样变（B线增多，胸膜线不规则）"},
+        {"if": "disease.fluid_retention > thresholds.dcm_fluid", "text": "双肺B线增多（肺淤血/肺水肿）"}
+      ],
+      "urine_findings": [
+        {"if": "state.Urine < thresholds.urine_anuria", "text": "无尿（尿量 {state.Urine:.4f} mL/min）"},
+        {"if": "state.Urine < thresholds.urine_oliguria", "text": "少尿（尿量 {state.Urine:.4f} mL/min）"},
+        {"else": true, "text": "尿量正常"}
+      ],
+      "bladder_findings": [
+        {"if": "disease.bladder_distension > thresholds.bladder_severe", "text": "膀胱极度膨大，壁薄（尿道完全梗阻）"},
+        {"if": "disease.bladder_distension > thresholds.bladder_moderate", "text": "膀胱明显膨大，需紧急导尿"},
+        {"if": "disease.bladder_distension > thresholds.bladder_mild", "text": "膀胱中度充盈"}
+      ],
+      "pericardial_findings_us": [
+        {"if": "disease.tamponade_severity > thresholds.pericardial_muffled", "text": "心包腔内可见液性暗区，右室舒张期塌陷（心脏填塞）"},
+        {"if": "disease.pericardial_volume > 0.1", "text": "少量心包积液"}
+      ],
+      "dic_kidney_findings": [
+        {"if": "disease.organ_ischemia > thresholds.dic_organ_moderate", "text": "双肾回声增强，皮髓质分界不清（肾微血栓缺血）"},
+        {"if": "disease.organ_ischemia > thresholds.dic_organ_mild", "text": "肾血流灌注减少"}
+      ]
+    }
+  },
+  "ct": {
+    "name": "CT",
+    "test_type": "ct",
+    "handler": "ct",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "exudate_severe": 0.7,
+      "exudate_moderate": 0.3,
+      "exudate_mild": 0.05,
+      "dcm_dilation": 0.3,
+      "dcm_fluid": 0.3,
+      "pao2_low": 70
+    },
+    "tag_rules": [
+      {
+        "clue_id": "lung_exudate_ct",
+        "condition": "disease.alveolar_exudate > thresholds.exudate_mild",
+        "requires": "disease.alveolar_exudate"
+      },
+      {
+        "clue_id": "cardiomegaly_xray",
+        "condition": "disease.ventricular_dilation > thresholds.dcm_dilation",
+        "requires": "disease.ventricular_dilation"
+      }
+    ],
+    "findings_rules": {
+      "pneumonia_findings": [
+        {"if": "disease.alveolar_exudate > thresholds.exudate_severe", "texts": ["双肺大面积实变，累及多个肺叶", "空气支气管征明显，呈大叶性肺炎典型表现", "少量胸腔积液"]},
+        {"if": "disease.alveolar_exudate > thresholds.exudate_moderate", "texts": ["多发磨玻璃影伴实变，以下叶和背侧为主", "支气管充气征可见"]},
+        {"if": "disease.alveolar_exudate > thresholds.exudate_mild", "texts": ["散在磨玻璃样渗出，范围较小"]}
+      ],
+      "non_pneumonia_findings": [
+        {"else": true, "texts": ["肺野清晰，未见实质性病变", "纵隔结构正常，无肿大淋巴结"]}
+      ],
+      "dcm_findings": [
+        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "text": "心脏各房室普遍扩大，以左室为主"},
+        {"if": "disease.fluid_retention > thresholds.dcm_fluid", "text": "肺血管纹理增粗，少量胸腔积液"}
+      ],
+      "hypoxia_finding": [
+        {"if": "state.PaO2 < thresholds.pao2_low", "text": "低氧血症相关改变"}
+      ]
+    }
+  },
+  "ecg": {
+    "name": "心电图",
+    "test_type": "ecg",
+    "handler": "ecg",
+    "vitals": ["HR"],
+    "extra_params": [
+      {
+        "param": "节律",
+        "unit": "",
+        "normal_range": "窦性心律",
+        "source": "computed"
+      }
+    ],
+    "thresholds": {
+      "hr_tachy_severe": 160,
+      "hr_tachy_mild": 140,
+      "hr_brady_severe": 50,
+      "hr_brady_mild": 60,
+      "k_high": 5.5,
+      "k_low": 3.0,
+      "fever_state": 0.5,
+      "arrhythmia_severe": 0.5,
+      "dic_shock_moderate": 0.5
+    },
+    "tag_rules": [
+      {
+        "clue_id": "hr_high",
+        "condition": "state.HR > thresholds.hr_tachy_mild"
+      },
+      {
+        "clue_id": "hr_low",
+        "condition": "state.HR < thresholds.hr_brady_mild"
+      },
+      {
+        "clue_id": "potassium_high",
+        "condition": "state.K > thresholds.k_high"
+      },
+      {
+        "clue_id": "potassium_low",
+        "condition": "state.K < thresholds.k_low"
+      }
+    ],
+    "findings_rules": {
+      "rhythm_base": [
+        {"if": "state.HR > thresholds.hr_tachy_severe", "text": "窦性心动过速"},
+        {"if": "state.HR > thresholds.hr_tachy_mild", "text": "窦性心动过速（轻度）"},
+        {"if": "state.HR < thresholds.hr_brady_severe", "text": "窦性心动过缓"},
+        {"if": "state.HR < thresholds.hr_brady_mild", "text": "窦性心动过缓（轻度）"},
+        {"else": true, "text": "窦性心律，节律整齐"}
+      ],
+      "fever_note": [
+        {"if": "disease.fever_state > thresholds.fever_state", "text": "；发热相关心率增快"}
+      ],
+      "k_note": [
+        {"if": "state.K > thresholds.k_high", "text": "；高钾血症相关T波高尖"},
+        {"if": "state.K < thresholds.k_low", "text": "；低钾血症相关U波"}
+      ],
+      "arrhythmia_note": [
+        {"if": "disease.arrhythmia_severity > thresholds.arrhythmia_severe", "text": "；室性早搏二联律（胃扩张扭转相关心律失常）"}
+      ],
+      "dic_ecg_note": [
+        {"if": "disease.shock_from_dIC > thresholds.dic_shock_moderate", "text": "；窦性心动过速伴ST段改变（微血栓心肌缺血）"}
+      ]
+    }
+  },
+  "urinalysis": {
+    "name": "尿液分析",
+    "test_type": "urinalysis",
+    "handler": "urinalysis",
+    "vitals": [],
+    "extra_params": [
+      {
+        "param": "USG",
+        "unit": "",
+        "normal_range": "1.015-1.040",
+        "source": "computed",
+        "value_formula": "1.035 if bv_ratio < thresholds.bv_dehydrated else (1.015 if state.GFR < thresholds.gfr_low else 1.025)"
+      },
+      {
+        "param": "UPCR",
+        "unit": "",
+        "normal_range": "<0.5",
+        "source": "computed",
+        "value_formula": "1.5 if state.GFR < thresholds.gfr_very_low else 0.3"
+      },
+      {
+        "param": "沉渣",
+        "unit": "",
+        "normal_range": "阴性",
+        "source": "computed",
+        "value_formula": "1 if state.GFR < thresholds.gfr_low else 0",
+        "is_text_result": true,
+        "text_values": {
+          "1": "颗粒管型、肾上皮细胞",
+          "0": "阴性"
+        }
+      }
+    ],
+    "thresholds": {
+      "gfr_low": 30,
+      "gfr_very_low": 50,
+      "bv_dehydrated": 0.9
+    },
+    "tag_rules": [
+      {
+        "clue_id": "usg_low",
+        "condition": "state.USG < 1.015"
+      },
+      {
+        "clue_id": "upcr_high",
+        "condition": "state.UPCR > 0.5"
+      }
+    ],
+    "findings_rules": {}
+  },
+  "blood_pressure": {
+    "name": "血压测量",
+    "test_type": "blood_pressure",
+    "handler": "blood_pressure",
+    "vitals": ["MAP"],
+    "extra_params": [
+      {
+        "param": "SBP",
+        "unit": "mmHg",
+        "normal_range": "110-160",
+        "source": "computed",
+        "formula": "state.MAP * 1.4"
+      },
+      {
+        "param": "DBP",
+        "unit": "mmHg",
+        "normal_range": "60-90",
+        "source": "computed",
+        "formula": "state.MAP * 0.8",
+        "note": "SBP/DBP 由 MAP 估算: SBP≈MAP×1.4, DBP≈MAP×0.8"
+      }
+    ],
+    "thresholds": {
+      "map_normal_low": 80,
+      "map_normal_high": 120,
+      "pulsus_paradoxus_severe": 0.5
+    },
+    "tag_rules": [
+      {
+        "clue_id": "map_high",
+        "condition": "state.MAP > thresholds.map_normal_high"
+      },
+      {
+        "clue_id": "map_low",
+        "condition": "state.MAP < thresholds.map_normal_low"
+      },
+      {
+        "clue_id": "pulsus_paradoxus",
+        "condition": "disease.pulsus_paradoxus > thresholds.pulsus_paradoxus_severe",
+        "requires": "disease.pulsus_paradoxus"
+      }
+    ]
+  },
+  "cytology": {
+    "name": "细胞学检查",
+    "test_type": "cytology",
+    "handler": "cytology",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "bacterial_load_significant": 0.3
+    },
+    "tag_rules": [
+      {
+        "clue_id": "wbc_high",
+        "condition": "disease.bacterial_load > thresholds.bacterial_load_significant",
+        "requires": "disease.bacterial_load"
+      }
+    ],
+    "findings_rules": {
+      "pneumonia_findings": [
+        {"if": "disease.bacterial_load > thresholds.bacterial_load_significant", "texts": ["大量中性粒细胞，可见细菌吞噬现象", "化脓性炎症表现，符合细菌性肺炎"]},
+        {"else": true, "text": "轻度炎性细胞浸润"}
+      ],
+      "dcm_findings": [
+        {"if": "disease.ventricular_dilation is not None", "texts": ["未见明显异常细胞", "排除肿瘤性病变"]}
+      ],
+      "default_finding": [
+        {"else": true, "text": "细胞学未见明显异常"}
+      ]
+    }
+  },
+  "snap_test": {
+    "name": "快速检测（SNAP）",
+    "test_type": "snap_test",
+    "handler": "snap_test",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "bacterial_load_significant": 0.3
+    },
+    "tag_rules": [
+      {
+        "clue_id": "wbc_high",
+        "condition": "disease.bacterial_load > thresholds.bacterial_load_significant",
+        "requires": "disease.bacterial_load"
+      }
+    ],
+    "findings_rules": {
+      "positive": [
+        {"if": "disease.bacterial_load > thresholds.bacterial_load_significant", "texts": ["犬瘟热/副流感快速检测：阳性", "提示病毒性呼吸道感染合并细菌感染"]}
+      ],
+      "negative": [
+        {"else": true, "texts": ["快速检测：阴性", "未检测到常见病原标志物"]}
+      ]
+    }
+  },
+  "fna": {
+    "name": "细针穿刺（FNA）",
+    "test_type": "fna",
+    "handler": "fna",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "exudate_significant": 0.3
+    },
+    "tag_rules": [
+      {
+        "clue_id": "lung_exudate_us",
+        "condition": "disease.alveolar_exudate > thresholds.exudate_significant",
+        "requires": "disease.alveolar_exudate"
+      }
+    ],
+    "findings_rules": {
+      "pneumonia_findings": [
+        {"if": "disease.alveolar_exudate > thresholds.exudate_significant", "texts": ["肺组织穿刺：大量炎性细胞", "符合感染性肺炎细胞学表现"]},
+        {"else": true, "text": "少量炎性细胞"}
+      ],
+      "default_findings": [
+        {"else": true, "texts": ["细胞学样本未见明显异常", "少量正常间皮细胞"]}
+      ]
+    }
+  },
+  "abdominocentesis": {
+    "name": "腹腔穿刺",
+    "test_type": "abdominocentesis",
+    "handler": "abdominocentesis",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "fluid_retention_significant": 0.3
+    },
+    "tag_rules": [
+      {
+        "clue_id": "lung_exudate_us",
+        "condition": "disease.fluid_retention > thresholds.fluid_retention_significant",
+        "requires": "disease.fluid_retention",
+        "note": "心源性腹水 tag 复用 lung_exudate_us clue"
+      }
+    ],
+    "findings_rules": {
+      "positive": [
+        {"if": "disease.fluid_retention > thresholds.fluid_retention_significant", "texts": ["腹腔穿刺获淡黄色漏出液", "蛋白含量低（<2.5 g/dL），符合漏出液", "提示心源性腹水"]}
+      ],
+      "negative": [
+        {"else": true, "texts": ["腹腔未见明显积液", "穿刺阴性"]}
+      ]
+    }
+  },
+  "thoracocentesis": {
+    "name": "胸腔穿刺",
+    "test_type": "thoracocentesis",
+    "handler": "thoracocentesis",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "exudate_severe": 0.5,
+      "exudate_mild": 0.1,
+      "fluid_retention_significant": 0.3
+    },
+    "tag_rules": [
+      {
+        "clue_id": "lung_exudate_us",
+        "condition": "disease.alveolar_exudate > thresholds.exudate_mild",
+        "requires": "disease.alveolar_exudate"
+      }
+    ],
+    "findings_rules": {
+      "pneumonia_severe": [
+        {"if": "disease.alveolar_exudate > thresholds.exudate_severe", "texts": ["胸腔穿刺获浑浊液体", "细胞计数升高，蛋白含量高", "符合渗出液，提示感染性胸膜炎"]},
+        {"if": "disease.alveolar_exudate > thresholds.exudate_mild", "text": "少量胸腔积液，淡黄色"}
+      ],
+      "dcm_findings": [
+        {"if": "disease.fluid_retention > thresholds.fluid_retention_significant", "text": "双侧少量胸腔积液，漏出液性质"}
+      ],
+      "negative": [
+        {"else": true, "texts": ["胸腔未见明显积液", "穿刺阴性"]}
+      ]
+    }
+  },
+  "echocardiography": {
+    "name": "超声心动图",
+    "test_type": "echocardiography",
+    "handler": "echocardiography",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "dcm_dilation": 0.3,
+      "fs_reduction_factor": 30,
+      "fs_base": 25,
+      "pao2_low": 60
+    },
+    "tag_rules": [
+      {
+        "clue_id": "cardiomegaly_us",
+        "condition": "disease.ventricular_dilation > thresholds.dcm_dilation",
+        "requires": "disease.ventricular_dilation"
+      }
+    ],
+    "findings_rules": {
+      "dcm_findings": [
+        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "texts": ["左室舒张末期内径增大（LVIDd ↑）", "缩短分数（FS）显著减低（{fs_value:.0f}%）", "室壁运动弥漫性减弱", "符合扩张型心肌病（DCM）表现"],
+         "fs_formula": "thresholds.fs_base - disease.contractility_loss * thresholds.fs_reduction_factor"
+        }
+      ],
+      "normal_findings": [
+        {"else": true, "texts": ["心脏结构正常，各房室大小在正常范围", "室壁运动良好，缩短分数正常", "瓣膜启闭正常，未见明显反流"]}
+      ],
+      "pericardial_echo": [
+        {"if": "disease.tamponade_severity > thresholds.pericardial_muffled", "texts": ["心包腔内可见中-大量液性暗区", "右室游离壁舒张期塌陷（填塞征象）", "下腔静脉扩张，呼吸变异度减低", "确诊：心包积液伴心脏填塞"]},
+        {"if": "disease.pericardial_volume > 0.1", "text": "少量心包积液，未见填塞征象"}
+      ],
+      "pah_note": [
+        {"if": "state.PaO2 < thresholds.pao2_low", "text": "估测肺动脉收缩压升高（肺动脉高压）"}
+      ]
+    }
+  },
+  "endoscopy": {
+    "name": "内窥镜",
+    "test_type": "endoscopy",
+    "handler": "endoscopy",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "exudate_significant": 0.05,
+      "exudate_severe": 0.5
+    },
+    "tag_rules": [
+      {
+        "clue_id": "crackles",
+        "condition": "disease.alveolar_exudate > thresholds.exudate_significant",
+        "requires": "disease.alveolar_exudate"
+      }
+    ],
+    "findings_rules": {
+      "pneumonia_findings": [
+        {"if": "disease.alveolar_exudate > thresholds.exudate_significant", "texts": ["气管内可见脓性分泌物", "支气管黏膜充血水肿"]},
+        {"if": "disease.alveolar_exudate > thresholds.exudate_severe", "text": "叶支气管内可见渗出物"},
+        {"if": "disease.alveolar_exudate > thresholds.exudate_significant", "text": "符合感染性气道病变"}
+      ],
+      "normal_findings": [
+        {"else": true, "texts": ["食道黏膜正常，未见异物或溃疡", "胃黏膜正常，未见肿物", "十二指肠黏膜正常"]}
+      ]
+    }
+  },
+  "mri": {
+    "name": "MRI",
+    "test_type": "mri",
+    "handler": "mri",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "dcm_dilation": 0.3
+    },
+    "tag_rules": [
+      {
+        "clue_id": "cardiomegaly_us",
+        "condition": "disease.ventricular_dilation > thresholds.dcm_dilation",
+        "requires": "disease.ventricular_dilation"
+      }
+    ],
+    "findings_rules": {
+      "dcm_findings": [
+        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "texts": ["心脏 MRI：左室扩张，心肌变薄", "延迟增强扫描：心肌中层强化（纤维化表现）", "确诊扩张型心肌病"]}
+      ],
+      "normal_findings": [
+        {"else": true, "texts": ["MRI 扫描未见明显信号", "脑部和脊髓结构正常"]}
+      ]
+    }
+  },
+  "histopathology": {
+    "name": "组织病理学",
+    "test_type": "histopathology",
+    "handler": "histopathology",
+    "vitals": [],
+    "extra_params": [],
+    "thresholds": {
+      "exudate_significant": 0.3,
+      "dcm_dilation": 0.3
+    },
+    "tag_rules": [
+      {
+        "clue_id": "lung_exudate_us",
+        "condition": "disease.alveolar_exudate > thresholds.exudate_significant",
+        "requires": "disease.alveolar_exudate"
+      },
+      {
+        "clue_id": "cardiomegaly_us",
+        "condition": "disease.ventricular_dilation > thresholds.dcm_dilation",
+        "requires": "disease.ventricular_dilation"
+      }
+    ],
+    "findings_rules": {
+      "pneumonia_findings": [
+        {"if": "disease.alveolar_exudate > thresholds.exudate_significant", "texts": ["肺泡腔内大量中性粒细胞浸润", "肺泡壁充血，纤维素渗出", "细菌菌落可见", "病理诊断：化脓性肺炎"]},
+        {"else": true, "text": "轻度肺泡炎性细胞浸润"}
+      ],
+      "dcm_findings": [
+        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "texts": ["心肌细胞变性，排列紊乱", "间质纤维化", "病理诊断：扩张型心肌病"]}
+      ],
+      "normal_findings": [
+        {"else": true, "text": "组织学未见明显异常"}
+      ]
+    }
+  }
+}

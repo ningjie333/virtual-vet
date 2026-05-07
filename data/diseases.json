@@ -2,7 +2,14 @@
   "disease_names": {
     "pneumonia": "肺炎（肺部感染）",
     "acute_renal_failure": "急性肾衰竭",
-    "dilated_cardiomyopathy": "扩张型心肌病（DCM）"
+    "dilated_cardiomyopathy": "扩张型心肌病（DCM）",
+    "phosphorus_poisoning": "磷化锌/磷化铝灭鼠药中毒",
+    "gastric_dilatation_volvulus": "胃扩张扭转（GDV）",
+    "immune_mediated_hemolytic_anemia": "免疫介导性溶血性贫血（IMHA）",
+    "urinary_obstruction": "尿道梗阻",
+    "diabetic_ketoacidosis": "糖尿病酮症酸中毒（DKA）",
+    "pericardial_effusion": "心包积液/心脏填塞",
+    "disseminated_intravascular_coagulation": "弥散性血管内凝血（DIC）"
   },
   "clues": {
     "pneumonia": [
@@ -37,6 +44,82 @@
       "cardiomegaly_xray",
       "cardiomegaly_us",
       "weak_pulse"
+    ],
+    "phosphorus_poisoning": [
+      "hr_high",
+      "hr_low",
+      "map_low",
+      "gfr_low",
+      "ph_low",
+      "temp_high",
+      "temp_low",
+      "cvp_high",
+      "weak_pulse"
+    ],
+    "gastric_dilatation_volvulus": [
+      "hr_high",
+      "hr_low",
+      "map_low",
+      "cvp_low",
+      "ph_low",
+      "lactate_high",
+      "temp_low",
+      "weak_pulse",
+      "abdominal_distension",
+      "arrhythmia"
+    ],
+    "immune_mediated_hemolytic_anemia": [
+      "hr_high",
+      "hct_low",
+      "map_low",
+      "bilirubin_high",
+      "SpO2_low",
+      "weak_pulse",
+      "icterus"
+    ],
+    "urinary_obstruction": [
+      "hr_low",
+      "hr_high",
+      "map_high",
+      "gfr_low",
+      "bun_high",
+      "potassium_high",
+      "ph_low",
+      "cvp_high",
+      "bladder_distension",
+      "anuria"
+    ],
+    "diabetic_ketoacidosis": [
+      "hr_high",
+      "map_low",
+      "rr_high",
+      "ph_low",
+      "glucose_high",
+      "hco3_low",
+      "cvp_low",
+      "kussmaul_respiration",
+      "dehydration"
+    ],
+    "pericardial_effusion": [
+      "hr_high",
+      "map_low",
+      "cvp_high",
+      "SpO2_low",
+      "weak_pulse",
+      "pulsus_paradoxus",
+      "muffled_heart_sounds",
+      "jugular_distension"
+    ],
+    "disseminated_intravascular_coagulation": [
+      "hr_high",
+      "map_low",
+      "gfr_low",
+      "ph_low",
+      "SpO2_low",
+      "plt_low",
+      "weak_pulse",
+      "hemorrhage",
+      "petechiae"
     ]
   },
   "clue_descriptions": {
@@ -61,7 +144,30 @@
     "cvp_high": "中心静脉压升高",
     "cardiomegaly_xray": "心影增大",
     "cardiomegaly_us": "心腔扩大",
-    "weak_pulse": "脉搏弱"
+    "weak_pulse": "脉搏弱",
+    "cvp_low": "中心静脉压降低",
+    "cvp_high": "中心静脉压升高",
+    "lactate_high": "乳酸升高",
+    "temp_low": "低体温",
+    "arrhythmia": "心律失常",
+    "abdominal_distension": "腹部膨隆",
+    "hct_low": "红细胞比容降低",
+    "bilirubin_high": "高胆红素血症",
+    "icterus": "黄疸",
+    "map_high": "高血压",
+    "potassium_high": "高钾血症",
+    "bladder_distension": "膀胱膨大",
+    "anuria": "无尿",
+    "glucose_high": "高血糖",
+    "hco3_low": "碳酸氢根降低",
+    "kussmaul_respiration": "Kussmaul呼吸",
+    "dehydration": "脱水",
+    "pulsus_paradoxus": "奇脉",
+    "muffled_heart_sounds": "心音遥远",
+    "jugular_distension": "颈静脉怒张",
+    "plt_low": "血小板减少",
+    "hemorrhage": "出血",
+    "petechiae": "瘀点瘀斑"
   },
   "clue_to_test": {
     "PaO2_low": "blood_gas",
@@ -85,7 +191,30 @@
     "cvp_high": "physical",
     "cardiomegaly_xray": "chest_xray",
     "cardiomegaly_us": "ultrasound",
-    "weak_pulse": "physical"
+    "weak_pulse": "physical",
+    "cvp_low": "physical",
+    "cvp_high": "physical",
+    "lactate_high": "blood_gas",
+    "temp_low": "physical",
+    "arrhythmia": "ecg",
+    "abdominal_distension": "physical",
+    "hct_low": "blood_routine",
+    "bilirubin_high": "blood_biochem",
+    "icterus": "inspection",
+    "map_high": "blood_pressure",
+    "potassium_high": "blood_biochem",
+    "bladder_distension": "ultrasound",
+    "anuria": "physical",
+    "glucose_high": "blood_biochem",
+    "hco3_low": "blood_gas",
+    "kussmaul_respiration": "physical",
+    "dehydration": "inspection",
+    "pulsus_paradoxus": "blood_pressure",
+    "muffled_heart_sounds": "auscultation",
+    "jugular_distension": "inspection",
+    "plt_low": "blood_routine",
+    "hemorrhage": "inspection",
+    "petechiae": "inspection"
   },
   "treatment_protocols": {
     "dilated_cardiomyopathy": [
@@ -97,18 +226,53 @@
     ],
     "acute_renal_failure": [
       {"drug_name": "fluid_bolus", "volume_ml": 300}
+    ],
+    "phosphorus_poisoning": [
+      {"drug_name": "fluid_bolus", "volume_ml": 250}
+    ],
+    "gastric_dilatation_volvulus": [
+      {"drug_name": "fluid_bolus", "volume_ml": 500}
+    ],
+    "immune_mediated_hemolytic_anemia": [
+      {"drug_name": "fluid_bolus", "volume_ml": 200}
+    ],
+    "urinary_obstruction": [
+      {"drug_name": "fluid_bolus", "volume_ml": 300}
+    ],
+    "diabetic_ketoacidosis": [
+      {"drug_name": "fluid_bolus", "volume_ml": 400}
+    ],
+    "pericardial_effusion": [
+      {"drug_name": "fluid_bolus", "volume_ml": 150}
+    ],
+    "disseminated_intravascular_coagulation": [
+      {"drug_name": "fluid_bolus", "volume_ml": 350}
     ]
   },
   "messages": {
     "win": {
       "pneumonia": "正确诊断！补液治疗后，患犬的循环状态和氧合逐渐改善。",
       "acute_renal_failure": "正确诊断！积极补液恢复肾灌注后，患犬的肾功能指标开始好转。",
-      "dilated_cardiomyopathy": "正确诊断！强心（匹莫苯丹）+ 利尿（呋塞米）治疗后，患犬心功能逐渐改善，呼吸困难缓解。"
+      "dilated_cardiomyopathy": "正确诊断！强心（匹莫苯丹）+ 利尿（呋塞米）治疗后，患犬心功能逐渐改善，呼吸困难缓解。",
+      "phosphorus_poisoning": "正确诊断！积极补液和支持治疗后，患犬的中毒症状逐渐缓解，体温和心律趋于稳定。",
+      "gastric_dilatation_volvulus": "正确诊断！紧急补液稳定循环后，患犬顺利接受手术复位，胃壁血供恢复。",
+      "immune_mediated_hemolytic_anemia": "正确诊断！免疫抑制治疗和输血后，患犬的溶血得到控制，HCT开始回升。",
+      "urinary_obstruction": "正确诊断！紧急导尿排除膀胱蓄积尿液后，患犬的高钾和酸中毒迅速纠正。",
+      "diabetic_ketoacidosis": "正确诊断！积极补液+胰岛素治疗后，患犬的血糖和酮体逐渐恢复正常，酸中毒纠正。",
+      "pericardial_effusion": "正确诊断！心包穿刺引流后，患犬的心脏填塞症状迅速缓解，血压回升。",
+      "disseminated_intravascular_coagulation": "正确诊断！积极补液+抗凝+输血支持治疗后，患犬的凝血功能逐渐恢复。"
     },
     "loss": {
       "pneumonia": "误诊！患犬的呼吸系统症状提示存在感染性病变，请重新评估肺部检查。",
       "acute_renal_failure": "误诊！患犬的氮质血症和电解质紊乱提示泌尿系统出了问题，请复查肾功能和尿液。",
-      "dilated_cardiomyopathy": "误诊！患犬的心脏扩大伴收缩功能下降，提示心肌病变，请复查心脏超声和心电图。"
+      "dilated_cardiomyopathy": "误诊！患犬的心脏扩大伴收缩功能下降，提示心肌病变，请复查心脏超声和心电图。",
+      "phosphorus_poisoning": "误诊！患犬的中毒症状（心律紊乱、体温异常、低血压）提示毒性物质暴露，请进行毒物筛查。",
+      "gastric_dilatation_volvulus": "误诊！患犬的急性腹痛、休克和腹部膨隆提示胃部急症，请紧急评估腹部X光和超声。",
+      "immune_mediated_hemolytic_anemia": "误诊！患犬的严重贫血伴黄疸提示溶血性疾病，请复查血常规和细胞学。",
+      "urinary_obstruction": "误诊！患犬的无尿、高钾和酸中毒提示尿道梗阻，请紧急导尿并复查尿液。",
+      "diabetic_ketoacidosis": "误诊！患犬的高血糖、酮症酸中毒和Kussmaul呼吸提示代谢危象，请复查血糖和血气。",
+      "pericardial_effusion": "误诊！患犬的颈静脉怒张、心音遥远和奇脉提示心包积液，请紧急心脏超声。",
+      "disseminated_intravascular_coagulation": "误诊！患犬的多部位出血、血小板减少和休克提示凝血功能障碍，请复查凝血功能。"
     }
   }
 }

@@ -1,0 +1,223 @@
+{
+  "_comment": "生理参数参考范围与危急值 — 替代 test_translator.py 中的 NORMAL_RANGES / CRITICAL_THRESHOLDS / clue_map",
+  "_version": "1.1",
+  "HR": {
+    "unit": "bpm",
+    "normal": [60, 120],
+    "critical": [40, 180],
+    "clue_flags": {
+      "high": "hr_high",
+      "low": "hr_low"
+    }
+  },
+  "MAP": {
+    "unit": "mmHg",
+    "normal": [80, 120],
+    "critical": [50, 160],
+    "clue_flags": {
+      "high": "map_high",
+      "low": "map_low"
+    }
+  },
+  "CVP": {
+    "unit": "mmHg",
+    "normal": [0, 5],
+    "critical": null,
+    "clue_flags": {
+      "high": "cvp_high"
+    }
+  },
+  "RR": {
+    "unit": "/min",
+    "normal": [10, 30],
+    "critical": null,
+    "clue_flags": {
+      "high": "rr_high"
+    }
+  },
+  "SpO2": {
+    "unit": "%",
+    "normal": [95, 100],
+    "critical": [85, 100],
+    "clue_flags": {
+      "low": "SpO2_low"
+    }
+  },
+  "PaO2": {
+    "unit": "mmHg",
+    "normal": [80, 110],
+    "critical": [50, 150],
+    "clue_flags": {
+      "low": "PaO2_low"
+    }
+  },
+  "PaCO2": {
+    "unit": "mmHg",
+    "normal": [35, 45],
+    "critical": [25, 65],
+    "clue_flags": {
+      "high": "PaCO2_high"
+    }
+  },
+  "pH": {
+    "unit": "",
+    "normal": [7.35, 7.45],
+    "critical": [7.1, 7.6],
+    "clue_flags": {
+      "low": "ph_low",
+      "high": "ph_high"
+    }
+  },
+  "GFR": {
+    "unit": "mL/min",
+    "normal": [60, 120],
+    "critical": null,
+    "clue_flags": {
+      "low": "gfr_low"
+    }
+  },
+  "BUN": {
+    "unit": "mg/dL",
+    "normal": [10, 30],
+    "critical": null,
+    "clue_flags": {
+      "high": "bun_high"
+    }
+  },
+  "Na": {
+    "unit": "mEq/L",
+    "normal": [140, 155],
+    "critical": null,
+    "clue_flags": {}
+  },
+  "K": {
+    "unit": "mEq/L",
+    "normal": [3.5, 5.5],
+    "critical": null,
+    "clue_flags": {
+      "high": "potassium_high",
+      "low": "potassium_low"
+    }
+  },
+  "Glu": {
+    "unit": "mmol/L",
+    "normal": [3.3, 6.1],
+    "critical": [2.0, 15.0],
+    "clue_flags": {}
+  },
+  "Lactate": {
+    "unit": "mmol/L",
+    "normal": [0.5, 2.5],
+    "critical": [0.0, 5.0],
+    "clue_flags": {
+      "high": "lactate_high"
+    }
+  },
+  "HCT": {
+    "unit": "%",
+    "normal": [37, 55],
+    "critical": null,
+    "clue_flags": {
+      "low": "hct_low"
+    }
+  },
+  "WBC": {
+    "unit": "×10⁹/L",
+    "normal": [6.0, 17.0],
+    "critical": null,
+    "clue_flags": {
+      "high": "wbc_high"
+    }
+  },
+  "PLT": {
+    "unit": "×10⁹/L",
+    "normal": [150, 500],
+    "critical": null,
+    "clue_flags": {
+      "low": "plt_low"
+    }
+  },
+  "Temp": {
+    "unit": "°C",
+    "normal": [38.0, 39.2],
+    "critical": [37.0, 41.0],
+    "clue_flags": {
+      "high": "temp_high"
+    }
+  },
+  "Cr": {
+    "unit": "mg/dL",
+    "normal": [0.5, 1.5],
+    "critical": [0.2, 5.0],
+    "clue_flags": {
+      "high": "cr_high"
+    }
+  },
+  "ALT": {
+    "unit": "U/L",
+    "normal": [10, 100],
+    "critical": null,
+    "clue_flags": {
+      "high": "alt_high"
+    }
+  },
+  "USG": {
+    "unit": "",
+    "normal": [1.015, 1.040],
+    "critical": null,
+    "clue_flags": {
+      "low": "usg_low",
+      "high": "usg_high"
+    }
+  },
+  "UPCR": {
+    "unit": "",
+    "normal": [0.0, 0.5],
+    "critical": null,
+    "clue_flags": {
+      "high": "upcr_high"
+    }
+  },
+  "SBP": {
+    "unit": "mmHg",
+    "normal": [110, 160],
+    "critical": [70, 200],
+    "clue_flags": {
+      "high": "sbp_high",
+      "low": "sbp_low"
+    }
+  },
+  "DBP": {
+    "unit": "mmHg",
+    "normal": [60, 90],
+    "critical": [40, 120],
+    "clue_flags": {
+      "high": "dbp_high",
+      "low": "dbp_low"
+    }
+  },
+  "HCO3": {
+    "unit": "mmol/L",
+    "normal": [18, 26],
+    "critical": [8, 40],
+    "clue_flags": {
+      "low": "hco3_low"
+    }
+  },
+  "Bilirubin": {
+    "unit": "mg/dL",
+    "normal": [0.0, 0.5],
+    "critical": [0.0, 5.0],
+    "clue_flags": {
+      "high": "bilirubin_high"
+    }
+  },
+  "Ketone": {
+    "unit": "mmol/L",
+    "normal": [0.0, 0.5],
+    "critical": [0.0, 6.0],
+    "clue_flags": {
+      "high": "ketone_high"
+    }
+  }
+}
