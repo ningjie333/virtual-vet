@@ -203,7 +203,8 @@ class TestMatchDiseases:
     def test_match_diseases_arf(self):
         """ARF clues should match acute_renal_failure with high confidence."""
         from game.diagnosis_engine import match_diseases
-        clues = ["gfr_low", "bun_high", "potassium_high", "ph_low", "hr_low"]
+        clues = ["gfr_low", "bun_high", "potassium_high", "ph_low", "hr_low",
+                 "cr_high", "usg_low", "upcr_high", "t_wave_tall", "qrs_wide"]
         matches = match_diseases([], known_clues=clues)
         top = matches[0]
         assert top["disease"] == "acute_renal_failure"

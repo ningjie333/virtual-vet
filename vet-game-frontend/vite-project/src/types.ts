@@ -107,6 +107,13 @@ export interface AdministerDrugResponse {
   vitals: Vitals;
   game_log: string[];
   error?: string;
+  ap?: number;
+  max_ap?: number;
+  stress?: number;
+  pending_reports?: number;
+  new_reports?: Report[];
+  game_time?: string;
+  is_night?: boolean;
 }
 
 export interface ApiResponse<T = unknown> {

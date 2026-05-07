@@ -31,7 +31,12 @@
       "potassium_high",
       "ph_low",
       "hr_low",
-      "map_high"
+      "map_high",
+      "cr_high",
+      "usg_low",
+      "upcr_high",
+      "t_wave_tall",
+      "qrs_wide"
     ],
     "dilated_cardiomyopathy": [
       "hr_high",
@@ -43,7 +48,8 @@
       "lung_exudate_us",
       "cardiomegaly_xray",
       "cardiomegaly_us",
-      "weak_pulse"
+      "weak_pulse",
+      "qrs_wide"
     ],
     "phosphorus_poisoning": [
       "hr_high",
@@ -54,7 +60,8 @@
       "temp_high",
       "temp_low",
       "cvp_high",
-      "weak_pulse"
+      "weak_pulse",
+      "p_wave_absent"
     ],
     "gastric_dilatation_volvulus": [
       "hr_high",
@@ -66,7 +73,9 @@
       "temp_low",
       "weak_pulse",
       "abdominal_distension",
-      "arrhythmia"
+      "arrhythmia",
+      "p_wave_absent",
+      "ph_high"
     ],
     "immune_mediated_hemolytic_anemia": [
       "hr_high",
@@ -87,7 +96,12 @@
       "ph_low",
       "cvp_high",
       "bladder_distension",
-      "anuria"
+      "anuria",
+      "cr_high",
+      "usg_low",
+      "upcr_high",
+      "t_wave_tall",
+      "qrs_wide"
     ],
     "diabetic_ketoacidosis": [
       "hr_high",
@@ -98,7 +112,9 @@
       "hco3_low",
       "cvp_low",
       "kussmaul_respiration",
-      "dehydration"
+      "dehydration",
+      "ketone_high",
+      "potassium_low"
     ],
     "pericardial_effusion": [
       "hr_high",
@@ -131,7 +147,7 @@
     "hr_low": "心动过缓",
     "rr_high": "呼吸频率加快",
     "temp_high": "体温升高",
-    "map_high": "血压升高",
+    "map_high": "高血压",
     "map_low": "低血压",
     "ph_low": "酸中毒",
     "gfr_low": "GFR降低",
@@ -146,7 +162,6 @@
     "cardiomegaly_us": "心腔扩大",
     "weak_pulse": "脉搏弱",
     "cvp_low": "中心静脉压降低",
-    "cvp_high": "中心静脉压升高",
     "lactate_high": "乳酸升高",
     "temp_low": "低体温",
     "arrhythmia": "心律失常",
@@ -154,8 +169,6 @@
     "hct_low": "红细胞比容降低",
     "bilirubin_high": "高胆红素血症",
     "icterus": "黄疸",
-    "map_high": "高血压",
-    "potassium_high": "高钾血症",
     "bladder_distension": "膀胱膨大",
     "anuria": "无尿",
     "glucose_high": "高血糖",
@@ -167,7 +180,16 @@
     "jugular_distension": "颈静脉怒张",
     "plt_low": "血小板减少",
     "hemorrhage": "出血",
-    "petechiae": "瘀点瘀斑"
+    "petechiae": "瘀点瘀斑",
+    "potassium_low": "低钾血症",
+    "cr_high": "肌酐升高",
+    "ketone_high": "酮体升高",
+    "ph_high": "碱中毒",
+    "t_wave_tall": "T波高尖",
+    "qrs_wide": "QRS增宽",
+    "p_wave_absent": "P波消失",
+    "usg_low": "尿比重降低",
+    "upcr_high": "尿蛋白/肌酐比升高"
   },
   "clue_to_test": {
     "PaO2_low": "blood_gas",
@@ -186,14 +208,13 @@
     "bun_high": "blood_biochem",
     "potassium_high": "blood_biochem",
     "ph_low": "blood_gas",
-    "map_high": "physical",
+    "map_high": "blood_pressure",
     "map_low": "physical",
     "cvp_high": "physical",
     "cardiomegaly_xray": "chest_xray",
     "cardiomegaly_us": "ultrasound",
     "weak_pulse": "physical",
     "cvp_low": "physical",
-    "cvp_high": "physical",
     "lactate_high": "blood_gas",
     "temp_low": "physical",
     "arrhythmia": "ecg",
@@ -201,8 +222,6 @@
     "hct_low": "blood_routine",
     "bilirubin_high": "blood_biochem",
     "icterus": "inspection",
-    "map_high": "blood_pressure",
-    "potassium_high": "blood_biochem",
     "bladder_distension": "ultrasound",
     "anuria": "physical",
     "glucose_high": "blood_biochem",
@@ -214,39 +233,81 @@
     "jugular_distension": "inspection",
     "plt_low": "blood_routine",
     "hemorrhage": "inspection",
-    "petechiae": "inspection"
+    "petechiae": "inspection",
+    "potassium_low": "blood_biochem",
+    "cr_high": "blood_biochem",
+    "ketone_high": "blood_biochem",
+    "ph_high": "blood_gas",
+    "t_wave_tall": "ecg",
+    "qrs_wide": "ecg",
+    "p_wave_absent": "ecg",
+    "usg_low": "urinalysis",
+    "upcr_high": "urinalysis"
   },
   "treatment_protocols": {
     "dilated_cardiomyopathy": [
-      {"drug_name": "pimobendan", "dose_mg_kg": 0.25},
-      {"drug_name": "furosemide", "dose_mg_kg": 1.0}
+      {
+        "drug_name": "pimobendan",
+        "dose_mg_kg": 0.25
+      },
+      {
+        "drug_name": "furosemide",
+        "dose_mg_kg": 1.0
+      }
     ],
     "pneumonia": [
-      {"drug_name": "fluid_bolus", "volume_ml": 200}
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 200
+      }
     ],
     "acute_renal_failure": [
-      {"drug_name": "fluid_bolus", "volume_ml": 300}
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 300
+      }
     ],
     "phosphorus_poisoning": [
-      {"drug_name": "fluid_bolus", "volume_ml": 250}
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 250
+      }
     ],
     "gastric_dilatation_volvulus": [
-      {"drug_name": "fluid_bolus", "volume_ml": 500}
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 500
+      }
     ],
     "immune_mediated_hemolytic_anemia": [
-      {"drug_name": "fluid_bolus", "volume_ml": 200}
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 200
+      }
     ],
     "urinary_obstruction": [
-      {"drug_name": "fluid_bolus", "volume_ml": 300}
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 300
+      }
     ],
     "diabetic_ketoacidosis": [
-      {"drug_name": "fluid_bolus", "volume_ml": 400}
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 400
+      }
     ],
     "pericardial_effusion": [
-      {"drug_name": "fluid_bolus", "volume_ml": 150}
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 150
+      }
     ],
     "disseminated_intravascular_coagulation": [
-      {"drug_name": "fluid_bolus", "volume_ml": 350}
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 350
+      }
     ]
   },
   "messages": {
