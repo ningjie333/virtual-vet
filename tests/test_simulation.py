@@ -19,6 +19,7 @@ import pytest
 
 from simulation import VirtualCreature
 from organ_health import OrganHealthTracker
+from noble_purkinje import NoblePurkinjeFiber
 from parameters import total_blood_volume_ml
 
 
@@ -311,3 +312,162 @@ class TestWeightScaling:
         co_10 = dog_10.heart.cardiac_output
         co_30 = dog_30.heart.cardiac_output
         assert co_30 > co_10, f"30kg CO ({co_30}) should exceed 10kg CO ({co_10})"
+
+
+# ---------------------------------------------------------------------------
+# Three-model integration tests (VdP + HH + Noble)
+# ---------------------------------------------------------------------------
+
+class TestThreeModelIntegration:
+    """
+    Integration tests verifying Van der Pol + HH + Noble models work together.
+
+    These tests simulate realistic clinical scenarios where all three models
+    interact: respiratory rhythm → blood gases → cardiac electrophysiology.
+    """
+
+    def test_normal_all_models_stable(self):
+        """All three models should produce stable, normal values at baseline."""
+        v = VirtualCreature(20.0)
+        for _ in range(200):
+            v.step()
+
+        # VdP: RR should be ~18/min
+        rr = v.lung.respiratory_rate
+        assert 16.0 <= rr <= 20.0, f"RR={rr}, expected ~18/min"
+
+        # HH: K⁺ toxicity factor should be ~1.0 (normal K⁺)
+        k_tox = v.heart.hh.k_toxicity_factor
+        assert 0.95 <= k_tox <= 1.0, f"k_tox={k_tox}, expected ~1.0"
+
+        # Noble: conduction should be normal
+        cv = v.heart.hh.conduction_velocity
+        assert cv > 3.5, f"CV={cv}, expected > 3.5 m/s"
+        assert v.heart.hh.av_block_degree == 0, \
+            f"AV block={v.heart.hh.av_block_degree}, expected 0"
+
+    def test_hyperkalemia_all_models(self):
+        """
+        High K⁺ scenario: all three models should respond coherently.
+
+        With K⁺=8.0:
+        - VdP: RR should increase (acidosis from K⁺ shift)
+        - HH: K⁺ toxicity factor should drop significantly
+        - Noble: conduction velocity should decrease, AV block may appear
+        """
+        v = VirtualCreature(20.0)
+        # Simulate hyperkalemia by directly setting K⁺
+        v.blood.potassium_mEq_L = 8.0
+        for _ in range(200):
+            v.step()
+
+        # HH: significant K⁺ toxicity
+        k_tox = v.heart.hh.k_toxicity_factor
+        assert k_tox < 0.5, f"k_tox={k_tox}, expected < 0.5 at K⁺=8"
+
+        # Noble: conduction slowed
+        cv = v.heart.hh.conduction_velocity
+        assert cv < 3.0, f"CV={cv}, expected < 3.0 m/s at K⁺=8"
+
+        # Noble: some degree of AV block
+        assert v.heart.hh.av_block_degree >= 1, \
+            f"AV block={v.heart.hh.av_block_degree}, expected >= 1 at K⁺=8"
+
+    def test_three_model_coexistence(self):
+        """
+        All three models should coexist without interfering with each other
+        under normal conditions.
+
+        VdP produces respiratory rhythm → blood gases affect HH/Noble
+        but at normal values, all should remain at baseline.
+        """
+        v = VirtualCreature(20.0)
+        for _ in range(200):
+            v.step()
+
+        # VdP: stable RR
+        rr = v.lung.respiratory_rate
+        assert 16.0 <= rr <= 20.0, f"RR={rr}, expected ~18/min"
+
+        # VdP: oscillating (not stuck)
+        vdp_state = v.lung._vdp.get_state()
+        assert vdp_state["amplitude"] > 0.5, \
+            f"VdP amplitude={vdp_state['amplitude']}, expected > 0.5"
+
+        # HH: normal K⁺ toxicity
+        assert 0.95 <= v.heart.hh.k_toxicity_factor <= 1.0
+
+        # Noble: normal conduction
+        assert v.heart.hh.conduction_velocity > 3.5
+        assert v.heart.hh.av_block_degree == 0
+
+        # Noble: PR and QRS in normal range
+        assert v.heart.hh.pr_interval_ms < 120
+        assert v.heart.hh.qrs_width_ms < 100
+
+    def test_severe_hyperkalemia_av_progression(self):
+        """
+        Progressive AV block with increasing K⁺ (Noble model).
+
+        K⁺ 4.2 → normal conduction
+        K⁺ 6.5 → first-degree AVB (PR prolongation)
+        K⁺ 8.0 → second-degree AVB
+        K⁺ 9.0 → near-complete block
+        """
+        degrees = []
+        for k_ext in [4.2, 6.5, 8.0, 9.0]:
+            noble = NoblePurkinjeFiber()
+            for _ in range(200):
+                noble.update(dt=0.1, heart_rate_bpm=85, k_ext=k_ext)
+            degrees.append(noble.av_block_degree)
+
+        # AV block should worsen with increasing K⁺
+        assert degrees[0] == 0, f"K⁺=4.2: AV={degrees[0]}, expected 0"
+        assert degrees[1] >= 1, f"K⁺=6.5: AV={degrees[1]}, expected >= 1"
+        assert degrees[2] >= degrees[1], \
+            f"K⁺=8.0: AV={degrees[2]}, should be >= K⁺=6.5: AV={degrees[1]}"
+        assert degrees[3] >= 2, f"K⁺=9.0: AV={degrees[3]}, expected >= 2"
+
+    def test_noble_inherits_hh_k_toxicity(self):
+        """
+        Noble's parent HH k_toxicity_factor should still affect heart rate.
+
+        This verifies the inheritance chain works: Noble → HH → k_toxicity.
+        """
+        v = VirtualCreature(20.0)
+        v.blood.potassium_mEq_L = 9.0
+        for _ in range(200):
+            v.step()
+
+        # Heart rate should be suppressed by HH k_toxicity
+        hr = v.heart.heart_rate
+        assert hr < 60, f"HR={hr}, expected < 60 bpm at K⁺=9 (HH toxicity)"
+
+    def test_vdp_noble_independent(self):
+        """
+        VdP and Noble should respond to different stimuli independently.
+
+        VdP responds to PCO2/PO2/pH
+        Noble responds to K⁺
+        """
+        # Normal creature (baseline)
+        v0 = VirtualCreature(20.0)
+        for _ in range(200):
+            v0.step()
+        rr_normal = v0.lung.respiratory_rate
+        cv_normal = v0.heart.hh.conduction_velocity
+
+        # High K⁺ → Noble slows conduction, minimal VdP effect
+        v_k = VirtualCreature(20.0)
+        v_k.blood.potassium_mEq_L = 8.5
+        for _ in range(300):
+            v_k.step()
+
+        # Noble effect: high K⁺ should slow conduction
+        assert v_k.heart.hh.conduction_velocity < cv_normal, \
+            f"Noble: CV(K⁺)={v_k.heart.hh.conduction_velocity} should be < CV(normal)={cv_normal}"
+
+        # VdP: RR should be similar (K⁺ doesn't directly affect respiration much)
+        # Allow some tolerance for indirect effects
+        assert abs(v_k.lung.respiratory_rate - rr_normal) < 5.0, \
+            f"VdP: RR(K⁺)={v_k.lung.respiratory_rate} should be close to RR(normal)={rr_normal}"
