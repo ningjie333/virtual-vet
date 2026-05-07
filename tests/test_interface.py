@@ -180,8 +180,7 @@ class TestNewGame:
         data = _start_game(client)
         gs = data["game_state"]
         assert "phase" in gs
-        assert "action_count" in gs
-        assert "elapsed_time_s" in gs
+        assert "time_used" in gs
         assert "medical_phase" in gs
         assert "death_timer" in gs
 
@@ -246,23 +245,23 @@ class TestExamine:
         state_data = json.loads(state_resp.data)
         assert state_data["reports_count"] == 3
 
-    def test_api_examine_increments_action_count(self, client):
-        """Each examine call should increment action_count."""
+    def test_api_examine_increments_time_used(self, client):
+        """Each examine call should increment time_used."""
         _start_game(client)
         resp1 = client.post(
             "/api/examine",
             data=json.dumps({"session_id": "case_001", "test_type": "physical"}),
             content_type="application/json",
         )
-        assert json.loads(resp1.data)["action_count"] == 1
+        assert json.loads(resp1.data)["time_used"] == 1
 
         resp2 = client.post(
             "/api/examine",
             data=json.dumps({"session_id": "case_001", "test_type": "blood_gas"}),
             content_type="application/json",
         )
-        # blood_gas has cost=3, so action_count goes from 1 → 4
-        assert json.loads(resp2.data)["action_count"] == 4
+        # blood_gas has cost=3, so time_used goes from 1 → 4
+        assert json.loads(resp2.data)["time_used"] == 4
 
     def test_api_examine_returns_game_log(self, client):
         """POST /api/examine should return game_log field."""
@@ -376,7 +375,7 @@ class TestWait:
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert data["success"] is True
-        assert data["action_count"] == 1
+        assert data["time_used"] == 1
 
     def test_api_wait_invalid_session(self, client):
         """POST /api/wait with unknown session should return 404."""
@@ -388,7 +387,7 @@ class TestWait:
         assert resp.status_code == 404
 
     def test_api_wait_advances_time(self, client):
-        """Wait should advance elapsed_time_s."""
+        """Wait should advance time_used."""
         _start_game(client)
         resp = client.post(
             "/api/wait",
@@ -396,7 +395,7 @@ class TestWait:
             content_type="application/json",
         )
         data = json.loads(resp.data)
-        assert data["elapsed_time_s"] > 0
+        assert data["time_used"] > 0
 
 
 # ─────────────────────────────────────────────────────────────
@@ -414,7 +413,7 @@ class TestGameState:
         assert "phase" in data
         assert "medical_phase" in data
         assert "vitals" in data
-        assert "action_count" in data
+        assert "time_used" in data
 
     def test_api_game_state_invalid_session(self, client):
         """GET /api/game-state with unknown session should return 404."""
@@ -584,7 +583,7 @@ class TestSessionPersistence:
     def test_full_game_flow(self, client):
         """Complete flow: new-game -> examine -> examine -> diagnose."""
         start_data = _start_game(client)
-        assert start_data["game_state"]["action_count"] == 0
+        assert start_data["game_state"]["time_used"] == 0
 
         resp1 = client.post(
             "/api/examine",
@@ -592,7 +591,7 @@ class TestSessionPersistence:
             content_type="application/json",
         )
         d1 = json.loads(resp1.data)
-        assert d1["action_count"] == 1
+        assert d1["time_used"] == 1
 
         resp2 = client.post(
             "/api/examine",
@@ -600,8 +599,8 @@ class TestSessionPersistence:
             content_type="application/json",
         )
         d2 = json.loads(resp2.data)
-        # blood_gas has cost=3, so action_count goes 1 → 4
-        assert d2["action_count"] == 4
+        # blood_gas has cost=3, so time_used goes 1 → 4
+        assert d2["time_used"] == 4
 
         # Check accumulated reports via game-state
         state = client.get("/api/game-state?session_id=case_001")
@@ -616,7 +615,7 @@ class TestSessionPersistence:
         )
         dd = json.loads(diag.data)
         assert dd["phase"] == "won"
-        assert dd["action_count"] == 5
+        assert dd["time_used"] == 5
 
     def test_multiple_case_isolation(self, client):
         """Two different cases should maintain separate sessions."""

@@ -80,7 +80,7 @@ class TestCaseGenerator:
         assert isinstance(state.disease_name, str)
         assert len(state.disease_name) > 0
         assert state.phase == "playing"
-        assert state.action_count == 0
+        assert state.total_ap_spent == 0
 
     def test_generate_case_different_difficulties(self):
         """'easy', 'normal', 'hard' should all produce valid cases."""
@@ -98,7 +98,7 @@ class TestCaseGenerator:
         s1 = generate_case(difficulty="normal", seed=999)
         s2 = generate_case(difficulty="normal", seed=999)
         assert s1.disease_name == s2.disease_name
-        assert s1.action_count == s2.action_count
+        assert s1.total_ap_spent == s2.total_ap_spent
         assert s1.phase == s2.phase
         hr1 = s1.engine.history["HR_bpm"][-1] if s1.engine.history["HR_bpm"] else 0
         hr2 = s2.engine.history["HR_bpm"][-1] if s2.engine.history["HR_bpm"] else 0
@@ -147,25 +147,27 @@ class TestExtractClues:
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "blood_gas", "results": [
             {"param": "PaO2", "flag": "low"},
-        ]}]
+        ], "tags": ["PaO2_low"]}]
         clues = extract_clues(reports)
         assert "PaO2_low" in clues
 
     def test_extract_clues_from_auscultation(self):
-        """Report with '湿啰音' should extract 'crackles'."""
+        """Report with crackles tag should extract 'crackles'."""
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "auscultation",
                      "summary": "双肺湿啰音（肺泡渗出）",
-                     "results": ["双肺湿啰音（肺泡渗出）"]}]
+                     "results": ["双肺湿啰音（肺泡渗出）"],
+                     "tags": ["crackles"]}]
         clues = extract_clues(reports)
         assert "crackles" in clues
 
     def test_extract_clues_from_xray(self):
-        """Report with '渗出' should extract lung_exudate_xray."""
+        """Report with lung_exudate_xray tag should extract that clue."""
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "chest_xray",
                      "summary": "肺野斑片状渗出影",
-                     "results": ["肺野斑片状渗出影"]}]
+                     "results": ["肺野斑片状渗出影"],
+                     "tags": ["lung_exudate_xray"]}]
         clues = extract_clues(reports)
         assert "lung_exudate_xray" in clues
 
@@ -173,8 +175,10 @@ class TestExtractClues:
         """Same clue from multiple reports should appear only once."""
         from game.diagnosis_engine import extract_clues
         reports = [
-            {"test_type": "physical", "results": [{"param": "HR", "flag": "high"}]},
-            {"test_type": "ecg", "results": [{"param": "HR", "flag": "high"}]},
+            {"test_type": "physical", "results": [{"param": "HR", "flag": "high"}],
+             "tags": ["hr_high"]},
+            {"test_type": "ecg", "results": [{"param": "HR", "flag": "high"}],
+             "tags": ["hr_high"]},
         ]
         clues = extract_clues(reports)
         assert clues.count("hr_high") == 1
@@ -270,8 +274,7 @@ class TestProcessAction:
         assert result["success"] is True
         assert result["result"] is not None
         assert result["result"]["test_type"] == "physical"
-        assert state.action_count == 1
-        assert state.elapsed_time_s == 60.0
+        assert state.total_ap_spent == 1
 
     def test_process_action_wait(self, healthy_creature):
         """'wait' action should advance time without producing a report."""
@@ -280,8 +283,7 @@ class TestProcessAction:
         result = process_action(state, "wait")
         assert result["success"] is True
         assert result["result"] is None
-        assert state.action_count == 1
-        assert state.elapsed_time_s == 60.0
+        assert state.total_ap_spent == 1
 
     def test_process_action_treat_correct(self, healthy_creature):
         """Correct diagnosis should set phase='won'."""

@@ -73,11 +73,11 @@ class TestTimeScale:
         assert K_SECONDS_PER_ACTION == 60
 
     def test_action_advances_time(self):
-        """每次行动后 elapsed_time_s 增加"""
+        """每次行动后 total_ap_spent 增加"""
         state = _make_state()
-        initial_time = state.elapsed_time_s
+        initial_time = state.total_ap_spent
         process_action(state, "wait", {})
-        assert state.elapsed_time_s > initial_time
+        assert state.total_ap_spent > initial_time
 
     def test_wait_advances_simulation(self):
         """wait 行动推进仿真时间"""
@@ -146,13 +146,13 @@ class TestDiseaseProgressionTradeoff:
         final_spo2 = state.engine.blood.arterial_saturation
         assert final_spo2 <= initial_spo2
 
-    def test_action_count_increments(self):
-        """行动次数正确累加"""
+    def test_time_accumulates(self):
+        """时间预算正确累加"""
         state = _make_state()
         process_action(state, "wait", {})
-        assert state.action_count == 1
+        assert state.total_ap_spent == 1
         process_action(state, "examine", {"test_type": "physical"})
-        assert state.action_count == 2
+        assert state.total_ap_spent == 2
 
     def test_death_timer_decreases_in_moribund(self):
         """濒死状态下每次行动倒计时减 1"""
@@ -181,7 +181,7 @@ class TestNightHrReversibility:
         initial_hr_rest = state.engine.heart.HR_rest
         # 推进到夜间（22:00 = 14h = 50400s，每次 wait 60s）
         # 从 08:00 开始，需要 14h = 840 次 wait → 太多，直接设置 clock
-        state.game_clock_s = 50400.0  # 22:00
+        state.total_ap_spent = 840  # 22:00 = 50400s / 60
         process_action(state, "wait", {})
         assert state.engine.heart.HR_rest < initial_hr_rest
 
@@ -190,11 +190,11 @@ class TestNightHrReversibility:
         state = _make_state()
         initial_hr_rest = state.engine.heart.HR_rest
         # 进入夜间
-        state.game_clock_s = 50400.0  # 22:00
+        state.total_ap_spent = 840  # 22:00 = 50400s / 60
         process_action(state, "wait", {})
         assert state.engine.heart.HR_rest < initial_hr_rest
         # 推进到白天（06:00 = 22h = 79200s）
-        state.game_clock_s = 79201.0  # 06:00 刚过
+        state.total_ap_spent = 1320  # 06:00 ≈ 79200s / 60
         process_action(state, "wait", {})
         # HR_rest 应恢复到原始值
         assert state.engine.heart.HR_rest == pytest.approx(initial_hr_rest, abs=0.5)
@@ -206,10 +206,10 @@ class TestNightHrReversibility:
         # 模拟 3 次昼夜循环
         for cycle in range(3):
             # 夜间
-            state.game_clock_s = 50400.0
+            state.total_ap_spent = 840
             process_action(state, "wait", {})
             # 白天
-            state.game_clock_s = 79201.0
+            state.total_ap_spent = 1320
             process_action(state, "wait", {})
         # 最终 HR_rest 应接近原始值
         assert state.engine.heart.HR_rest == pytest.approx(initial_hr_rest, abs=1.0)
@@ -219,7 +219,7 @@ class TestNightHrReversibility:
         state = _make_state_no_disease()
         initial_hr = state.engine.heart.heart_rate
         # 进入夜间
-        state.game_clock_s = 50400.0
+        state.total_ap_spent = 840
         # 多步让 HR 有时间下降
         for _ in range(5):
             process_action(state, "wait", {})
@@ -231,13 +231,13 @@ class TestNightHrReversibility:
         state = _make_state_no_disease()
         initial_hr = state.engine.heart.heart_rate
         # 夜间
-        state.game_clock_s = 50400.0
+        state.total_ap_spent = 840
         for _ in range(5):
             process_action(state, "wait", {})
         night_hr = state.engine.heart.heart_rate
         assert night_hr < initial_hr
         # 白天恢复
-        state.game_clock_s = 79201.0
+        state.total_ap_spent = 1320
         for _ in range(10):
             process_action(state, "wait", {})
         # HR 应该回升（至少不低于夜间值）

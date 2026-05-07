@@ -69,154 +69,154 @@ class TestFlag:
 
     # Normal
     def test_normal_ph(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(7.40, "pH") == "normal"
 
     def test_normal_hr(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(90, "HR") == "normal"
 
     def test_normal_rr(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(20, "RR") == "normal"
 
     def test_normal_map(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(100, "MAP") == "normal"
 
     # Acidosis / alkalosis
     def test_acidosis(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(7.2, "pH") == "low"
 
     def test_alkalosis(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(7.5, "pH") == "high"
 
     def test_critical_acidosis_at_threshold(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(7.0, "pH") == "critical"
 
     def test_critical_acidosis_below(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(6.9, "pH") == "critical"
 
     # Electrolytes
     def test_k_high(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(6.0, "K") == "high"
 
     def test_k_low(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(3.0, "K") == "low"
 
     def test_k_normal(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(4.5, "K") == "normal"
 
     def test_na_high(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(160, "Na") == "high"
 
     def test_na_low(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(135, "Na") == "low"
 
     # Blood gas
     def test_pao2_low(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(70, "PaO2") == "low"
 
     def test_pao2_normal(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(90, "PaO2") == "normal"
 
     def test_paco2_high(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(50, "PaCO2") == "high"
 
     def test_spo2_low(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(92, "SpO2") == "low"
 
     def test_spo2_critical(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(80, "SpO2") == "critical"
 
     # Renal
     def test_bun_high(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(50, "BUN") == "high"
 
     def test_gfr_low(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(40, "GFR") == "low"
 
     # Borderline
     def test_ph_at_lower_border(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(7.35, "pH") == "normal"
 
     def test_ph_just_below_normal(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(7.34, "pH") == "low"
 
     def test_ph_at_upper_border(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(7.45, "pH") == "normal"
 
     def test_ph_just_above_normal(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(7.46, "pH") == "high"
 
     def test_hr_at_lower_border(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(60, "HR") == "normal"
 
     def test_hr_at_upper_border(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(120, "HR") == "normal"
 
     def test_hr_just_above_normal(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(121, "HR") == "high"
 
     def test_hr_critical_high(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(185, "HR") == "critical"
 
     def test_temp_high(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(39.5, "Temp") == "high"
 
     def test_temp_critical(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(41.5, "Temp") == "critical"
 
     def test_lactate_high(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(3.0, "Lactate") == "high"
 
     def test_lactate_critical(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(5.5, "Lactate") == "critical"
 
     # SpO2 critical is asymmetric: only low side dangerous
     def test_spo2_at_critical_threshold_boundary(self):
         """SpO2 critical threshold is (85, 100); 85 is NOT < 85, so it's 'low'."""
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(85, "SpO2") == "low"
 
     def test_spo2_below_critical_threshold(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(84, "SpO2") == "critical"
 
     def test_spo2_just_above_critical(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(86, "SpO2") == "low"
 
     def test_map_critical_low(self):
-        from game.test_translator import _flag
+        from src.report_engine import flag as _flag
         assert _flag(45, "MAP") == "critical"
 
 
@@ -224,7 +224,7 @@ class TestResultEntry:
     """Test _result_entry() helper."""
 
     def test_basic(self):
-        from game.test_translator import _result_entry
+        from src.report_engine import result_entry as _result_entry
         e = _result_entry("HR", 95.5, "normal")
         assert e["param"] == "HR"
         assert e["value"] == 95.5
@@ -233,45 +233,54 @@ class TestResultEntry:
         assert e["normal_range"] == "60-120"
 
     def test_rounding(self):
-        from game.test_translator import _result_entry
+        from src.report_engine import result_entry as _result_entry
         e = _result_entry("pH", 7.4567, "high")
         assert e["value"] == 7.46
 
     def test_range_string(self):
-        from game.test_translator import _result_entry
+        from src.report_engine import result_entry as _result_entry
         e = _result_entry("K", 4.2, "normal")
         assert e["normal_range"] == "3.5-5.5"
 
 
 class TestNormalRanges:
-    """Validate NORMAL_RANGES constants."""
+    """Validate vitals_ranges.json data integrity."""
 
     def test_all_ranges_valid(self):
-        from game.test_translator import NORMAL_RANGES
-        for param, (lo, hi, unit) in NORMAL_RANGES.items():
+        from src.vitals_config import get_vitals_config
+        vc = get_vitals_config()
+        for param in vc.params:
+            lo, hi = vc.get_normal(param)
             assert lo < hi, f"{param}: {lo} >= {hi}"
 
     def test_expected_params(self):
-        from game.test_translator import NORMAL_RANGES
+        from src.vitals_config import get_vitals_config
+        vc = get_vitals_config()
         expected = ["HR", "MAP", "CVP", "RR", "SpO2", "PaO2", "PaCO2",
                      "pH", "GFR", "BUN", "Na", "K", "Glu", "Lactate",
                      "HCT", "WBC", "PLT", "Temp"]
         for p in expected:
-            assert p in NORMAL_RANGES, f"Missing: {p}"
+            assert p in vc.params, f"Missing: {p}"
 
 
 class TestCriticalThresholds:
-    """Validate CRITICAL_THRESHOLDS."""
+    """Validate critical thresholds in vitals_ranges.json."""
 
     def test_spo2_asymmetric(self):
-        from game.test_translator import CRITICAL_THRESHOLDS
-        lo, hi = CRITICAL_THRESHOLDS["SpO2"]
+        from src.vitals_config import get_vitals_config
+        vc = get_vitals_config()
+        crit = vc.get_critical("SpO2")
+        assert crit is not None
+        lo, hi = crit
         assert lo == 85
         assert hi == 100
 
     def test_ph_range(self):
-        from game.test_translator import CRITICAL_THRESHOLDS
-        assert CRITICAL_THRESHOLDS["pH"] == (7.1, 7.6)
+        from src.vitals_config import get_vitals_config
+        vc = get_vitals_config()
+        crit = vc.get_critical("pH")
+        assert crit is not None
+        assert crit == (7.1, 7.6)
 
 
 # =============================================================================
@@ -402,8 +411,8 @@ class TestTranslate:
             translate("bogus", healthy_creature)
 
     def test_all_test_types_produce_valid_reports(self, healthy_creature):
-        from game.test_translator import _TEST_DISPATCH
-        for tt in _TEST_DISPATCH:
+        from src.exam_registry import get_exam_registry
+        for tt in get_exam_registry().exam_types:
             from game.test_translator import translate
             r = translate(tt, healthy_creature)
             assert "test_type" in r
@@ -422,7 +431,7 @@ class TestExtractClues:
             {"param": "PaO2", "flag": "low"},
             {"param": "PaCO2", "flag": "high"},
             {"param": "SpO2", "flag": "low"},
-        ]}]
+        ], "tags": ["PaO2_low", "PaCO2_high", "SpO2_low"]}]
         clues = extract_clues(reports)
         assert "PaO2_low" in clues
         assert "PaCO2_high" in clues
@@ -434,7 +443,7 @@ class TestExtractClues:
             {"param": "HR", "flag": "high"},
             {"param": "RR", "flag": "high"},
             {"param": "Temp", "flag": "high"},
-        ]}]
+        ], "tags": ["hr_high", "rr_high", "temp_high"]}]
         clues = extract_clues(reports)
         assert "hr_high" in clues
         assert "rr_high" in clues
@@ -444,35 +453,40 @@ class TestExtractClues:
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "auscultation",
                      "summary": "双肺湿啰音（肺泡渗出）",
-                     "results": ["双肺湿啰音（肺泡渗出）"]}]
+                     "results": ["双肺湿啰音（肺泡渗出）"],
+                     "tags": ["crackles"]}]
         assert "crackles" in extract_clues(reports)
 
     def test_xray_exudate(self):
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "chest_xray",
                      "summary": "肺野斑片状渗出影",
-                     "results": ["肺野斑片状渗出影"]}]
+                     "results": ["肺野斑片状渗出影"],
+                     "tags": ["lung_exudate_xray"]}]
         assert "lung_exudate_xray" in extract_clues(reports)
 
     def test_ct_exudate(self):
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "ct",
                      "summary": "多发磨玻璃影伴实变",
-                     "results": ["多发磨玻璃影伴实变"]}]
+                     "results": ["多发磨玻璃影伴实变"],
+                     "tags": ["lung_exudate_ct"]}]
         assert "lung_exudate_ct" in extract_clues(reports)
 
     def test_ultrasound_lung(self):
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "ultrasound",
                      "summary": "肺实质样变（B线增多）",
-                     "results": ["肺实质样变（B线增多）"]}]
+                     "results": ["肺实质样变（B线增多）"],
+                     "tags": ["lung_exudate_us"]}]
         assert "lung_exudate_us" in extract_clues(reports)
 
     def test_ultrasound_kidney(self):
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "ultrasound",
                      "summary": "肾血流灌注减少",
-                     "results": ["肾血流灌注减少"]}]
+                     "results": ["肾血流灌注减少"],
+                     "tags": ["gfr_low"]}]
         assert "gfr_low" in extract_clues(reports)
 
     def test_biochem_renal_clues(self):
@@ -480,7 +494,7 @@ class TestExtractClues:
         reports = [{"test_type": "blood_biochem", "results": [
             {"param": "BUN", "flag": "high"},
             {"param": "K", "flag": "high"},
-        ]}]
+        ], "tags": ["bun_high", "potassium_high"]}]
         clues = extract_clues(reports)
         assert "bun_high" in clues
         assert "potassium_high" in clues
@@ -496,8 +510,10 @@ class TestExtractClues:
     def test_deduplication(self):
         from game.diagnosis_engine import extract_clues
         reports = [
-            {"test_type": "physical", "results": [{"param": "HR", "flag": "high"}]},
-            {"test_type": "ecg", "results": [{"param": "HR", "flag": "high"}]},
+            {"test_type": "physical", "results": [{"param": "HR", "flag": "high"}],
+             "tags": ["hr_high"]},
+            {"test_type": "ecg", "results": [{"param": "HR", "flag": "high"}],
+             "tags": ["hr_high"]},
         ]
         clues = extract_clues(reports)
         assert clues.count("hr_high") == 1
@@ -505,13 +521,15 @@ class TestExtractClues:
     def test_critical_flag_maps_low(self):
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "blood_gas",
-                     "results": [{"param": "PaO2", "flag": "critical"}]}]
+                     "results": [{"param": "PaO2", "flag": "critical"}],
+                     "tags": ["PaO2_low"]}]
         assert "PaO2_low" in extract_clues(reports)
 
     def test_inspection_cyanosis(self):
         from game.diagnosis_engine import extract_clues
         reports = [{"test_type": "inspection",
-                     "summary": "黏膜发绀（严重低氧）"}]
+                     "summary": "黏膜发绀（严重低氧）",
+                     "tags": ["SpO2_low"]}]
         assert "SpO2_low" in extract_clues(reports)
 
 
@@ -563,7 +581,7 @@ class TestMatchDiseases:
         reports = [{"test_type": "blood_gas", "results": [
             {"param": "PaO2", "flag": "low"},
             {"param": "SpO2", "flag": "low"},
-        ]}]
+        ], "tags": ["PaO2_low", "SpO2_low"]}]
         matches = match_diseases(reports)
         pn = next(m for m in matches if m["disease"] == "pneumonia")
         assert pn["confidence"] > 0
@@ -922,7 +940,7 @@ class TestProcessAction:
         assert result["success"] is True
         assert result["result"] is not None
         assert result["result"]["test_type"] == "physical"
-        assert state.action_count == 1
+        assert state.total_ap_spent == 1
 
     def test_treat_correct_action(self, healthy_creature):
         from game.action_system import GameState, process_action
@@ -943,7 +961,7 @@ class TestProcessAction:
         state = GameState(engine=healthy_creature, disease_name="pneumonia")
         result = process_action(state, "wait")
         assert result["success"] is True
-        assert state.action_count == 1
+        assert state.total_ap_spent == 1
 
     def test_invalid_action_type(self, healthy_creature):
         from game.action_system import GameState, process_action
@@ -1009,8 +1027,7 @@ class TestGameState:
         from src.simulation import VirtualCreature
         e = VirtualCreature(body_weight_kg=20.0)
         s = GameState(engine=e, disease_name="pneumonia")
-        assert s.action_count == 0
-        assert s.elapsed_time_s == 0.0
+        assert s.total_ap_spent == 0
         assert s.phase == "playing"
         assert s.death_timer is None
         assert s.reports == []
@@ -1229,10 +1246,11 @@ class TestDataExaminations:
             assert "name_en" in exam, f"Exam {key}: missing name_en"
 
     def test_exam_test_types_match_translator(self, exams_data):
-        """All exam keys must be valid test_translator types."""
-        from game.test_translator import _TEST_DISPATCH
+        """All exam keys must be valid exam_registry types."""
+        from src.exam_registry import get_exam_registry
+        reg = get_exam_registry()
         for key in exams_data:
-            assert key in _TEST_DISPATCH, f"Exam key '{key}' not in _TEST_DISPATCH"
+            assert key in reg.exam_types, f"Exam key '{key}' not in exam_registry"
 
 
 class TestDataTreatments:

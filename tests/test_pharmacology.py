@@ -718,7 +718,7 @@ class TestE2EGameFlow:
 
         r = self._get(f"/api/game-state?session_id={sid}")
         data = r.get_json()
-        assert data["action_count"] >= 2
+        assert data["time_used"] >= 2
 
     def test_e2e_multiple_drugs_via_administer(self):
         """Multiple administer-drug calls should accumulate."""
