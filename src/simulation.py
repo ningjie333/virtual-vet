@@ -73,6 +73,13 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.temperature":          ("blood", "core_temperature_C"),
     "blood.BUN":                  ("blood", "bun_mg_dL"),
     "blood.HCO3":                 ("fluid", "vascular_hco3_meq_l"),
+    "blood.glucose":              ("blood", "glucose_mmol_L"),
+    "blood.lactate":              ("blood", "lactate_mmol_L"),
+    "blood.creatinine":           ("blood", "creatinine_mg_dL"),
+    "blood.red_cell_volume_ml":   ("blood", "red_cell_volume_ml"),
+    "blood.bilirubin_mg_dL":      ("blood", "bilirubin_mg_dL"),
+    "blood.ketone_mmol_L":        ("blood", "ketone_mmol_L"),
+    "blood.PLT":                  ("blood", "PLT"),
 }
 
 

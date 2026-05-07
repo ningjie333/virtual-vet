@@ -44,6 +44,15 @@ class BloodCompartment:
         # 体温（核心体温 °C）
         self.core_temperature_C = 38.5         # 犬正常体温
 
+        # 胆红素（mg/dL）— IMHA 等疾病可升高
+        self.bilirubin_mg_dL = 0.2            # 正常 < 0.5
+
+        # 酮体（mmol/L）— DKA 可升高
+        self.ketone_mmol_L = 0.0              # 正常 < 0.5
+
+        # 血小板（×10³/μL）— DIC 可消耗
+        self.PLT = 300.0                      # 正常 150-400
+
     def calculate_O2_content(self, PO2_mmHg, saturation, is_arterial=True):
         """
         计算血液氧含量 (mL O2/100mL blood)
