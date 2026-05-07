@@ -136,6 +136,15 @@ def get_state(creature: VirtualCreature) -> dict:
         state["P波"] = ecg_interp.get("p_wave", "present")
         state["K_toxicity_stage"] = ecg_interp.get("k_toxicity_stage", "none")
 
+        # Noble 浦肯野纤维数据
+        from src.noble_purkinje import NoblePurkinjeFiber
+        if isinstance(hh, NoblePurkinjeFiber):
+            av_interp = hh.get_av_interpretation(b.potassium_mEq_L)
+            state["PR间期"] = av_interp.get("pr_interval_ms", 80.0)
+            state["AV传导"] = av_interp.get("av_block_description", "normal_conduction")
+            state["传导速度"] = av_interp.get("conduction_velocity", 4.0)
+            state["逸搏心率"] = av_interp.get("purkinje_intrinsic_rate_bpm", 30.0)
+
     return state
 
 

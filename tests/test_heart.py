@@ -4,6 +4,7 @@ Unit tests for HeartModule class in src/heart.py
 
 from src.blood import BloodCompartment
 from src.heart import HeartModule
+from src.noble_purkinje import NoblePurkinjeFiber
 
 
 def _make_heart(weight_kg=20.0):
@@ -375,3 +376,125 @@ class TestCoronaryPerfusionFeedback:
         )
         # 死亡螺旋心脏的 CO 应显著降低
         assert heart_spiral.cardiac_output < heart_normal.cardiac_output * 0.7
+
+
+# ---------------------------------------------------------------------------
+# Noble 1962 Purkinje Fiber tests
+# ---------------------------------------------------------------------------
+
+class TestNoblePurkinjeFiber:
+    """Test the Noble 1962 Purkinje fiber electrophysiology model."""
+
+    def _make_heart_with_noble(self, weight_kg=20.0):
+        """Create a heart with NoblePurkinjeFiber electrophysiology."""
+        bv = 86.0 * weight_kg
+        blood = BloodCompartment(total_volume_ml=bv)
+        heart = HeartModule(weight_kg=weight_kg, blood=blood)
+        # Ensure the HH module is NoblePurkinjeFiber
+        assert isinstance(heart.hh, NoblePurkinjeFiber), \
+            f"Expected NoblePurkinjeFiber, got {type(heart.hh)}"
+        return heart
+
+    def test_noble_normal_conduction(self):
+        """At normal K⁺, conduction velocity should be near maximum."""
+        heart = self._make_heart_with_noble()
+        noble = heart.hh
+        # Run a few steps to stabilize
+        for _ in range(50):
+            noble.update(dt=0.1, heart_rate_bpm=85, k_ext=4.2)
+        assert noble.conduction_velocity > 3.5, \
+            f"CV={noble.conduction_velocity}, expected > 3.5 m/s at normal K⁺"
+        assert noble.av_block_degree == 0, \
+            f"AV block={noble.av_block_degree}, expected 0 (normal)"
+        assert noble.pr_interval_ms < 120, \
+            f"PR={noble.pr_interval_ms}, expected < 120ms at normal K⁺"
+
+    def test_noble_hyperkalemia_slows_conduction(self):
+        """High K⁺=7.5 should slow conduction velocity."""
+        heart = self._make_heart_with_noble()
+        noble = heart.hh
+        for _ in range(100):
+            noble.update(dt=0.1, heart_rate_bpm=85, k_ext=7.5)
+        assert noble.conduction_velocity < 3.0, \
+            f"CV={noble.conduction_velocity}, expected < 3.0 m/s at K⁺=7.5"
+        assert noble.av_block_degree >= 1, \
+            f"AV block={noble.av_block_degree}, expected >= 1 at K⁺=7.5"
+
+    def test_noble_severe_hyperkalemia_av_block(self):
+        """K⁺=9.0 should cause high-grade AV block."""
+        heart = self._make_heart_with_noble()
+        noble = heart.hh
+        for _ in range(100):
+            noble.update(dt=0.1, heart_rate_bpm=85, k_ext=9.0)
+        assert noble.av_block_degree >= 2, \
+            f"AV block={noble.av_block_degree}, expected >= 2 at K⁺=9.0"
+        assert noble.pr_interval_ms > 120, \
+            f"PR={noble.pr_interval_ms}, expected > 120ms at K⁺=9.0"
+
+    def test_noble_pr_prolongation_with_k(self):
+        """PR interval should lengthen as K⁺ increases."""
+        heart = self._make_heart_with_noble()
+        noble = heart.hh
+
+        # Normal K⁺
+        for _ in range(100):
+            noble.update(dt=0.1, heart_rate_bpm=85, k_ext=4.2)
+        pr_normal = noble.pr_interval_ms
+
+        # High K⁺
+        noble2 = NoblePurkinjeFiber()
+        for _ in range(100):
+            noble2.update(dt=0.1, heart_rate_bpm=85, k_ext=8.0)
+        pr_high = noble2.pr_interval_ms
+
+        assert pr_high > pr_normal, \
+            f"PR at K⁺=8 ({pr_high}) should be > PR at K⁺=4.2 ({pr_normal})"
+
+    def test_noble_qrs_widening_with_k(self):
+        """QRS width should increase as K⁺ increases."""
+        heart = self._make_heart_with_noble()
+        noble = heart.hh
+
+        for _ in range(100):
+            noble.update(dt=0.1, heart_rate_bpm=85, k_ext=4.2)
+        qrs_normal = noble.qrs_width_ms
+
+        noble2 = NoblePurkinjeFiber()
+        for _ in range(100):
+            noble2.update(dt=0.1, heart_rate_bpm=85, k_ext=8.0)
+        qrs_high = noble2.qrs_width_ms
+
+        assert qrs_high > qrs_normal, \
+            f"QRS at K⁺=8 ({qrs_high}) should be > QRS at K⁺=4.2 ({qrs_normal})"
+
+    def test_noble_purkinje_intrinsic_rate(self):
+        """Purkinje intrinsic rate should be ~30 bpm and decrease with high K⁺."""
+        noble = NoblePurkinjeFiber()
+        for _ in range(100):
+            noble.update(dt=0.1, heart_rate_bpm=85, k_ext=4.2)
+        rate_normal = noble._intrinsic_rate_hz * 60.0
+
+        noble2 = NoblePurkinjeFiber()
+        for _ in range(100):
+            noble2.update(dt=0.1, heart_rate_bpm=85, k_ext=9.0)
+        rate_high = noble2._intrinsic_rate_hz * 60.0
+
+        assert 10 < rate_normal < 40, \
+            f"Intrinsic rate={rate_normal}, expected 10-40 bpm"
+        assert rate_high < rate_normal, \
+            f"Rate at K⁺=9 ({rate_high}) should be < rate at K⁺=4.2 ({rate_normal})"
+
+    def test_noble_av_interpretation(self):
+        """get_av_interpretation() should return valid fields."""
+        noble = NoblePurkinjeFiber()
+        for _ in range(50):
+            noble.update(dt=0.1, heart_rate_bpm=85, k_ext=4.2)
+        interp = noble.get_av_interpretation(4.2)
+        assert "conduction_velocity" in interp
+        assert "pr_interval_ms" in interp
+        assert "qrs_width_ms" in interp
+        assert "av_block_degree" in interp
+        assert interp["av_block_description"] in [
+            "normal_conduction", "first_degree_avb",
+            "second_degree_avb", "third_degree_avb",
+        ]

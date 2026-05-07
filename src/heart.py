@@ -18,6 +18,7 @@ Heart Module - 心血管循环系统（修正版）
 
 from parameters import *
 from src.cardiac_electrophysiology import CardiacElectrophysiology
+from src.noble_purkinje import NoblePurkinjeFiber
 
 
 class HeartModule:
@@ -81,8 +82,8 @@ class HeartModule:
         self.blood_loss_ml = 0.0
         self.fluid_infused_ml = 0.0
 
-        # 电生理计算器（基于 HH 第一性原理）
-        self.hh = CardiacElectrophysiology()
+        # 电生理计算器（Noble 1962 浦肯野纤维，扩展 HH）
+        self.hh = NoblePurkinjeFiber()
 
     def blood_volume_change(self, delta_ml: float):
         """外部调用：改变血容量"""
@@ -322,6 +323,12 @@ class HeartModule:
             "hh_h_inf": round(self.hh._h_inf, 3),
             "hh_e_k": round(self.hh._nernst_k(self.blood.potassium_mEq_L), 1),
             "ecg_interpretation": self.hh.get_ecg_interpretation(self.blood.potassium_mEq_L),
+            # Noble 浦肯野纤维数据
+            "noble_conduction_velocity": round(self.hh.conduction_velocity, 2),
+            "noble_pr_interval_ms": round(self.hh.pr_interval_ms, 1),
+            "noble_qrs_width_ms": round(self.hh.qrs_width_ms, 1),
+            "noble_av_block_degree": self.hh.av_block_degree,
+            "noble_av_interpretation": self.hh.get_av_interpretation(self.blood.potassium_mEq_L),
         }
 
     def summary(self):
