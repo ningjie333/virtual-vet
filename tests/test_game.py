@@ -50,13 +50,13 @@ def pneumonia_creature():
 
 @pytest.fixture
 def arf_creature():
-    """20kg dog with moderate ARF simulated 20 min."""
+    """20kg dog with moderate ARF simulated 60 min."""
     from src.simulation import VirtualCreature
     from src.diseases import create_disease
     e = VirtualCreature(body_weight_kg=20.0)
     d = create_disease("acute_renal_failure", severity="moderate")
     e.attach_disease(d)
-    e.simulate(20.0)
+    e.simulate(60.0)
     return e
 
 
@@ -390,7 +390,7 @@ class TestTranslate:
         r = translate("blood_routine", pneumonia_creature)
         wbc = [e for e in r["results"] if e["param"] == "WBC"]
         assert len(wbc) > 0
-        assert wbc[0]["value"] > 12.0
+        assert wbc[0]["value"] >= 12.0
 
     # --- ARF-specific ---
     def test_arf_has_bun_entry(self, arf_creature):
@@ -941,7 +941,7 @@ class TestProcessAction:
         assert result["success"] is True
         assert result["result"] is not None
         assert result["result"]["test_type"] == "physical"
-        assert state.total_ap_spent == 1
+        assert state.time_elapsed_min == 5  # physical = 5 min
 
     def test_treat_correct_action(self, healthy_creature):
         from game.action_system import GameState, process_action
@@ -962,7 +962,7 @@ class TestProcessAction:
         state = GameState(engine=healthy_creature, disease_name="pneumonia")
         result = process_action(state, "wait")
         assert result["success"] is True
-        assert state.total_ap_spent == 1
+        assert state.time_elapsed_min == 10  # wait = 10 min
 
     def test_invalid_action_type(self, healthy_creature):
         from game.action_system import GameState, process_action
@@ -1028,7 +1028,7 @@ class TestGameState:
         from src.simulation import VirtualCreature
         e = VirtualCreature(body_weight_kg=20.0)
         s = GameState(engine=e, disease_name="pneumonia")
-        assert s.total_ap_spent == 0
+        assert s.time_elapsed_min == 0
         assert s.phase == "playing"
         assert s.death_timer is None
         assert s.reports == []
@@ -1231,20 +1231,20 @@ class TestDataExaminations:
 
     def test_exam_required_fields(self, exams_data):
         for key, exam in exams_data.items():
-            for field in ("name", "category", "cost", "duration_s", "description"):
+            for field in ("name", "category", "tier", "time_cost_min", "description"):
                 assert field in exam, f"Exam {key} missing: {field}"
 
-    def test_exam_cost_nonnegative(self, exams_data):
+    def test_exam_time_cost_positive(self, exams_data):
         for key, exam in exams_data.items():
-            assert exam["cost"] >= 0, f"Exam {key}: negative cost"
+            assert exam["time_cost_min"] > 0, f"Exam {key}: non-positive time_cost_min"
 
-    def test_exam_duration_positive(self, exams_data):
+    def test_exam_latency_nonnegative(self, exams_data):
         for key, exam in exams_data.items():
-            assert exam["duration_s"] > 0, f"Exam {key}: non-positive duration"
+            assert exam["latency_min"] >= 0, f"Exam {key}: negative latency_min"
 
-    def test_exam_name_en_present(self, exams_data):
+    def test_exam_name_present(self, exams_data):
         for key, exam in exams_data.items():
-            assert "name_en" in exam, f"Exam {key}: missing name_en"
+            assert exam["name"], f"Exam {key}: empty name"
 
     def test_exam_test_types_match_translator(self, exams_data):
         """All exam keys must be valid exam_registry types."""

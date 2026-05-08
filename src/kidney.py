@@ -188,6 +188,14 @@ class KidneyModule:
         total_reabsorption = proximal_reabsorption + distal_reabsorption
         self.urine_output = max(0.0, filtered_water - total_reabsorption)
 
+        # 渗透性利尿：血糖 > 8 mmol/L 时，葡萄糖在肾小管中产生渗透效应
+        # 减少水重吸收，增加尿量。这是 DKA 高血糖导致脱水的核心路径。
+        # 公式：血糖每升高 1 mmol/L（超过 8），尿量增加 30%
+        glucose = self.blood.glucose_mmol_L
+        if glucose > 8.0:
+            osmotic_factor = 1.0 + (glucose - 8.0) * 0.3
+            self.urine_output *= osmotic_factor
+
     def compute(self, dt: float, MAP: float, CVP: float, cardiac_output: float):
         """
         主计算函数：推进肾脏功能一个时间步

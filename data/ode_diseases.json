@@ -321,11 +321,10 @@
       }
     },
     "outputs": [
-      { "target": "blood.glucose_mmol_L", "op": "set", "fn": "max(5.0, 5.0 + hyperglycemia * 30.0)" },
+      { "target": "blood.glucose", "op": "set", "fn": "max(5.0, 5.0 + hyperglycemia * 30.0)" },
       { "target": "blood.pH", "op": "set", "fn": "max(6.95, 7.40 - anion_gap_acidosis * 0.4)" },
       { "target": "blood.HCO3", "op": "set", "fn": "max(5.0, 24.0 - anion_gap_acidosis * 18.0)" },
       { "target": "lung.respiratory_rate", "op": "add", "fn": "kussmaul_respiration * 15.0" },
-      { "target": "heart.blood_volume", "op": "multiply", "fn": "max(0.6, 1.0 - dehydration * 0.35)" },
       { "target": "heart.heart_rate", "op": "add", "fn": "dehydration * 15.0 - kussmaul_respiration * 5.0" },
       { "target": "blood.ketone_mmol_L", "op": "set", "fn": "max(0.0, ketone_accumulation * 6.0)" }
     ]

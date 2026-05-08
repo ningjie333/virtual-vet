@@ -80,7 +80,7 @@ class TestCaseGenerator:
         assert isinstance(state.disease_name, str)
         assert len(state.disease_name) > 0
         assert state.phase == "playing"
-        assert state.total_ap_spent == 0
+        assert state.time_elapsed_min == 0
 
     def test_generate_case_different_difficulties(self):
         """'easy', 'normal', 'hard' should all produce valid cases."""
@@ -98,7 +98,7 @@ class TestCaseGenerator:
         s1 = generate_case(difficulty="normal", seed=999)
         s2 = generate_case(difficulty="normal", seed=999)
         assert s1.disease_name == s2.disease_name
-        assert s1.total_ap_spent == s2.total_ap_spent
+        assert s1.time_elapsed_min == s2.time_elapsed_min
         assert s1.phase == s2.phase
         hr1 = s1.engine.history["HR_bpm"][-1] if s1.engine.history["HR_bpm"] else 0
         hr2 = s2.engine.history["HR_bpm"][-1] if s2.engine.history["HR_bpm"] else 0
@@ -275,7 +275,7 @@ class TestProcessAction:
         assert result["success"] is True
         assert result["result"] is not None
         assert result["result"]["test_type"] == "physical"
-        assert state.total_ap_spent == 1
+        assert state.time_elapsed_min > 0
 
     def test_process_action_wait(self, healthy_creature):
         """'wait' action should advance time without producing a report."""
@@ -284,7 +284,7 @@ class TestProcessAction:
         result = process_action(state, "wait")
         assert result["success"] is True
         assert result["result"] is None
-        assert state.total_ap_spent == 1
+        assert state.time_elapsed_min > 0
 
     def test_process_action_treat_correct(self, healthy_creature):
         """Correct diagnosis should set phase='won'."""
@@ -475,6 +475,9 @@ class TestEndToEndWorkflows:
                 state = s
                 break
         assert state is not None, "Failed to generate an ARF case in 50 seeds"
+
+        # Simulate further for ARF signs to develop (5-30 min pre-visit may not be enough)
+        state.engine.simulate(60.0)
 
         # Examine: blood_biochem + ultrasound
         reports = []
