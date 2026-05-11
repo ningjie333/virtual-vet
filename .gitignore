@@ -21,3 +21,5 @@ static/
 # OS
 .DS_Store
 Thumbs.db
+.tmp/
+data/game_sessions.db
