@@ -7,7 +7,7 @@ _EXAM_CONFIG 硬编码字典。
 使用方式：
     from src.exam_registry import get_exam_registry
     reg = get_exam_registry()
-    ap_cost, tier, latency = reg.get_exam("blood_gas")  # (3, 3, 1)
+    time_cost_min, tier, latency_min = reg.get_exam("blood_gas")  # (5, 3, 0)
     meta = reg.get_meta("blood_gas")   # 完整元数据 dict
 """
 
@@ -17,6 +17,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
+from .config_validation import validate_examinations
 from .logger_config import get_logger
 
 logger = get_logger(__name__)
@@ -42,16 +43,16 @@ class ExamRegistry:
 
     def get_exam(self, test_type: str) -> tuple[int, int, int]:
         """
-        返回 (ap_cost, tier, latency_turns)。
-        未知检查默认 (2, 2, 0)。
+        返回 (time_cost_min, tier, latency_min)。
+        未知检查默认 (5, 2, 0)。
         """
         meta = self._exams.get(test_type)
         if meta is None:
-            return (2, 2, 0)
-        ap_cost = meta.get("cost", 0)
+            return (5, 2, 0)
+        time_cost = meta.get("time_cost_min", 5)
         tier = meta.get("tier", 2)
-        latency = meta.get("latency_turns", 0)
-        return (ap_cost, tier, latency)
+        latency = meta.get("latency_min", 0)
+        return (time_cost, tier, latency)
 
     @property
     def exam_types(self) -> list[str]:
@@ -65,5 +66,11 @@ def get_exam_registry(reload: bool = False) -> ExamRegistry:
     if _instance is None or reload:
         with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
             raw = json.load(f)
+        # Validate config before creating registry
+        from .config_validation import ValidationError as ConfigValidationError
+        errors = validate_examinations(raw)
+        if errors:
+            msgs = "; ".join(f"{e.path}: {e.message}" for e in errors)
+            raise ConfigValidationError(f"Examinations validation failed: {msgs}")
         _instance = ExamRegistry(raw)
     return _instance

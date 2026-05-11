@@ -42,6 +42,13 @@ def app():
     import gui_app as gui
     gui.app.config["TESTING"] = True
     gui._game_sessions.clear()
+    try:
+        if hasattr(gui, '_db_conn') and gui._db_conn is not None:
+            gui._db_conn.execute("DELETE FROM action_log")
+            gui._db_conn.execute("DELETE FROM sessions")
+            gui._db_conn.commit()
+    except Exception:
+        pass
     return gui.app
 
 
@@ -53,11 +60,27 @@ def client(app):
 
 @pytest.fixture(autouse=True)
 def clean_sessions():
-    """Ensure each test starts with clean game sessions."""
+    """Ensure each test starts with clean game sessions and DB."""
     import gui_app as gui
     gui._game_sessions.clear()
+    # Also clear the session DB so repeat test runs don't get UNIQUE violations
+    try:
+        import gui_app as _gui
+        if hasattr(_gui, '_db_conn') and _gui._db_conn is not None:
+            _gui._db_conn.execute("DELETE FROM action_log")
+            _gui._db_conn.execute("DELETE FROM sessions")
+            _gui._db_conn.commit()
+    except Exception:
+        pass
     yield
-    gui._game_sessions.clear()
+    try:
+        import gui_app as _gui
+        if hasattr(_gui, '_db_conn') and _gui._db_conn is not None:
+            _gui._db_conn.execute("DELETE FROM action_log")
+            _gui._db_conn.execute("DELETE FROM sessions")
+            _gui._db_conn.commit()
+    except Exception:
+        pass
 
 
 def _start_game(client, case_id="case_001"):

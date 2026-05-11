@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import DiseaseModule, register_disease
+from ..config_validation import validate_ode_diseases, ValidationError
 from ..simulation import FactorCommand
 from ..logger_config import get_logger
 
@@ -159,7 +160,13 @@ def _load_config() -> dict:
     """加载 data/ode_diseases.json"""
     config_path = Path(__file__).resolve().parents[2] / "data" / "ode_diseases.json"
     with open(config_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        config = json.load(f)
+    # Validate config before use
+    errors = validate_ode_diseases(config)
+    if errors:
+        msgs = "; ".join(f"{e.path}: {e.message}" for e in errors)
+        raise ValidationError(f"ODE diseases validation failed: {msgs}")
+    return config
 
 
 def _get_clamp(clamp_list: list | None) -> tuple[float | None, float | None]:
@@ -193,6 +200,13 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
         elif "moderate" in presets:
             self._params.update(presets["moderate"])
 
+        # 时间缩放：引擎速率 → 游戏速率（统一 14x）
+        # 所有 ODE 速率常数和 tau 除以该系数，使疾病进展速度与游戏时间匹配
+        _TIME_SCALE = 14.0
+        for key in list(self._params.keys()):
+            if key.endswith("_rate"):
+                self._params[key] /= _TIME_SCALE
+
         # 初始化状态变量
         self._state_vars: dict[str, float] = {}
         self._var_meta: dict[str, dict] = {}
@@ -218,6 +232,11 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
                     raw_params["K"] = self._params[kk]
             raw_params["_clamp_lo"] = lo
             raw_params["_clamp_hi"] = hi
+            # 缩放时间常数（tau）和种子增量（seed_boost）
+            if "tau" in raw_params:
+                raw_params["tau"] /= _TIME_SCALE
+            if "seed_boost" in raw_params:
+                raw_params["seed_boost"] /= _TIME_SCALE
             # 预编译所有表达式字符串为 code 对象，加速重复求值
             for _expr_key in ("fn", "derivative_fn", "target_fn", "seed_boost_fn"):
                 if _expr_key in raw_params and isinstance(raw_params[_expr_key], str):

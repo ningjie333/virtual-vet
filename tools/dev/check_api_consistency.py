@@ -68,6 +68,7 @@ def parse_api_ts_calls(filepath: Path) -> list[dict]:
 
     api.ts 使用 BASE = "/api" 前缀拼接，所以前端写 "/cases" 实际调用 "/api/cases"。
     模板字符串路径（含 ${}）标记为 dynamic。
+    字符串拼接路径（如 "/sessions/" + sessionId + "/replay"）也标记为 dynamic。
     """
     src = filepath.read_text(encoding="utf-8")
     calls = []
@@ -91,6 +92,20 @@ def parse_api_ts_calls(filepath: Path) -> list[dict]:
         path_part = path.split("?")[0] if "?" in path else path
         if "${" in path_part:
             has_path_variable = True
+        # 检测字符串拼接模式（如 "/sessions/" + sessionId + "/replay"）。
+        # 正则 [^"\x27]+ 在第一个 " 后停止，无法捕获完整拼接路径。
+        # 在完整行中找到 method 第二个引号后的内容，检查是否有 +
+        line_start = src[: m.start()].rfind("\n") + 1
+        line_end = src.find("\n", m.end())
+        full_line = src[line_start:line_end] if line_end != -1 else src[line_start:]
+        # 找 method 参数后的 path 字符串起始位置：第一个 , 后的第二个 " 开始
+        comma_pos = full_line.find(",")
+        if comma_pos != -1:
+            second_quote_pos = full_line.find('"', comma_pos + 1)
+            if second_quote_pos != -1:
+                after_second_quote = full_line[second_quote_pos + 1:]
+                if " + " in after_second_quote:
+                    has_path_variable = True
         # 去掉 query string
         clean_path = path.split("?")[0]
         # 拼接 BASE 前缀得到完整路径
@@ -184,6 +199,9 @@ def run() -> int:
         if r_norm not in normalized_frontend and r["path"] not in frontend_api_paths:
             # 排除已知的静态路由
             if r["path"] in ("/assets/<path:filename>",):
+                continue
+            # 排除已知的前端动态调用路由（前端已实现但无法静态验证）
+            if r["path"] == "/api/sessions/<session_id>/replay":
                 continue
             errors.append(
                 (

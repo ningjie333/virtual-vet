@@ -453,6 +453,12 @@ class VirtualCreature:
         self._hh.pco2 = self.blood.arterial_PCO2_mmHg
         self.blood.arterial_pH = self._hh._compute_ph()
 
+        # Step 7.7: 保守血容量同步
+        # HeartModule.circulating_volume_ml 是循环血量的权威来源。
+        # blood.total_volume_ml 会在每步结束时与之一致，
+        # 确保血液隔室的血容量始终反映真实的循环血量。
+        self.blood.total_volume_ml = self.heart.circulating_volume_ml
+
         # Step 8: 记录（使用修改后的最终值）
         self.history["time_s"].append(t)
         self.history["HR_bpm"].append(heart_state["heart_rate_bpm"])
@@ -579,6 +585,69 @@ class VirtualCreature:
     def _scenario_cocaine_high(self):
         """可卡因高剂量（6 mg/kg IV）— 心脏抑制更明显"""
         self.schedule_event(30.0, "cocaine", {"dose_mg_kg": 6.0})
+
+    def to_minimal_snapshot(self) -> dict:
+        """
+        Serialize the essential readable engine state for session persistence.
+
+        Omits full history to save space.  Stores only the last value of each
+        vital so that an instructor can review a completed session without
+        replaying the full simulation.
+        """
+        h = self.history
+
+        def _last(key: str, fallback):
+            vals = h.get(key, [])
+            return vals[-1] if vals else fallback
+
+        return {
+            # ── Simulation time ──────────────────────────────────────────
+            "time_s": self.current_time_s,
+
+            # ── Cardiovascular ───────────────────────────────────────────
+            "HR_bpm": round(_last("HR_bpm", self.heart.heart_rate), 1),
+            "MAP_mmHg": round(_last("MAP_mmHg", self.heart.mean_arterial_pressure), 1),
+            "CO_ml_min": round(_last("CO_ml_min", self.heart.cardiac_output), 1),
+            "CVP_mmHg": round(_last("CVP_mmHg", self.heart.central_venous_pressure), 1),
+            "blood_volume_ml": round(
+                _last("blood_volume_ml", self.heart.circulating_volume_ml), 1
+            ),
+            "contractility_factor": round(
+                _last("contractility_factor", self.heart.contractility_factor), 3
+            ),
+
+            # ── Respiratory ─────────────────────────────────────────────
+            "RR": round(_last("RR", self.lung.respiratory_rate), 1),
+            "art_PO2": round(_last("art_PO2", self.blood.arterial_PO2_mmHg), 1),
+            "art_PCO2": round(_last("art_PCO2", self.blood.arterial_PCO2_mmHg), 1),
+            "saturation": round(_last("saturation", self.blood.arterial_saturation) * 100, 1),
+
+            # ── Renal ───────────────────────────────────────────────────
+            "GFR": round(_last("GFR", self.kidney.GFR), 1),
+            "urine_ml_min": round(_last("urine_ml_min", self.kidney.urine_output), 3),
+            "BUN": round(_last("BUN", self.blood.bun_mg_dL), 1),
+
+            # ── Metabolic / Blood ──────────────────────────────────────
+            "pH": round(_last("pH", self.blood.arterial_pH), 3),
+            "glucose_mmol_L": round(_last("glucose", self.blood.glucose_mmol_L), 2),
+            "lactate_mmol_L": round(self.blood.lactate_mmol_L, 2),
+            "core_temperature_C": round(self.blood.core_temperature_C, 1),
+
+            # ── Fluid compartments ───────────────────────────────────────
+            "fluid_vascular_ml": round(
+                _last("fluid_vascular_ml", self.fluid.vascular_volume_ml), 1
+            ),
+            "fluid_isf_ml": round(_last("fluid_isf_ml", self.fluid.isf_volume_ml), 1),
+            "fluid_icf_ml": round(_last("fluid_icf_ml", self.fluid.icf_volume_ml), 1),
+
+            # ── Organ health ────────────────────────────────────────────
+            "heart_health": round(self.organ_health.heart_health, 3),
+            "lung_health": round(self.organ_health.lung_health, 3),
+            "kidney_health": round(self.organ_health.kidney_health, 3),
+
+            # ── Disease state (readable summary) ────────────────────────
+            "disease_state": self.disease.summary() if self.disease else None,
+        }
 
     def print_summary(self):
         """打印当前状态摘要"""

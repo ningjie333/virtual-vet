@@ -1,0 +1,1 @@
+"""db — SQLite persistence layer for virtual-vet game sessions."""

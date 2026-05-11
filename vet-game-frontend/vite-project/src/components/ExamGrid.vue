@@ -3,11 +3,11 @@ import { computed } from "vue";
 import type { Report } from "../types";
 
 const props = defineProps<{
-  examinations: Record<string, { name: string; name_en: string; category: string; tier: number; cost: number; description: string }>;
+  examinations: Record<string, { name: string; category: string; tier: number; time_cost_min: number; description: string }>;
   examsDone: Set<string>;
   reports: Report[];
   loading: boolean;
-  currentAp?: number;
+  timeRemainingMin?: number;
 }>();
 
 const emit = defineEmits<{
@@ -34,7 +34,7 @@ const tierOrder = [1, 2, 3, 4, 5];
 
 interface ExamEntry {
   key: string;
-  ex: { name: string; name_en: string; category: string; tier: number; cost: number; description: string };
+  ex: { name: string; category: string; tier: number; time_cost_min: number; description: string };
 }
 
 const groupedExams = computed(() => {
@@ -50,9 +50,15 @@ const groupedExams = computed(() => {
   return groups;
 });
 
-function canAfford(ex: { tier: number; cost: number }, currentAp: number): boolean {
-  if (ex.tier >= 2) return currentAp >= ex.cost;
-  return true; // Tier 1 always affordable (just costs action count)
+function canAfford(ex: { time_cost_min: number }, remainingMin: number): boolean {
+  return ex.time_cost_min <= remainingMin;
+}
+
+function formatTime(min: number): string {
+  if (min < 60) return `${min} 分钟`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h} 小时 ${m} 分钟` : `${h} 小时`;
 }
 </script>
 
@@ -69,22 +75,18 @@ function canAfford(ex: { tier: number; cost: number }, currentAp: number): boole
         <div
           v-for="{ key, ex } in group.exams"
           :key="key"
-          :class="['ec', { done: examsDone.has(key), disabled: !canAfford(ex, currentAp ?? 10) }]"
-          @click="canAfford(ex, currentAp ?? 10) && emit('exam', key)"
+          :class="['ec', { done: examsDone.has(key), disabled: !canAfford(ex, timeRemainingMin ?? 90) }]"
+          @click="canAfford(ex, timeRemainingMin ?? 90) && emit('exam', key)"
         >
           <div class="ec-tier" :style="{ color: tierColors[ex.tier] }">
             T{{ ex.tier }}
           </div>
           <div class="ec-name">{{ ex.name }}</div>
-          <div class="ec-name-en">{{ ex.name_en }}</div>
           <div class="ec-desc">{{ ex.description }}</div>
           <div class="ec-cost">
             <template v-if="examsDone.has(key)"><span class="ec-done-mark">✓ 已完成</span></template>
-            <template v-else-if="ex.tier >= 2">
-              ⚡ {{ ex.cost }} AP
-            </template>
             <template v-else>
-              🆓 免费（消耗 1 行动）
+              ⏱ {{ formatTime(ex.time_cost_min) }}
             </template>
           </div>
         </div>

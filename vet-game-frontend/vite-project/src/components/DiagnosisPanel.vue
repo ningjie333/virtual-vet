@@ -38,7 +38,14 @@ const diagLoading = ref(false);
 const diseaseNameMap: Record<string, string> = {
   pneumonia: "肺炎",
   acute_renal_failure: "急性肾衰竭",
-  dilated_cardiomyopathy: "扩张型心肌病（DCM）",
+  dilated_cardiomyopathy: "扩张型心肌病",
+  phosphorus_poisoning: "磷化锌/磷化铝灭鼠药中毒",
+  gastric_dilatation_volvulus: "胃扩张扭转",
+  immune_mediated_hemolytic_anemia: "免疫介导性溶血性贫血",
+  urinary_obstruction: "尿道梗阻",
+  diabetic_ketoacidosis: "糖尿病酮症酸中毒",
+  pericardial_effusion: "心包积液/心脏填塞",
+  disseminated_intravascular_coagulation: "弥散性血管内凝血",
 };
 
 async function refreshDiagnosis() {

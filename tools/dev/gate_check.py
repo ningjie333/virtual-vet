@@ -82,37 +82,43 @@ def run_fix() -> int:
     return 0
 
 
-def run_quick() -> int:
-    """快速检查：API + 数据一致性。"""
+def run_schema() -> int:
+    """JSON Schema 验证：所有四个配置文件。"""
     print("=" * 50)
-    print("Virtual Vet Gate Check — 快速模式")
+    print("Virtual Vet Gate Check — Schema 验证")
     print("=" * 50)
 
+    # Import from project root (add both project root and src/ like conftest.py does)
+    import sys
+    sys.path.insert(0, str(PROJECT_ROOT))
+    sys.path.insert(0, str(PROJECT_ROOT / "src"))
+    from src.config_validation import validate_all
+
+    results = validate_all()
     max_code = 0
 
-    code = run_checker("API 一致性", "check_api_consistency.py")
-    max_code = max(max_code, code)
-
-    code = run_checker("数据一致性", "check_data_consistency.py")
-    max_code = max(max_code, code)
+    for filename, errors in results.items():
+        if not errors:
+            print(f"  [{filename}] 通过")
+        else:
+            max_code = 1
+            print(f"  [{filename}] 失败 ({len(errors)} 个错误):")
+            for err in errors:
+                print(f"    {err.path}: {err.message}")
 
     print("=" * 50)
     if max_code == 0:
-        print("[PASS] 所有检查通过 ✓")
-    elif max_code == 1:
-        print("[FAIL] 发现 CRITICAL/HIGH 问题，请修复后重试")
-        print("       或使用 --fix 自动修复 / git commit --no-verify 跳过")
+        print("[PASS] 所有 Schema 验证通过")
     else:
-        print("[WARN] 发现 MEDIUM/LOW 问题，建议修复")
+        print("[FAIL] Schema 验证失败")
     print("=" * 50)
-
     return max_code
 
 
-def run_full() -> int:
+def run_quick() -> int:
     """全套检查：API + 数据 + 类型。"""
     print("=" * 50)
-    print("Virtual Vet Gate Check — 完整模式")
+    print("Virtual Vet Gate Check — 快速检查")
     print("=" * 50)
 
     max_code = 0
@@ -151,6 +157,7 @@ def main():
     group.add_argument("--quick", action="store_true", help="快速模式（默认）")
     group.add_argument("--full", action="store_true", help="完整模式")
     group.add_argument("--fix", action="store_true", help="自动修复可修复的问题")
+    group.add_argument("--schema", action="store_true", help="JSON Schema 验证")
     group.add_argument("--install-hook", action="store_true", help="安装 Git pre-commit hook")
     args = parser.parse_args()
 
@@ -165,8 +172,10 @@ def main():
 
     if args.fix:
         return run_fix()
+    elif args.schema:
+        return run_schema()
     elif args.full:
-        return run_full()
+        return run_quick()
     else:
         return run_quick()
 

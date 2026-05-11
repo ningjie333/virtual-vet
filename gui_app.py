@@ -26,8 +26,16 @@ from src.parameters import (
     RESPIRATORY_RATE_REST,
 )
 from src.diseases import create_disease
-from game.action_system import GameState, process_action
+from game.action_system import GameState, process_action, TIME_BUDGET_EASY, TIME_BUDGET_NORMAL, TIME_BUDGET_HARD
 from game.diagnosis_engine import match_diseases, get_suggested_tests, CLUE_DESCRIPTIONS
+from src.db.conn import connect
+from src.db.schema import init_db
+from src.db.sessions import create_session as db_create_session
+from src.db.sessions import update_session_outcome as db_update_session_outcome
+from src.db.sessions import update_engine_snapshot as db_update_engine_snapshot
+from src.db.sessions import get_session as db_get_session
+from src.db.action_log import append_action as db_append_action
+from src.db.action_log import get_action_log as db_get_action_log
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +73,59 @@ CASES_DATA = _load_json("cases.json")
 _DISEASE_NAMES: dict[str, str] = _load_json("diseases.json")["disease_names"]
 
 # ============================================================
+# SQLite persistence (multi-user session storage)
+# ============================================================
+_DB_PATH = os.path.join(os.path.dirname(__file__), "data", "game_sessions.db")
+_db_conn = connect(_DB_PATH)
+init_db(_db_conn)
+
+
+def _persist_action(state: GameState, session_id: str, action_type: str,
+                      params: dict, result: dict) -> None:
+    """
+    Append an action row and update the engine snapshot in SQLite.
+    Silently ignores errors so that SQLite failures never break gameplay.
+    """
+    import json
+    try:
+        seq = _action_seq.get(session_id, 1)
+        _action_seq[session_id] = seq + 1
+
+        params_json = json.dumps(params, ensure_ascii=False) if params else None
+        snapshot = _snapshot_json(state.engine)
+        medical_phase = result.get("medical_phase", "stable")
+        outcome = state.phase if state.phase in ("won", "lost") else None
+
+        db_append_action(
+            conn=_db_conn,
+            session_id=session_id,
+            seq=seq,
+            action_type=action_type,
+            params=params_json,
+            time_cost_min=result.get("time_cost_min"),
+            engine_snapshot_json=snapshot,
+            medical_phase=medical_phase,
+            outcome=outcome,
+        )
+        db_update_engine_snapshot(_db_conn, session_id, snapshot)
+    except Exception:
+        pass  # Never let SQLite errors affect gameplay
+
+
+def _snapshot_json(vc: VirtualCreature) -> str:
+    """Serialize VirtualCreature to JSON for SQLite storage."""
+    import json
+    try:
+        return json.dumps(vc.to_minimal_snapshot(), ensure_ascii=False)
+    except Exception:
+        return "{}"
+
+
+# ============================================================
 # 游戏会话存储（单用户，内存存储）
 # ============================================================
-# 生产环境应使用 session +数据库，单用户原型用全局变量即可
 _game_sessions: dict[str, GameState] = {}
+_action_seq: dict[str, int] = {}  # session_id → next seq number
 _DEFAULT_SESSION_ID = "case_001"
 
 # ============================================================
@@ -91,6 +148,11 @@ def get_normal_value(metric_key: str, weight_kg: float = 20.0) -> float:
         "pH": 7.40,
     }
     return defaults.get(metric_key, 0.0)
+
+
+def _get_time_budget(difficulty: int) -> int:
+    """根据难度返回时间预算（分钟）。"""
+    return {1: TIME_BUDGET_EASY, 2: TIME_BUDGET_NORMAL, 3: TIME_BUDGET_HARD}.get(difficulty, TIME_BUDGET_NORMAL)
 
 
 # ============================================================
@@ -166,20 +228,28 @@ def api_new_game():
 
     # 创建游戏状态
     species = animal.get("species", "犬")
-    # 根据难度设置 AP 上限
-    difficulty = case.get("difficulty", 1)
-    max_ap = {1: 12, 2: 10, 3: 8}.get(difficulty, 10)
+    difficulty = case.get("difficulty", 2)
+    time_budget = _get_time_budget(difficulty)
     state = GameState(
         engine=vc,
         disease_name=disease_name,
         species=species,
-        current_ap=max_ap,
-        max_ap=max_ap,
+        time_budget_min=time_budget,
     )
 
     # 用 case_id 作为 session id（单用户原型）
     session_id = case_id
     _game_sessions[session_id] = state
+
+    # Persist to SQLite
+    db_create_session(
+        conn=_db_conn,
+        session_id=session_id,
+        case_id=case_id,
+        species=species,
+        difficulty=difficulty,
+        disease_name=disease_name,
+    )
 
     from game.time_manager import format_game_time, is_night_time
 
@@ -189,17 +259,16 @@ def api_new_game():
             "case": case,
             "game_state": {
                 "phase": state.phase,
-                "time_used": state.total_ap_spent,
+                "time_elapsed_min": 0,
+                "time_budget_min": state.time_budget_min,
                 "medical_phase": "stable",
                 "death_timer": state.death_timer,
             },
-            "game_time": format_game_time(state.total_ap_spent * 60),
-            "is_night": is_night_time(state.total_ap_spent * 60),
-            "vitals": _get_vitals(vc),
-            "ap": state.current_ap,
-            "max_ap": state.max_ap,
-            "stress": round(state.stress_level, 1),
-            "pending_reports": len(state.pending_reports),
+            "game_time": format_game_time(0),
+            "is_night": is_night_time(0),
+            "vitals": _get_vitals(vc, 0),
+            "time_budget_min": state.time_budget_min,
+            "pending_reports": 0,
         }
     )
 
@@ -230,20 +299,18 @@ def api_examine():
         "success": result["success"],
         "phase": result["phase"],
         "medical_phase": result.get("medical_phase", "stable"),
-        "time_used": state.total_ap_spent,
+        "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
+        "time_budget_min": state.time_budget_min,
+        "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
         "death_timer": state.death_timer,
         "report": result.get("result"),
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.total_ap_spent * 60),
+        "vitals": _get_vitals(state.engine, state.time_elapsed_min),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
-        "ap": result.get("ap_remaining", state.current_ap),
-        "max_ap": state.max_ap,
-        "ap_cost": result.get("ap_cost", 0),
-        "stress": result.get("stress_level", round(state.stress_level, 1)),
-        "combo_bonus": result.get("combo_bonus", None),
+        "time_cost_min": result.get("time_cost_min", 0),
     }
 
     if not result["success"] and result.get("error"):
@@ -254,6 +321,9 @@ def api_examine():
             "reason": "患犬未能挺过危机，抢救无效。",
             "actual_disease": state.disease_name,
         }
+
+    # Persist to SQLite (best-effort)
+    _persist_action(state, session_id, "examine", {"test_type": test_type}, result)
 
     return jsonify(response)
 
@@ -293,21 +363,24 @@ def api_administer_drug():
         "success": result["success"],
         "phase": result["phase"],
         "medical_phase": result.get("medical_phase", "stable"),
-        "time_used": state.total_ap_spent,
+        "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
+        "time_budget_min": state.time_budget_min,
+        "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
         "death_timer": state.death_timer,
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.total_ap_spent * 60),
+        "vitals": _get_vitals(state.engine, state.time_elapsed_min),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
-        "ap": result.get("ap_remaining", state.current_ap),
-        "max_ap": state.max_ap,
-        "stress": result.get("stress_level", round(state.stress_level, 1)),
+        "time_cost_min": result.get("time_cost_min", 0),
     }
 
     if not result["success"]:
         response["error"] = f"给药失败：药物 '{drug_name}' 未注册"
+
+    # Persist to SQLite (best-effort)
+    _persist_action(state, session_id, "administer_drug", params, result)
 
     return jsonify(response)
 
@@ -316,7 +389,7 @@ def api_administer_drug():
 def api_diagnose():
     """
     提交诊断 + 治疗
-    POST body: {"session_id": "case_001", "diagnosis": "pneumonia", "treatment": "antibiotics"}
+    POST body: {"session_id": "case_001", "diagnosis": "pneumonia"}
     返回: 治疗结果 + 游戏状态
     """
     data = request.get_json() or {}
@@ -338,18 +411,18 @@ def api_diagnose():
         "success": result["success"],
         "phase": result["phase"],
         "medical_phase": result.get("medical_phase", "stable"),
-        "time_used": state.total_ap_spent,
+        "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
+        "time_budget_min": state.time_budget_min,
+        "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
         "death_timer": state.death_timer,
         "treatment_result": result.get("result"),
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.total_ap_spent * 60),
+        "vitals": _get_vitals(state.engine, state.time_elapsed_min),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
-        "ap": result.get("ap_remaining", state.current_ap),
-        "max_ap": state.max_ap,
-        "stress": result.get("stress_level", round(state.stress_level, 1)),
+        "time_cost_min": result.get("time_cost_min", 0),
     }
 
     if state.phase == "won":
@@ -363,6 +436,13 @@ def api_diagnose():
             "reason": "患犬未能挺过危机，抢救无效。",
             "actual_disease": state.disease_name,
         }
+
+    # Persist to SQLite; also record final outcome
+    _persist_action(state, session_id, "treat", {"disease_guess": diagnosis}, result)
+    if state.phase in ("won", "lost"):
+        db_update_session_outcome(
+            _db_conn, session_id, state.phase, state.time_elapsed_min,
+        )
 
     return jsonify(response)
 
@@ -387,17 +467,17 @@ def api_wait():
         "success": result["success"],
         "phase": result["phase"],
         "medical_phase": result.get("medical_phase", "stable"),
-        "time_used": state.total_ap_spent,
+        "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
+        "time_budget_min": state.time_budget_min,
+        "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
         "death_timer": state.death_timer,
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.total_ap_spent * 60),
+        "vitals": _get_vitals(state.engine, state.time_elapsed_min),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
-        "ap": result.get("ap_remaining", state.current_ap),
-        "max_ap": state.max_ap,
-        "stress": result.get("stress_level", round(state.stress_level, 1)),
+        "time_cost_min": result.get("time_cost_min", 0),
     }
 
     if state.phase == "lost":
@@ -405,6 +485,9 @@ def api_wait():
             "reason": "患犬未能挺过危机，抢救无效。",
             "actual_disease": state.disease_name,
         }
+
+    # Persist to SQLite (best-effort)
+    _persist_action(state, session_id, "wait", {}, result)
 
     return jsonify(response)
 
@@ -427,17 +510,16 @@ def api_game_state():
         {
             "phase": state.phase,
             "medical_phase": medical_phase,
-            "time_used": state.total_ap_spent,
+            "time_elapsed_min": state.time_elapsed_min,
+            "time_budget_min": state.time_budget_min,
+            "time_remaining_min": state.time_remaining_min,
             "death_timer": state.death_timer,
-            "game_time": format_game_time(state.total_ap_spent * 60),
-            "is_night": is_night_time(state.total_ap_spent * 60),
-            "vitals": _get_vitals(state.engine, state.total_ap_spent),
+            "game_time": format_game_time(state.time_elapsed_min),
+            "is_night": is_night_time(state.time_elapsed_min),
+            "vitals": _get_vitals(state.engine, state.time_elapsed_min),
             "reports_count": len(state.reports),
             "pending_reports": len(state.pending_reports),
             "game_log": _build_game_log(state),
-            "ap": state.current_ap,
-            "max_ap": state.max_ap,
-            "stress": round(state.stress_level, 1),
         }
     )
 
@@ -502,7 +584,25 @@ def api_diagnosis():
 # ============================================================
 
 
-def _get_vitals(vc: VirtualCreature, time_spent_s: float = 0.0) -> dict:
+@app.route("/api/sessions/<session_id>/replay", methods=["GET"])
+def api_session_replay(session_id):
+    """
+    Return a completed session's data for instructor review.
+
+    Returns the session metadata, final engine snapshot, and the
+    full action sequence in chronological order.
+    """
+    session = db_get_session(_db_conn, session_id)
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+    actions = db_get_action_log(_db_conn, session_id)
+    return jsonify({"session": session, "actions": actions})
+
+
+# ============================================================
+
+
+def _get_vitals(vc: VirtualCreature, elapsed_min: float = 0.0) -> dict:
     """从引擎提取当前生命体征"""
     h = vc.history
 
@@ -520,9 +620,8 @@ def _get_vitals(vc: VirtualCreature, time_spent_s: float = 0.0) -> dict:
         "Temp": round(_last("Temp", vc.blood.core_temperature_C), 1),
         "GFR": round(_last("GFR", vc.kidney.GFR), 1),
         "pH": round(_last("pH", vc.blood.arterial_pH), 3),
-        "time_used": 0,  # 由调用方填充
-        "game_time": format_game_time(time_spent_s),
-        "is_night": is_night_time(time_spent_s),
+        "game_time": format_game_time(int(elapsed_min)),
+        "is_night": is_night_time(int(elapsed_min)),
     }
 
 
@@ -530,17 +629,19 @@ def _build_game_log(state: GameState) -> list[str]:
     """构建可读的诊疗日志"""
     from game.time_manager import format_game_time
     log = []
-    for i, report in enumerate(state.reports):
+    cumulative_min = 0
+    for report in state.reports:
         name = report.get("name", "未知检查")
         summary = report.get("summary", "")
-        log.append(f"[{format_game_time(i * 60)}] {name}：{summary[:80]}")
+        cumulative_min += 5  # 近似累计
+        log.append(f"[{format_game_time(cumulative_min)}] {name}：{summary[:80]}")
     return log
 
 
 # ── 评分参数 ──
 _SCORE_BASE = 100
-_SCORE_ACTION_PENALTY = 3
-_SCORE_MAX_PENALTY = 80
+_SCORE_TIME_PENALTY_PER_MIN = 0.5
+_SCORE_MAX_PENALTY = 60
 _SCORE_MIN = 20
 _GRADE_THRESHOLDS = [
     (90, "S"),
@@ -553,7 +654,7 @@ _GRADE_DEFAULT = "D"
 
 def _calc_score(state: GameState) -> dict:
     """计算最终评分（时间越少越好）"""
-    time_penalty = min(_SCORE_MAX_PENALTY, state.total_ap_spent * _SCORE_ACTION_PENALTY)
+    time_penalty = min(_SCORE_MAX_PENALTY, state.time_elapsed_min * _SCORE_TIME_PENALTY_PER_MIN)
     score = max(_SCORE_MIN, _SCORE_BASE - time_penalty)
 
     grade = _GRADE_DEFAULT
@@ -565,7 +666,7 @@ def _calc_score(state: GameState) -> dict:
     return {
         "total": score,
         "grade": grade,
-        "time_used": state.total_ap_spent,
+        "time_used": state.time_elapsed_min,
     }
 
 

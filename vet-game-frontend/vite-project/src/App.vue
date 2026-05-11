@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, watch, nextTick } from "vue";
-import type { Case, Vitals, Report, ApStressState } from "./types";
+import type { Case, Vitals, Report } from "./types";
 import { api } from "./api";
 import CaseSelect from "./components/CaseSelect.vue";
 import PatientCard from "./components/PatientCard.vue";
@@ -17,13 +17,15 @@ const tab = ref<"exam" | "report" | "diag">("exam");
 const sessionId = ref("");
 const caseData = ref<Case | null>(null);
 const cases = ref<Case[]>([]);
-const examinations = ref<Record<string, { name: string; name_en: string; category: string; tier: number; cost: number; description: string }>>({});
+const examinations = ref<Record<string, { name: string; category: string; tier: number; time_cost_min: number; description: string }>>({});
 const treatments = ref<Record<string, { name: string; description: string; correct_for: string | null }>>({});
 const drugs = ref<Record<string, { name: string; half_life_h: number; description: string }>>({});
 const examsDone = reactive(new Set<string>());
 const reports = ref<Report[]>([]);
 const vitals = reactive<Vitals>({ HR_bpm: 0, MAP_mmHg: 0, SpO2: 0, RR: 0, Temp: 0, GFR: 0, pH: 0 });
-const timeUsed = ref(0);
+const timeElapsedMin = ref(0);
+const timeBudgetMin = ref(90);
+const timeRemainingMin = ref(90);
 const medicalPhase = ref("stable");
 const deathTimer = ref<number | null>(null);
 const loading = ref(false);
@@ -33,15 +35,19 @@ const gameLog = ref<string[]>([]);
 const gameOverData = ref<{ reason: string; actual_disease: string; score?: { total: number; grade: string; time_used: number } }>({ reason: "", actual_disease: "" });
 const isNight = ref(false);
 const gameTime = ref("08:00");
-const apStress = reactive<ApStressState>({ ap: 10, max_ap: 10, stress: 0, pending_reports: 0 });
-const lastCombo = ref<string | null>(null);
-const comboTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 
 // ── 疾病名映射 ──
 const diseaseNameMap: Record<string, string> = {
-  pneumonia: "肺炎（Pneumonia）",
-  acute_renal_failure: "急性肾衰竭（Acute Renal Failure）",
-  dilated_cardiomyopathy: "扩张型心肌病（DCM）",
+  pneumonia: "肺炎",
+  acute_renal_failure: "急性肾衰竭",
+  dilated_cardiomyopathy: "扩张型心肌病",
+  phosphorus_poisoning: "磷化锌/磷化铝灭鼠药中毒",
+  gastric_dilatation_volvulus: "胃扩张扭转",
+  immune_mediated_hemolytic_anemia: "免疫介导性溶血性贫血",
+  urinary_obstruction: "尿道梗阻",
+  diabetic_ketoacidosis: "糖尿病酮症酸中毒",
+  pericardial_effusion: "心包积液/心脏填塞",
+  disseminated_intravascular_coagulation: "弥散性血管内凝血",
 };
 
 // ── Computed ──
@@ -50,15 +56,29 @@ const phaseLabel = computed(() => ({
   stable: "病情: 稳定",
   worsening: "病情: 恶化中",
   critical: "病情: 危重",
-  moribund: "病情: 死亡近",
+  moribund: "病情: 濒死",
 }[medicalPhase.value] || "病情: —"));
 const won = computed(() => phase.value === "done" && gameOverData.value.score !== undefined && gameOverData.value.score.total > 0);
 const actualDiseaseName = computed(() => diseaseNameMap[gameOverData.value.actual_disease] || gameOverData.value.actual_disease);
 
+// ── 时间显示 ──
+const timePercent = computed(() => {
+  if (timeBudgetMin.value <= 0) return 0;
+  return Math.min(100, (timeElapsedMin.value / timeBudgetMin.value) * 100);
+});
+const timeBarClass = computed(() => {
+  const pct = timePercent.value;
+  if (pct >= 80) return "danger";
+  if (pct >= 60) return "warn";
+  return "ok";
+});
+
 // ── Helpers ──
 function updateFrom(d: Record<string, unknown>) {
   if (d.vitals) Object.assign(vitals, d.vitals);
-  if (d.time_used !== undefined) timeUsed.value = d.time_used as number;
+  if (d.time_elapsed_min !== undefined) timeElapsedMin.value = d.time_elapsed_min as number;
+  if (d.time_budget_min !== undefined) timeBudgetMin.value = d.time_budget_min as number;
+  if (d.time_remaining_min !== undefined) timeRemainingMin.value = d.time_remaining_min as number;
   if (d.medical_phase) medicalPhase.value = d.medical_phase as string;
   if (d.death_timer !== undefined) deathTimer.value = d.death_timer as number | null;
   if (d.game_log) gameLog.value = d.game_log as string[];
@@ -68,16 +88,6 @@ function updateFrom(d: Record<string, unknown>) {
   }
   if (d.game_time !== undefined) gameTime.value = d.game_time as string;
   if (d.is_night !== undefined) isNight.value = d.is_night as boolean;
-  if (d.ap !== undefined) apStress.ap = d.ap as number;
-  if (d.max_ap !== undefined) apStress.max_ap = d.max_ap as number;
-  if (d.stress !== undefined) apStress.stress = d.stress as number;
-  if (d.pending_reports !== undefined) apStress.pending_reports = d.pending_reports as number;
-  if (d.ap_cost !== undefined) apStress.ap_cost = d.ap_cost as number;
-  if (d.combo_bonus !== undefined && d.combo_bonus) {
-    lastCombo.value = d.combo_bonus as string;
-    if (comboTimer.value) clearTimeout(comboTimer.value);
-    comboTimer.value = setTimeout(() => { lastCombo.value = null; }, 3000);
-  }
   if (d.new_reports && Array.isArray(d.new_reports)) {
     for (const r of d.new_reports) {
       if (!reports.value.find((x) => x.test_type === (r as Report).test_type && x.summary === (r as Report).summary)) {
@@ -112,7 +122,9 @@ async function startGame(caseId: string) {
   caseData.value = d.case;
   phase.value = "game";
   Object.assign(vitals, d.vitals);
-  timeUsed.value = 0;
+  timeElapsedMin.value = 0;
+  timeBudgetMin.value = d.time_budget_min || 90;
+  timeRemainingMin.value = timeBudgetMin.value;
   medicalPhase.value = d.game_state?.medical_phase || "stable";
   deathTimer.value = null;
   reports.value = [];
@@ -130,7 +142,7 @@ async function doExam(testType: string) {
   try {
     const d = await api.examine(sessionId.value, testType);
     if (!d.success) {
-      alert("检查失败");
+      alert(d.error || "检查失败");
       return;
     }
     if (d.report) reports.value.push(d.report);
@@ -268,11 +280,16 @@ function restart() {
         </button>
       </div>
       <div class="top-right" v-if="phase !== 'select'">
-        <span class="badge badge-ap" :class="{ 'ap-low': apStress.ap <= 3 }">⏱ 时间预算: {{ apStress.ap }}/{{ apStress.max_ap }}</span>
-        <span class="badge badge-stress" :class="{ 'stress-high': apStress.stress >= 50, 'stress-crit': apStress.stress >= 80 }">😰 压力: {{ apStress.stress }}</span>
-        <span v-if="apStress.pending_reports > 0" class="badge badge-pending">📋 待出报告: {{ apStress.pending_reports }}</span>
-        <span class="badge badge-turn">已用: {{ timeUsed }}</span>
-        <span :class="['clock-display', { night: isNight }]">{{ isNight ? '🌙' : '🕐' }} {{ gameTime }}</span>
+        <!-- 时间预算条 -->
+        <div class="time-budget-container">
+          <div class="time-budget-label">
+            <span :class="['clock-display', { night: isNight }]">{{ isNight ? '🌙' : '🕐' }} {{ gameTime }}</span>
+            <span class="time-remaining" :class="timeBarClass">{{ timeRemainingMin }} min 剩余</span>
+          </div>
+          <div class="time-budget-bar">
+            <div class="time-budget-fill" :class="timeBarClass" :style="{ width: timePercent + '%' }"></div>
+          </div>
+        </div>
         <span v-if="isNight" class="badge badge-night">夜间模式</span>
         <span :class="['badge', phaseClass]">{{ phaseLabel }}</span>
         <span class="death-timer" v-if="deathTimer !== null">⚠ 濒死倒计时: {{ deathTimer }}</span>
@@ -316,7 +333,7 @@ function restart() {
             :exams-done="examsDone"
             :reports="reports"
             :loading="loading"
-            :current-ap="apStress.ap"
+            :time-remaining-min="timeRemainingMin"
             @exam="doExam"
           />
 
@@ -386,16 +403,11 @@ function restart() {
             @click="doWait"
             :disabled="phase === 'done'"
           >
-            ⏳ 等待观察（恢复 2 AP，缓解压力）
+            ⏳ 等待观察（10 分钟）
           </button>
         </div>
       </template>
     </div>
-  </div>
-
-  <!-- Combo Bonus Toast -->
-  <div v-if="lastCombo" class="combo-toast">
-    🎉 组合折扣：{{ lastCombo }}
   </div>
 
   <!-- Game Over Overlay -->
@@ -429,6 +441,41 @@ function restart() {
   border-color: var(--cyan);
   color: var(--cyan);
 }
+
+/* ── Time Budget Bar ── */
+.time-budget-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+}
+.time-budget-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-remaining {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+.time-remaining.ok { color: #4caf50; }
+.time-remaining.warn { color: #ff9800; }
+.time-remaining.danger { color: #f44336; }
+.time-budget-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.time-budget-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.time-budget-fill.ok { background: #4caf50; }
+.time-budget-fill.warn { background: #ff9800; }
+.time-budget-fill.danger { background: #f44336; }
 
 /* ── Drug Panel ── */
 .drug-panel {

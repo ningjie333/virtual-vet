@@ -8,6 +8,12 @@ class BloodCompartment:
     """
     血液隔室：存储动脉血和静脉血的关键参数
     作为所有器官模块之间的物质交换载体
+
+    Note:
+        total_volume_ml is kept in sync with HeartModule.circulating_volume_ml
+        by the simulation engine at the end of each step(). The blood compartment
+        does not modify volume itself — all changes flow through heart's
+        blood_volume_change() or urine loss in simulation.py Step 7.5.
     """
 
     def __init__(self, total_volume_ml: float, plasma_fraction: float = 0.55):

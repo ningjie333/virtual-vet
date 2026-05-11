@@ -28,18 +28,8 @@ export interface Vitals {
   Temp: number;
   GFR: number;
   pH: number;
-  time_used?: number;
   game_time?: string;
   is_night?: boolean;
-}
-
-export interface ApStressState {
-  ap: number;
-  max_ap: number;
-  stress: number;
-  pending_reports: number;
-  ap_cost?: number;
-  combo_bonus?: string | null;
 }
 
 export interface ResultEntry {
@@ -61,7 +51,9 @@ export interface Report {
 
 export interface GameState {
   phase: string;
-  time_used: number;
+  time_elapsed_min: number;
+  time_budget_min: number;
+  time_remaining_min: number;
   medical_phase: string;
   death_timer: number | null;
   game_time?: string;
@@ -102,18 +94,18 @@ export interface AdministerDrugResponse {
   success: boolean;
   phase: string;
   medical_phase: string;
-  time_used: number;
+  time_elapsed_min: number;
+  time_budget_min: number;
+  time_remaining_min: number;
   death_timer: number | null;
   vitals: Vitals;
   game_log: string[];
   error?: string;
-  ap?: number;
-  max_ap?: number;
-  stress?: number;
   pending_reports?: number;
   new_reports?: Report[];
   game_time?: string;
   is_night?: boolean;
+  time_cost_min?: number;
 }
 
 export interface ApiResponse<T = unknown> {
