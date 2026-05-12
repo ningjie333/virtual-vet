@@ -256,8 +256,9 @@ class KidneyModule:
         crea_target = min(5.0, crea_target)
         self.blood.creatinine_mg_dL = max(0.5, self.blood.creatinine_mg_dL + (crea_target - self.blood.creatinine_mg_dL) * 0.1)
 
-        # Step 8: 累计尿量
-        self.cumulative_urine_ml += self.urine_output * dt
+        # Step 8: 累计尿量（urine_output 是 mL/min，dt 是秒）
+        dt_min = dt / 60.0
+        self.cumulative_urine_ml += self.urine_output * dt_min
 
         # Step 9: 尿量从血液隔室排出
         # 70% 由体内水分补充（胃肠道、细胞内液），30% 直接减少循环血量

@@ -1,0 +1,100 @@
+{
+  "metabolic_activity": {
+    "unit": "",
+    "normal": [0.9, 1.0],
+    "critical": [0.1, 1.0],
+    "clue_flags": { "low": "liver_metabolic_low" },
+    "description": "肝脏代谢活性 (0-1)"
+  },
+  "detox_capacity": {
+    "unit": "",
+    "normal": [0.9, 1.0],
+    "critical": [0.1, 1.0],
+    "clue_flags": { "low": "ammonia_high" },
+    "description": "氨解毒能力 (0-1)"
+  },
+  "cyp450_activity": {
+    "unit": "",
+    "normal": [0.9, 1.0],
+    "critical": [0.1, 1.0],
+    "clue_flags": { "low": "drug_metabolism_impaired" },
+    "description": "CYP450 药物代谢活性 (0-1)"
+  },
+  "glycogen_fraction": {
+    "unit": "",
+    "normal": [0.4, 0.8],
+    "critical": [0.0, 1.0],
+    "clue_flags": { "low": "glycogen_depleted" },
+    "description": "糖原储备比例 (0-1)"
+  },
+  "bilirubin_conjugation": {
+    "unit": "",
+    "normal": [0.9, 1.0],
+    "critical": [0.1, 1.0],
+    "clue_flags": { "low": "bilirubin_high" },
+    "description": "胆红素结合能力 (0-1)"
+  },
+  "ALT": {
+    "unit": "U/L",
+    "normal": [10, 80],
+    "critical": [0, 500],
+    "clue_flags": { "high": "alt_high" },
+    "description": "丙氨酸氨基转移酶"
+  },
+  "AST": {
+    "unit": "U/L",
+    "normal": [10, 50],
+    "critical": [0, 500],
+    "clue_flags": { "high": "ast_high" },
+    "description": "天冬氨酸氨基转移酶"
+  },
+  "ALP": {
+    "unit": "U/L",
+    "normal": [20, 150],
+    "critical": [0, 1000],
+    "clue_flags": { "high": "alp_high" },
+    "description": "碱性磷酸酶"
+  },
+  "GGT": {
+    "unit": "U/L",
+    "normal": [1, 10],
+    "critical": [0, 50],
+    "clue_flags": { "high": "ggt_high" },
+    "description": "谷氨酰转肽酶"
+  },
+  "albumin": {
+    "unit": "g/dL",
+    "normal": [2.5, 4.0],
+    "critical": [1.0, 5.0],
+    "clue_flags": { "low": "albumin_low" },
+    "description": "白蛋白"
+  },
+  "ammonia": {
+    "unit": "μmol/L",
+    "normal": [0, 50],
+    "critical": [100, 500],
+    "clue_flags": { "high": "ammonia_high" },
+    "description": "血氨"
+  },
+  "bile_acids": {
+    "unit": "μmol/L",
+    "normal": [5, 15],
+    "critical": [0, 100],
+    "clue_flags": { "high": "bile_acids_high" },
+    "description": "胆汁酸"
+  },
+  "glucose": {
+    "unit": "mmol/L",
+    "normal": [3.5, 6.0],
+    "critical": [1.5, 20.0],
+    "clue_flags": { "high": "glucose_high", "low": "glucose_low" },
+    "description": "血糖"
+  },
+  "urea": {
+    "unit": "mmol/L",
+    "normal": [3.0, 8.0],
+    "critical": [0.5, 30.0],
+    "clue_flags": { "high": "urea_high" },
+    "description": "尿素"
+  }
+}
