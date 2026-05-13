@@ -17,7 +17,7 @@ function toggle(i: number) {
 }
 
 function flagText(f: string) {
-  return ({ normal: "正常", low: "↑ 偏低", high: "↑ 偏高", critical: "⚠ 危急" }[f] || f);
+  return ({ normal: "正常", low: "↓ 偏低", high: "↑ 偏高", critical: "⚠ 危急" }[f] || f);
 }
 
 function isResultEntryArray(results: ResultEntry[] | string[]): results is ResultEntry[] {
@@ -43,7 +43,7 @@ function isResultEntryArray(results: ResultEntry[] | string[]): results is Resul
         <span class="rc-name">{{ r.name }}</span>
         <span class="rc-toggle">▼</span>
       </div>
-      <div class="rc-body">
+      <div class="rc-body" @click.stop>
         <div class="rc-content">
           <div class="rc-summary">{{ r.summary }}</div>
           <table v-if="isResultEntryArray(r.results)" class="rc-table">

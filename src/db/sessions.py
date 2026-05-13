@@ -15,11 +15,13 @@ def create_session(
     """
     Insert a new session row and return its integer PK.
 
-    Raises sqlite3.IntegrityError if session_id already exists.
+    Uses INSERT OR REPLACE so that re-creating a session with the same
+    session_id (e.g. replaying the same case) updates the existing row
+    instead of raising a UNIQUE constraint violation.
     """
     cursor = conn.execute(
         """
-        INSERT INTO sessions (session_id, case_id, species, difficulty, disease_name)
+        INSERT OR REPLACE INTO sessions (session_id, case_id, species, difficulty, disease_name)
         VALUES (?, ?, ?, ?, ?)
         """,
         (session_id, case_id, species, difficulty, disease_name),
