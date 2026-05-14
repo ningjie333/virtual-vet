@@ -18,6 +18,8 @@ from fluid import FluidCompartment, HendersonHasselbalch
 from gut import GutModule
 from liver import LiverModule
 from endocrine import EndocrineModule
+from neuro import NeuroModule
+from immune import ImmuneModule
 from lifecycle import LifecycleEngine
 from parameters import (
     DT_SECONDS, SIMULATION_STEP_MS, T_MAX_MINUTES,
@@ -127,6 +129,20 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "endocrine.GH_ng_mL":           ("endocrine", "GH_ng_mL"),
     "endocrine.IGF1_nmol_L":        ("endocrine", "IGF1_nmol_L"),
     "endocrine.growth_factor":      ("endocrine", "growth_factor"),
+    # Neuro
+    "neuro.sympathetic_tone":        ("neuro", "sympathetic_tone"),
+    "neuro.parasympathetic_tone":     ("neuro", "parasympathetic_tone"),
+    "neuro.consciousness":           ("neuro", "consciousness"),
+    "neuro.seizure":                 ("neuro", "seizure"),
+    "neuro.pain_level":              ("neuro", "pain_level"),
+    "neuro.chemoreceptor_drive":     ("neuro", "chemoreceptor_drive"),
+    # Immune
+    "immune.cytokine_level":         ("immune", "cytokine_level"),
+    "immune.wbc_count":              ("immune", "wbc_count"),
+    "immune.crp_level":             ("immune", "crp_level"),
+    "immune.acute_phase_response":   ("immune", "acute_phase_response"),
+    "immune.immune_suppression":     ("immune", "immune_suppression"),
+    "immune.coagulation_state":      ("immune", "coagulation_state"),
 }
 
 
@@ -202,6 +218,8 @@ class VirtualCreature:
         self.gut = GutModule(weight_kg=body_weight_kg, blood=self.blood)
         self.liver = LiverModule(weight_kg=body_weight_kg, blood=self.blood)
         self.endocrine = EndocrineModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.neuro = NeuroModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.immune = ImmuneModule(weight_kg=body_weight_kg, blood=self.blood, endocrine=self.endocrine)
 
         # 生命周期引擎（驱动生长/衰老/死亡）
         self.lifecycle = LifecycleEngine(species=species, initial_age_days=age_days)
@@ -262,6 +280,17 @@ class VirtualCreature:
             "cortisol_ug_dL": [],
             "metabolic_rate": [],
             "core_temperature_C": [],
+            # 神经
+            "neuro_sympathetic": [],
+            "neuro_consciousness": [],
+            "neuro_seizure": [],
+            "neuro_pain": [],
+            "neuro_chemodrive": [],
+            # 免疫
+            "immune_cytokine": [],
+            "immune_wbc": [],
+            "immune_crp": [],
+            "immune_coagulation": [],
         }
 
         # 场景事件
@@ -493,6 +522,16 @@ class VirtualCreature:
         # Step 4.7: 内分泌轴
         endocrine_state = self.endocrine.compute(dt)
 
+        # Step 4.8: 神经系统
+        neuro_state = self.neuro.compute(dt, heart_state, lung_state)
+        for cmd in neuro_state.get("factor_commands", []):
+            self.apply_factor(cmd)
+
+        # Step 4.9: 免疫/炎症系统
+        immune_state = self.immune.compute(dt, endocrine_state)
+        for cmd in immune_state.get("factor_commands", []):
+            self.apply_factor(cmd)
+
         # Step 5: 器官衰竭追踪
         # 根据当前危险条件更新各器官健康状态
         self.organ_health.track(dt, heart_state, lung_state, kidney_state, liver_state)
@@ -606,6 +645,17 @@ class VirtualCreature:
         self.history["cortisol_ug_dL"].append(endocrine_state["cortisol_ug_dL"])
         self.history["metabolic_rate"].append(endocrine_state["metabolic_rate"])
         self.history["core_temperature_C"].append(self.blood.core_temperature_C)
+        # 神经
+        self.history["neuro_sympathetic"].append(neuro_state["sympathetic_tone"])
+        self.history["neuro_consciousness"].append(neuro_state["consciousness"])
+        self.history["neuro_seizure"].append(neuro_state["seizure"])
+        self.history["neuro_pain"].append(neuro_state["pain_level"])
+        self.history["neuro_chemodrive"].append(neuro_state["chemoreceptor_drive"])
+        # 免疫
+        self.history["immune_cytokine"].append(immune_state["cytokine_level"])
+        self.history["immune_wbc"].append(immune_state["wbc_count"])
+        self.history["immune_crp"].append(immune_state["crp_level"])
+        self.history["immune_coagulation"].append(immune_state["coagulation_state"])
 
         # 更新时间
         self.current_time_s += dt
@@ -617,6 +667,8 @@ class VirtualCreature:
             "gut": gut_state,
             "liver": liver_state,
             "endocrine": self.endocrine.summary(),
+            "neuro": self.neuro.summary(),
+            "immune": self.immune.summary(),
             "blood": self.blood.summary(),
             "toxicology": tox_state,
             "pharmacology": pharma_effects if (hasattr(self, "pharmacology") and self.pharmacology is not None) else {},

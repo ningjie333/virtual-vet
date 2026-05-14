@@ -32,6 +32,8 @@ VALID_PARAM_PREFIXES = (
     "gut.",
     "liver.",
     "endocrine.",
+    "neuro.",
+    "immune.",
 )
 
 # 可自动修复的问题类型

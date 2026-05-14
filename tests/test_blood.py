@@ -77,6 +77,10 @@ def test_summary_returns_dict():
         "albumin", "ammonia", "ALT", "AST", "ALP", "GGT", "bile_acids",
         # Endocrine
         "T3", "insulin", "cortisol", "calcium",
+        # Neurological
+        "consciousness", "seizure", "pain", "chemoreceptor_drive",
+        # Immune
+        "WBC", "CRP", "cytokine", "acute_phase", "immune_suppression", "coagulation",
     }
     assert isinstance(s, dict), f"Expected dict, got {type(s)}"
     assert set(s.keys()) == expected_keys, (

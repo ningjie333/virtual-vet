@@ -118,6 +118,24 @@ class BloodCompartment:
         self.GH_ng_mL = 2.0                  # 生长激素 ng/mL
         self.IGF1_nmol_L = 10.0             # 胰岛素样生长因子-1 nmol/L
 
+        # ============================================================
+        # Neurological state (written by NeuroModule)
+        # ============================================================
+        self.consciousness_level = 1.0     # CNS function (0=coma, 1=fully alert)
+        self.seizure_activity = 0.0        # 癫痫活动强度 (0=none, 1=severe)
+        self.pain_level = 0.0              # 疼痛强度 (0-10)
+        self.chemoreceptor_drive = 0.0     # 化学感受器驱动 (0-1)
+
+        # ============================================================
+        # Immune/Inflammation state (written by ImmuneModule)
+        # ============================================================
+        self.WBC_K_uL = 10.0              # 白细胞计数 x10³/μL (正常 ~10k)
+        self.CRP_mg_L = 10.0              # C反应蛋白 mg/L (正常 <10)
+        self.cytokine_level = 0.0          # 统一细胞因子水平 (0-1)
+        self.acute_phase_response = 0.0     # 急性期反应 (0-1)
+        self.immune_suppression = 0.0      # 免疫抑制水平 (0-1)
+        self.coagulation_state = 0.0       # 高凝状态 (0=正常, 1=DIC)
+
     def calculate_O2_content(self, PO2_mmHg, saturation, is_arterial=True):
         """
         计算血液氧含量 (mL O2/100mL blood)
@@ -163,4 +181,16 @@ class BloodCompartment:
             "insulin": round(self.insulin_uU_mL, 1),
             "cortisol": round(self.cortisol_ug_dL, 1),
             "calcium": round(self.calcium_mg_dL, 1),
+            # Neurological
+            "consciousness": round(self.consciousness_level, 2),
+            "seizure": round(self.seizure_activity, 2),
+            "pain": round(self.pain_level, 1),
+            "chemoreceptor_drive": round(self.chemoreceptor_drive, 2),
+            # Immune
+            "WBC": round(self.WBC_K_uL, 1),
+            "CRP": round(self.CRP_mg_L, 0),
+            "cytokine": round(self.cytokine_level, 3),
+            "acute_phase": round(self.acute_phase_response, 3),
+            "immune_suppression": round(self.immune_suppression, 3),
+            "coagulation": round(self.coagulation_state, 3),
         }

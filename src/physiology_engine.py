@@ -35,6 +35,9 @@ from organ_health import OrganHealthTracker
 from fluid import FluidCompartment, HendersonHasselbalch
 from gut import GutModule
 from liver import LiverModule
+from endocrine import EndocrineModule
+from neuro import NeuroModule
+from immune import ImmuneModule
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +116,32 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "liver.cyp450_activity":       ("liver", "cyp450_activity"),
     "liver.glycogen_fraction":    ("liver", "glycogen_fraction"),
     "liver.bilirubin_conjugation": ("liver", "bilirubin_conjugation"),
+    # Endocrine
+    "endocrine.T3_factor":         ("endocrine", "T3_factor"),
+    "endocrine.metabolic_rate":    ("endocrine", "metabolic_rate"),
+    "endocrine.T3_ng_dL":         ("endocrine", "T3_ng_dL"),
+    "endocrine.insulin_factor":    ("endocrine", "insulin_factor"),
+    "endocrine.glucagon_factor":   ("endocrine", "glucagon_factor"),
+    "endocrine.cortisol_factor":   ("endocrine", "cortisol_factor"),
+    "endocrine.cortisol_ug_dL":   ("endocrine", "cortisol_ug_dL"),
+    "endocrine.HPA_axis":          ("endocrine", "HPA_axis"),
+    "endocrine.epinephrine_pg_mL": ("endocrine", "epinephrine_pg_mL"),
+    "endocrine.PTH_pg_mL":        ("endocrine", "PTH_pg_mL"),
+    "endocrine.calcium_mg_dL":     ("endocrine", "calcium_mg_dL"),
+    # Neuro
+    "neuro.sympathetic_tone":        ("neuro", "sympathetic_tone"),
+    "neuro.parasympathetic_tone":     ("neuro", "parasympathetic_tone"),
+    "neuro.consciousness":           ("neuro", "consciousness"),
+    "neuro.seizure":                ("neuro", "seizure"),
+    "neuro.pain_level":             ("neuro", "pain_level"),
+    "neuro.chemoreceptor_drive":    ("neuro", "chemoreceptor_drive"),
+    # Immune
+    "immune.cytokine_level":        ("immune", "cytokine_level"),
+    "immune.wbc_count":             ("immune", "wbc_count"),
+    "immune.crp_level":             ("immune", "crp_level"),
+    "immune.acute_phase_response":  ("immune", "acute_phase_response"),
+    "immune.immune_suppression":    ("immune", "immune_suppression"),
+    "immune.coagulation_state":     ("immune", "coagulation_state"),
 }
 
 # 导出供外部使用
@@ -187,6 +216,9 @@ class PhysiologyEngine:
         )
         self.gut = GutModule(weight_kg=body_weight_kg, blood=self.blood)
         self.liver = LiverModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.endocrine = EndocrineModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.neuro = NeuroModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.immune = ImmuneModule(weight_kg=body_weight_kg, blood=self.blood, endocrine=self.endocrine)
 
         self.dt = DT_SECONDS
 
@@ -256,6 +288,26 @@ class PhysiologyEngine:
             raise ValueError(f"liver.glycogen_fraction out of range: {self.liver.glycogen_fraction}")
         if not (0 <= self.liver.bilirubin_conjugation <= 1.0):
             raise ValueError(f"liver.bilirubin_conjugation out of range: {self.liver.bilirubin_conjugation}")
+
+        # Neuro
+        if not (0 <= self.neuro.sympathetic_tone <= 1.0):
+            raise ValueError(f"neuro.sympathetic_tone out of range: {self.neuro.sympathetic_tone}")
+        if not (0 <= self.neuro.parasympathetic_tone <= 1.0):
+            raise ValueError(f"neuro.parasympathetic_tone out of range: {self.neuro.parasympathetic_tone}")
+        if not (0 <= self.neuro.consciousness <= 1.0):
+            raise ValueError(f"neuro.consciousness out of range: {self.neuro.consciousness}")
+        if not (0 <= self.neuro.seizure <= 1.0):
+            raise ValueError(f"neuro.seizure out of range: {self.neuro.seizure}")
+        if not (0 <= self.neuro.pain_level <= 10.0):
+            raise ValueError(f"neuro.pain_level out of range: {self.neuro.pain_level}")
+
+        # Immune
+        if not (0 <= self.immune.cytokine_level <= 1.0):
+            raise ValueError(f"immune.cytokine_level out of range: {self.immune.cytokine_level}")
+        if not (0 <= self.immune.immune_suppression <= 1.0):
+            raise ValueError(f"immune.immune_suppression out of range: {self.immune.immune_suppression}")
+        if not (0 <= self.immune.coagulation_state <= 1.0):
+            raise ValueError(f"immune.coagulation_state out of range: {self.immune.coagulation_state}")
 
     def apply_factor(self, cmd: FactorCommand) -> None:
         """
@@ -346,6 +398,9 @@ class PhysiologyEngine:
         5. kidney → GFR/urine
         5.5. gut → portal absorption
         5.6. liver → metabolism/detox
+        4.7. endocrine → hormone axes
+        4.8. neuro → autonomic/CNS/chemoreceptor
+        4.9. immune → cytokine/inflammation
         6. organ_health.track
         7. _update_venous_gas
         8. _update_blood_metabolites
@@ -393,6 +448,19 @@ class PhysiologyEngine:
 
         # ── Step 5.6: 肝脏代谢 ───────────────────────────────────────────
         liver_state = self.liver.compute(dt, gut_state, CO)
+
+        # ── Step 4.7: 内分泌轴 ───────────────────────────────────────────
+        endocrine_state = self.endocrine.compute(dt)
+
+        # ── Step 4.8: 神经系统 ───────────────────────────────────────────
+        neuro_state = self.neuro.compute(dt, heart_state, lung_state)
+        for cmd in neuro_state.get("factor_commands", []):
+            self.apply_factor(cmd)
+
+        # ── Step 4.9: 免疫/炎症系统 ─────────────────────────────────────────
+        immune_state = self.immune.compute(dt, endocrine_state)
+        for cmd in immune_state.get("factor_commands", []):
+            self.apply_factor(cmd)
 
         # ── Step 6: 器官衰竭追踪 ────────────────────────────────────────────
         self.organ_health.track(dt, heart_state, lung_state, kidney_state)
@@ -442,6 +510,9 @@ class PhysiologyEngine:
             "kidney": kidney_state,
             "gut": gut_state,
             "liver": liver_state,
+            "endocrine": self.endocrine.summary(),
+            "neuro": self.neuro.summary(),
+            "immune": self.immune.summary(),
             "blood": self.blood.summary(),
             "toxicology": tox_state,
             "fluid": fluid_state,
