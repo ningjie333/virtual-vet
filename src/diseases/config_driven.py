@@ -165,7 +165,7 @@ def _load_config() -> dict:
     errors = validate_ode_diseases(config)
     if errors:
         msgs = "; ".join(f"{e.path}: {e.message}" for e in errors)
-        raise ValidationError(f"ODE diseases validation failed: {msgs}")
+        raise ValidationError("ode_diseases.json", "root", f"ODE diseases validation failed: {msgs}")
     return config
 
 

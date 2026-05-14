@@ -73,6 +73,10 @@ def test_summary_returns_dict():
         "arterial_PO2", "arterial_PCO2", "venous_PO2", "venous_PCO2",
         "saturation_art", "saturation_ven",
         "glucose", "lactate", "sodium", "potassium", "temperature_C",
+        # Liver/gut markers
+        "albumin", "ammonia", "ALT", "AST", "ALP", "GGT", "bile_acids",
+        # Endocrine
+        "T3", "insulin", "cortisol", "calcium",
     }
     assert isinstance(s, dict), f"Expected dict, got {type(s)}"
     assert set(s.keys()) == expected_keys, (

@@ -17,6 +17,7 @@ from organ_health import OrganHealthTracker
 from fluid import FluidCompartment, HendersonHasselbalch
 from gut import GutModule
 from liver import LiverModule
+from endocrine import EndocrineModule
 from lifecycle import LifecycleEngine
 from parameters import (
     DT_SECONDS, SIMULATION_STEP_MS, T_MAX_MINUTES,
@@ -71,6 +72,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "kidney.renal_blood_flow":       ("kidney", "renal_blood_flow"),
     "kidney._disease_gfr_multiplier": ("kidney", "_disease_gfr_multiplier"),
     # 血液
+    "blood.sodium_mEq_L":         ("blood", "sodium_mEq_L"),
     "blood.potassium":            ("blood", "potassium_mEq_L"),
     "blood.pH":                   ("blood", "arterial_pH"),
     "blood.temperature":          ("blood", "core_temperature_C"),
@@ -103,6 +105,28 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "liver.cyp450_activity":      ("liver", "cyp450_activity"),
     "liver.glycogen_fraction":   ("liver", "glycogen_fraction"),
     "liver.bilirubin_conjugation": ("liver", "bilirubin_conjugation"),
+    # Endocrine
+    "endocrine.T3_factor":          ("endocrine", "T3_factor"),
+    "endocrine.T4_factor":          ("endocrine", "T4_ug_dL"),
+    "endocrine.metabolic_rate":     ("endocrine", "metabolic_rate"),
+    "endocrine.T3_ng_dL":           ("endocrine", "T3_ng_dL"),
+    "endocrine.T4_ug_dL":           ("endocrine", "T4_ug_dL"),
+    "endocrine.insulin_factor":      ("endocrine", "insulin_factor"),
+    "endocrine.glucagon_factor":    ("endocrine", "glucagon_factor"),
+    "endocrine.insulin_uU_mL":       ("endocrine", "insulin_uU_mL"),
+    "endocrine.glucagon_pg_mL":     ("endocrine", "glucagon_pg_mL"),
+    "endocrine.cortisol_factor":     ("endocrine", "cortisol_factor"),
+    "endocrine.cortisol_ug_dL":     ("endocrine", "cortisol_ug_dL"),
+    "endocrine.HPA_axis":           ("endocrine", "HPA_axis"),
+    "endocrine.epinephrine_pg_mL":  ("endocrine", "epinephrine_pg_mL"),
+    "endocrine.norepinephrine_pg_mL": ("endocrine", "norepinephrine_pg_mL"),
+    "endocrine.PTH_pg_mL":          ("endocrine", "PTH_pg_mL"),
+    "endocrine.calcium_mg_dL":       ("endocrine", "calcium_mg_dL"),
+    "endocrine.phosphate_mg_dL":    ("endocrine", "phosphate_mg_dL"),
+    "endocrine.calcium_factor":     ("endocrine", "calcium_factor"),
+    "endocrine.GH_ng_mL":           ("endocrine", "GH_ng_mL"),
+    "endocrine.IGF1_nmol_L":        ("endocrine", "IGF1_nmol_L"),
+    "endocrine.growth_factor":      ("endocrine", "growth_factor"),
 }
 
 
@@ -177,6 +201,7 @@ class VirtualCreature:
         )
         self.gut = GutModule(weight_kg=body_weight_kg, blood=self.blood)
         self.liver = LiverModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.endocrine = EndocrineModule(weight_kg=body_weight_kg, blood=self.blood)
 
         # 生命周期引擎（驱动生长/衰老/死亡）
         self.lifecycle = LifecycleEngine(species=species, initial_age_days=age_days)
@@ -231,6 +256,12 @@ class VirtualCreature:
             "gut_motility": [],
             "gut_barrier": [],
             "gut_microbiome": [],
+            # 内分泌
+            "T3_ng_dL": [],
+            "insulin_uU_mL": [],
+            "cortisol_ug_dL": [],
+            "metabolic_rate": [],
+            "core_temperature_C": [],
         }
 
         # 场景事件
@@ -459,6 +490,9 @@ class VirtualCreature:
         # Step 4.6: 肝脏代谢
         liver_state = self.liver.compute(dt, gut_state, CO)
 
+        # Step 4.7: 内分泌轴
+        endocrine_state = self.endocrine.compute(dt)
+
         # Step 5: 器官衰竭追踪
         # 根据当前危险条件更新各器官健康状态
         self.organ_health.track(dt, heart_state, lung_state, kidney_state, liver_state)
@@ -566,6 +600,12 @@ class VirtualCreature:
         self.history["gut_motility"].append(gut_state["gut_motility"])
         self.history["gut_barrier"].append(gut_state["barrier_integrity"])
         self.history["gut_microbiome"].append(gut_state["microbiome_activity"])
+        # 内分泌
+        self.history["T3_ng_dL"].append(endocrine_state["T3_ng_dL"])
+        self.history["insulin_uU_mL"].append(endocrine_state["insulin_uU_mL"])
+        self.history["cortisol_ug_dL"].append(endocrine_state["cortisol_ug_dL"])
+        self.history["metabolic_rate"].append(endocrine_state["metabolic_rate"])
+        self.history["core_temperature_C"].append(self.blood.core_temperature_C)
 
         # 更新时间
         self.current_time_s += dt
@@ -576,6 +616,7 @@ class VirtualCreature:
             "kidney": kidney_state,
             "gut": gut_state,
             "liver": liver_state,
+            "endocrine": self.endocrine.summary(),
             "blood": self.blood.summary(),
             "toxicology": tox_state,
             "pharmacology": pharma_effects if (hasattr(self, "pharmacology") and self.pharmacology is not None) else {},

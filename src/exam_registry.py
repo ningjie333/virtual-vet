@@ -71,6 +71,6 @@ def get_exam_registry(reload: bool = False) -> ExamRegistry:
         errors = validate_examinations(raw)
         if errors:
             msgs = "; ".join(f"{e.path}: {e.message}" for e in errors)
-            raise ConfigValidationError(f"Examinations validation failed: {msgs}")
+            raise ConfigValidationError("examinations.json", "root", f"Examinations validation failed: {msgs}")
         _instance = ExamRegistry(raw)
     return _instance

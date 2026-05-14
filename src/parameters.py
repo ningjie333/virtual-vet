@@ -103,6 +103,48 @@ BASELINE_LACTATE = 1.0                            # 基础血乳酸 mmol/L
 # --- 调节系统 ---
 SYMPATHETIC_BASELINE = 0.3                        # 交感神经基线活性 (0-1)
 
+# --- 内分泌系统 (犬科正常基线) ---
+# 甲状腺轴
+BASELINE_T3_NG_DL = 100.0                         # 正常犬 T3 ng/dL
+BASELINE_T4_UG_DL = 1.5                           # 正常犬 T4 ug/dL
+THYROID_T3_T4_RATIO = 0.1                         # T4→T3 转换率
+METABOLIC_RATE_MIN = 0.5                          # 甲减时代谢率下限
+METABOLIC_RATE_MAX = 2.0                          # 甲亢时代谢率上限
+METABOLIC_RATE_NORMAL = 1.0                       # 正常代谢率
+THYROID_TAU_SEC = 3600.0                          # T3 转换时间常数 (1h)
+
+# 胰腺轴
+BASELINE_INSULIN_UU_ML = 12.0                     # 正常空腹胰岛素 uU/mL
+BASELINE_GLUCAGON_PG_ML = 80.0                   # 正常空腹胰高血糖素 pg/mL
+GLUCOSE_EUGLYCEMIA_LOW = 3.5                      # 血糖正常下限 mmol/L
+GLUCOSE_EUGLYCEMIA_HIGH = 6.0                     # 血糖正常上限 mmol/L
+GLUCAGON_HYPOGLYCEMIA_THRESHOLD = 3.5            # 低血糖刺激胰高血糖素分泌阈值
+INSULIN_HYPERGLYCEMIA_THRESHOLD = 6.0             # 高血糖刺激胰岛素分泌阈值
+PANCREATIC_RESPONSE_TAU_SEC = 300.0               # 胰岛素分泌响应时间常数 (5min)
+
+# 肾上腺轴
+BASELINE_CORTISOL_UG_DL = 5.0                     # 正常犬皮质醇 ug/dL
+CORTISOL_STRESS_MAX = 25.0                        # 最大应激皮质醇 ug/dL
+BASELINE_EPINEPHRINE_PG_ML = 30.0                # 正常血浆肾上腺素 pg/mL
+BASELINE_NOREPINEPHRINE_PG_ML = 100.0             # 正常血浆去甲肾上腺素 pg/mL
+HPA_TAU_SEC = 900.0                               # HPA轴响应时间常数 (15min)
+CORTISOL_HALF_LIFE_SEC = 3600.0                   # 皮质醇半衰期 ≈ 60-90min
+CORTISOL_TAU_SEC = 900.0                          # 皮质醇响应时间常数
+
+# 甲状旁腺轴
+BASELINE_PTH_PG_ML = 30.0                        # 正常犬 PTH pg/mL
+BASELINE_CALCIUM_MG_DL = 10.0                    # 正常血钙 mg/dL
+BASELINE_PHOSPHATE_MG_DL = 4.0                   # 正常血磷 mg/dL
+CALCIUM_NORMAL_LOW = 9.0                          # 血钙临界下限 mg/dL
+CALCIUM_NORMAL_HIGH = 11.5                       # 血钙临界上限 mg/dL
+PTH_CALCIUM_SENSITIVITY = 2.0                    # PTH 对钙变化的响应系数
+PTH_TAU_SEC = 120.0                              # PTH 分泌响应时间常数
+
+# 生长轴
+BASELINE_GH_NG_ML = 2.0                          # 正常生长激素 ng/mL
+BASELINE_IGF1_NMOL_L = 10.0                      # 正常 IGF-1 nmol/L
+GROWTH_TAU_SEC = 7200.0                          # IGF-1 响应时间常数 (2h)
+
 # --- 毒理学参数 ---
 # 基于 Liu et al. (1993) JACC 21:260-268
 # 可卡因犬实验: 3 mg/kg IV, 心脏抑制短暂(5-10 min), 外周血管收缩持续(≥30 min)

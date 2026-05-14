@@ -33,6 +33,8 @@ from kidney import KidneyModule
 from toxicology import ToxicologyModule
 from organ_health import OrganHealthTracker
 from fluid import FluidCompartment, HendersonHasselbalch
+from gut import GutModule
+from liver import LiverModule
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +93,26 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.bilirubin_mg_dL":      ("blood", "bilirubin_mg_dL"),
     "blood.ketone_mmol_L":        ("blood", "ketone_mmol_L"),
     "blood.PLT":                  ("blood", "PLT"),
+    # Liver/gut blood markers
+    "blood.ALT":                  ("blood", "ALT_U_L"),
+    "blood.AST":                  ("blood", "AST_U_L"),
+    "blood.ALP":                  ("blood", "ALP_U_L"),
+    "blood.GGT":                  ("blood", "GGT_U_L"),
+    "blood.albumin":              ("blood", "albumin_g_dL"),
+    "blood.ammonia":              ("blood", "ammonia_umol_L"),
+    "blood.bile_acids":           ("blood", "bile_acids_umol_L"),
+    "blood.amino_acids":         ("blood", "amino_acids_g_L"),
+    "blood.fatty_acids":         ("blood", "fatty_acids_mmol_L"),
+    # Gut
+    "gut.motility":               ("gut", "gut_motility"),
+    "gut.barrier_integrity":      ("gut", "barrier_integrity"),
+    "gut.microbiome_activity":     ("gut", "microbiome_activity"),
+    # Liver
+    "liver.metabolic_activity":   ("liver", "metabolic_activity"),
+    "liver.detox_capacity":        ("liver", "detox_capacity"),
+    "liver.cyp450_activity":       ("liver", "cyp450_activity"),
+    "liver.glycogen_fraction":    ("liver", "glycogen_fraction"),
+    "liver.bilirubin_conjugation": ("liver", "bilirubin_conjugation"),
 }
 
 # 导出供外部使用
@@ -163,6 +185,8 @@ class PhysiologyEngine:
             hco3_meq_l=self.fluid.vascular_hco3_meq_l,
             pco2_mmHg=self.blood.arterial_PCO2_mmHg,
         )
+        self.gut = GutModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.liver = LiverModule(weight_kg=body_weight_kg, blood=self.blood)
 
         self.dt = DT_SECONDS
 
@@ -212,6 +236,26 @@ class PhysiologyEngine:
             raise ValueError(f"fluid.isf_volume_ml must be non-negative: {self.fluid.isf_volume_ml}")
         if self.fluid.icf_volume_ml < 0:
             raise ValueError(f"fluid.icf_volume_ml must be non-negative: {self.fluid.icf_volume_ml}")
+
+        # Gut
+        if not (0 <= self.gut.gut_motility <= 1.0):
+            raise ValueError(f"gut.gut_motility out of range: {self.gut.gut_motility}")
+        if not (0 <= self.gut.barrier_integrity <= 1.0):
+            raise ValueError(f"gut.barrier_integrity out of range: {self.gut.barrier_integrity}")
+        if not (0 <= self.gut.microbiome_activity <= 1.0):
+            raise ValueError(f"gut.microbiome_activity out of range: {self.gut.microbiome_activity}")
+
+        # Liver
+        if not (0 < self.liver.metabolic_activity <= 1.0):
+            raise ValueError(f"liver.metabolic_activity out of range: {self.liver.metabolic_activity}")
+        if not (0 <= self.liver.detox_capacity <= 1.0):
+            raise ValueError(f"liver.detox_capacity out of range: {self.liver.detox_capacity}")
+        if not (0 <= self.liver.cyp450_activity <= 1.0):
+            raise ValueError(f"liver.cyp450_activity out of range: {self.liver.cyp450_activity}")
+        if not (0 <= self.liver.glycogen_fraction <= 1.0):
+            raise ValueError(f"liver.glycogen_fraction out of range: {self.liver.glycogen_fraction}")
+        if not (0 <= self.liver.bilirubin_conjugation <= 1.0):
+            raise ValueError(f"liver.bilirubin_conjugation out of range: {self.liver.bilirubin_conjugation}")
 
     def apply_factor(self, cmd: FactorCommand) -> None:
         """
@@ -293,6 +337,22 @@ class PhysiologyEngine:
         这是纯函数：给定当前状态和输入，返回新的生理状态。
         无事件调度、无疾病逻辑、无日志记录。
 
+        计算顺序：
+        0. validate_parameters
+        1. apply_factor (FactorCommand)
+        2. toxicology
+        3. heart → CO/MAP/CVP
+        4. lung → gas exchange
+        5. kidney → GFR/urine
+        5.5. gut → portal absorption
+        5.6. liver → metabolism/detox
+        6. organ_health.track
+        7. _update_venous_gas
+        8. _update_blood_metabolites
+        9. urine blood loss
+        10. fluid + HH_pH
+        11. blood_volume_sync
+
         Args:
             inputs: PhysiologyInputs，包含 svr_factor 和 factor_commands
 
@@ -327,6 +387,12 @@ class PhysiologyEngine:
 
         # ── Step 5: 肾脏泌尿 ────────────────────────────────────────────────
         kidney_state = self.kidney.compute(dt, heart_state["MAP_mmHg"], CVP, CO)
+
+        # ── Step 5.5: 肠道吸收 ───────────────────────────────────────────
+        gut_state = self.gut.compute(dt, CO)
+
+        # ── Step 5.6: 肝脏代谢 ───────────────────────────────────────────
+        liver_state = self.liver.compute(dt, gut_state, CO)
 
         # ── Step 6: 器官衰竭追踪 ────────────────────────────────────────────
         self.organ_health.track(dt, heart_state, lung_state, kidney_state)
@@ -374,6 +440,8 @@ class PhysiologyEngine:
             "heart": heart_state,
             "lung": lung_state,
             "kidney": kidney_state,
+            "gut": gut_state,
+            "liver": liver_state,
             "blood": self.blood.summary(),
             "toxicology": tox_state,
             "fluid": fluid_state,

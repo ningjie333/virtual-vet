@@ -29,6 +29,9 @@ VALID_PARAM_PREFIXES = (
     "kidney.",
     "blood.",
     "fluid.",
+    "gut.",
+    "liver.",
+    "endocrine.",
 )
 
 # 可自动修复的问题类型

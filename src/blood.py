@@ -93,6 +93,31 @@ class BloodCompartment:
         self.PT_seconds = 12.0                # 凝血酶原时间（正常 ~12s）
         self.INR = 1.0                        # 国际标准化比值
 
+        # ============================================================
+        # Endocrine hormones (blood concentration)
+        # ============================================================
+        # 甲状腺轴
+        self.T3_ng_dL = 100.0                # 三碘甲状腺原氨酸 ng/dL
+        self.T4_ug_dL = 1.5                  # 甲状腺素 ug/dL
+
+        # 胰腺轴
+        self.insulin_uU_mL = 12.0            # 胰岛素 uU/mL
+        self.glucagon_pg_mL = 80.0           # 胰高血糖素 pg/mL
+
+        # 肾上腺轴
+        self.cortisol_ug_dL = 5.0             # 皮质醇 ug/dL
+        self.epinephrine_pg_mL = 30.0        # 肾上腺素 pg/mL
+        self.norepinephrine_pg_mL = 100.0     # 去甲肾上腺素 pg/mL
+
+        # 甲状旁腺轴
+        self.PTH_pg_mL = 30.0                # 甲状旁腺激素 pg/mL
+        self.calcium_mg_dL = 10.0            # 血钙 mg/dL
+        self.phosphate_mg_dL = 4.0           # 血磷 mg/dL
+
+        # 生长轴
+        self.GH_ng_mL = 2.0                  # 生长激素 ng/mL
+        self.IGF1_nmol_L = 10.0             # 胰岛素样生长因子-1 nmol/L
+
     def calculate_O2_content(self, PO2_mmHg, saturation, is_arterial=True):
         """
         计算血液氧含量 (mL O2/100mL blood)
@@ -133,4 +158,9 @@ class BloodCompartment:
             "ALP": round(self.ALP_U_L, 1),
             "GGT": round(self.GGT_U_L, 1),
             "bile_acids": round(self.bile_acids_umol_L, 1),
+            # Endocrine
+            "T3": round(self.T3_ng_dL, 1),
+            "insulin": round(self.insulin_uU_mL, 1),
+            "cortisol": round(self.cortisol_ug_dL, 1),
+            "calcium": round(self.calcium_mg_dL, 1),
         }
