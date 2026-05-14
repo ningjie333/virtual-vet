@@ -331,7 +331,21 @@ class PharmacologyState:
         """
         all_commands: list[FactorCommand] = []
         for drug in self.active_drugs:
+            # Step 1: PK 一阶衰减（浓度的自然减少）
             drug.compute(dt)
+
+            # Step 2: 肝脏 CYP450 首过代谢（如果有 active drug 且肝脏可用）
+            if (
+                not isinstance(drug, FluidBolus)
+                and drug.concentration > 0
+                and hasattr(creature, "liver")
+                and creature.liver is not None
+            ):
+                hepatic_cleared = creature.liver.compute_drug_clearance(
+                    dt, drug.concentration
+                )
+                drug.concentration = max(0.0, drug.concentration - hepatic_cleared)
+
             pd = drug.pd_effect()
             cmds = drug.factor_commands(pd)
             all_commands.extend(cmds)

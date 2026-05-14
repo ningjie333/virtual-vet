@@ -59,6 +59,40 @@ class BloodCompartment:
         # 血小板（×10³/μL）— DIC 可消耗
         self.PLT = 300.0                      # 正常 150-400
 
+        # ============================================================
+        # Gut absorption products (portal vein cache, cleared by liver each step)
+        # ============================================================
+        self.amino_acids_g_L = 1.0            # 氨基酸 g/L (fasting ~1.0, postprandial ~2.0)
+        self.fatty_acids_mmol_L = 0.5         # 游离脂肪酸 mmol/L
+
+        # ============================================================
+        # Liver synthesis products
+        # ============================================================
+        self.albumin_g_dL = 3.0               # 白蛋白 g/dL (正常 2.5-4.0)
+        self.ammonia_umol_L = 30.0            # 血氨 μmol/L (正常 <50)
+        self.bile_acids_umol_L = 10.0         # 胆汁酸 μmol/L
+
+        # ============================================================
+        # Liver injury markers
+        # ============================================================
+        self.ALT_U_L = 25.0                   # 丙氨酸氨基转移酶 U/L
+        self.AST_U_L = 25.0                   # 天冬氨酸氨基转移酶 U/L
+        self.ALP_U_L = 30.0                   # 碱性磷酸酶 U/L
+        self.GGT_U_L = 5.0                    # 谷氨酰转肽酶 U/L
+
+        # ============================================================
+        # Pharmacology / Drug concentration (generic, mg/kg equivalent)
+        # CYP450 hepatic first-pass metabolism via liver.compute_drug_clearance()
+        # ============================================================
+        self.drug_concentration_mg_kg = 0.0   # 通用药物浓度占位
+
+        # ============================================================
+        # Coagulation factors (liver synthesis)
+        # ============================================================
+        self.coagulation_factor_VII = 1.0     # 凝血因子 VII 活性 (0-1)
+        self.PT_seconds = 12.0                # 凝血酶原时间（正常 ~12s）
+        self.INR = 1.0                        # 国际标准化比值
+
     def calculate_O2_content(self, PO2_mmHg, saturation, is_arterial=True):
         """
         计算血液氧含量 (mL O2/100mL blood)
@@ -91,4 +125,12 @@ class BloodCompartment:
             "sodium": round(self.sodium_mEq_L, 1),
             "potassium": round(self.potassium_mEq_L, 2),
             "temperature_C": round(self.core_temperature_C, 1),
+            # Liver/gut markers
+            "albumin": round(self.albumin_g_dL, 2),
+            "ammonia": round(self.ammonia_umol_L, 1),
+            "ALT": round(self.ALT_U_L, 1),
+            "AST": round(self.AST_U_L, 1),
+            "ALP": round(self.ALP_U_L, 1),
+            "GGT": round(self.GGT_U_L, 1),
+            "bile_acids": round(self.bile_acids_umol_L, 1),
         }

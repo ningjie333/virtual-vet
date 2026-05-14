@@ -13,6 +13,12 @@ _UREA_MMOL_TO_BUN_MG_DL = 2.8    # 尿素 mmol → BUN mg/dL 转换系数
 _NORMAL_BILIRUBIN_MG_DL_PER_KG = 0.004  # 正常胆红素产生率 mg/day/kg
 _BILIRUBIN_AXIS_INTERCEPT = 0.2   # 胆红素基准值 mg/dL（正常）
 _BILIRUBIN_SEVERITY_SLOPE = 2.0   # 解毒能力下降时胆红素上升斜率
+# Cori cycle constants
+_CORI_VMAX_MMOL_L_MIN = 0.8     # 肝脏乳酸摄取最大速率 mmol/L/min
+_CORI_KM_MMOL_L = 1.5            # Michaelis 常数 mmol/L
+# CYP450 constants
+_CYP450_BASE_CAPACITY = 1.0       # 正常 CYP450 代谢容量（相对单位）
+_CYP450_KM = 2.0                 # Michaelis 常数（相对单位）
 
 
 class LiverModule:
@@ -274,14 +280,147 @@ class LiverModule:
             self.blood.AST_U_L = 25.0 + (1.0 - conjugation_factor) * 200.0
             self.blood.ALP_U_L = 30.0 + (1.0 - conjugation_factor) * 300.0
 
-    def _compute_cyp450_drug_metabolism(self, dt: float):
+    def _compute_cyp450_drug_metabolism(self, dt: float, drug_conc: float) -> float:
         """
-        CYP450 药物代谢
+        CYP450 Phase I 药物代谢（米氏动力学）
 
-        简化：代谢速率与 cyp450_activity 成正比
-        实际应用中，药物浓度更新由 pharmacology.py 处理
+        肝脏代谢药物浓度，速率受代谢活性和 cyp450_activity 调制。
+        肝血流量影响代谢效率。
+
+        Args:
+            dt: 时间步长（秒）
+            drug_conc: 药物浓度（相对单位，mg/kg 等效）
+
+        Returns:
+            本步药物清除量（用于 pharmacology.py 应用到 Drug.concentration）
         """
-        pass  # 占位，pharmacology.py 会通过 FactorCommand 修改此参数
+        if drug_conc <= 0 or self.cyp450_activity <= 0:
+            return 0.0
+
+        # 肝血流量因子（低灌注时代谢下降）
+        baseline_flow = 0.25 * base_cardiac_output_ml_min(self.w)
+        hepatic_factor = min(1.0, self.hepatic_blood_flow / baseline_flow)
+
+        # 米氏动力学
+        Vmax_eff = (
+            _CYP450_BASE_CAPACITY
+            * self.metabolic_activity
+            * self.cyp450_activity
+            * hepatic_factor
+        )
+        metabolism_rate = Vmax_eff * drug_conc / (_CYP450_KM + drug_conc)
+
+        # 限制最大清除速率（防止负浓度）
+        max_clearance = drug_conc / dt if dt > 0 else 0.0
+        cleared = min(metabolism_rate, max_clearance)
+        # 返回清除量（非速率），供调用方直接减 Drug.concentration
+        return cleared * dt
+
+    def _compute_lactate_metabolism(self, dt: float, lactate_conc: float) -> float:
+        """
+        Cori cycle：肝脏摄取乳酸 → 糖异生 → 葡萄糖释放
+
+        生理：
+        - 正常乳酸清除率 ≈ 0.5-1.0 mmol/L/min（肝脏占 60-70%）
+        - 低灌注时乳酸产生↑，肝脏清除负担↑
+        - 肝脏代谢活性下降时清除率下降
+
+        米氏动力学：rate = Vmax * [Lactate] / (Km + [Lactate])
+
+        Args:
+            dt: 时间步长（秒）
+            lactate_conc: 当前血乳酸 mmol/L
+
+        Returns:
+            本步消耗的乳酸量（mmol/L），用于监控
+        """
+        dt_min = dt / 60.0
+
+        # 肝血流量因子（低灌注时清除能力下降）
+        baseline_flow = 0.25 * base_cardiac_output_ml_min(self.w)
+        hepatic_factor = min(1.0, self.hepatic_blood_flow / baseline_flow)
+
+        # 米氏动力学摄取率
+        if lactate_conc > 0.1:
+            uptake_rate = (
+                _CORI_VMAX_MMOL_L_MIN
+                * self.metabolic_activity
+                * hepatic_factor
+                * lactate_conc
+                / (_CORI_KM_MMOL_L + lactate_conc)
+            )
+        else:
+            uptake_rate = 0.0
+
+        lactate_consumed = uptake_rate * dt_min  # mmol/L per step
+
+        # Cori cycle：2 lactate → 1 glucose（糖异生）
+        glucose_from_lactate = lactate_consumed / 2.0
+        if glucose_from_lactate > 0.001:
+            self.blood.glucose_mmol_L = min(
+                25.0,
+                self.blood.glucose_mmol_L + glucose_from_lactate
+            )
+
+        return lactate_consumed
+
+    def consume_lactate(self, dt: float) -> float:
+        """
+        Public API：供 simulation.py 调用，返回本步肝脏消耗的乳酸量 mmol/L
+
+        此方法读取当前血乳酸浓度，执行 Cori cycle，更新血糖，
+        返回本步净消耗量（供 caller 计算总清除率）。
+        """
+        return self._compute_lactate_metabolism(dt, self.blood.lactate_mmol_L)
+
+    def compute_drug_clearance(self, dt: float, drug_conc: float) -> float:
+        """
+        Public API：供 pharmacology.py 调用，返回本步肝脏 CYP450 代谢清除量
+
+        Args:
+            dt: 时间步长（秒）
+            drug_conc: 当前药物浓度
+
+        Returns:
+            药物清除量（与 drug.concentration 单位一致）
+        """
+        return self._compute_cyp450_drug_metabolism(dt, drug_conc)
+
+    def _compute_coagulation_factors(self, dt: float) -> None:
+        """
+        凝血因子合成（肝脏合成 II, V, VII, IX, X 因子）
+
+        简化建模：
+        - 因子 VII 半衰期最短（约 6h），PT 最先反映肝功能
+        - 因子 V 半衰期约 12h
+        - 肝脏代谢活性调节合成速率
+
+        PT（凝血酶原时间）估算：
+        - 正常 PT ≈ 12s
+        - 因子 VII 活性越低，PT 越长
+        - INR = (PT / 正常 PT) ^ PT_factor
+        """
+        dt_hour = dt / 3600.0
+
+        # 因子 VII 更新（一阶动力学）
+        # d[F]/dt = synthesis - k * F，其中 k = ln(2) / t_half
+        # 因子 VII t_half ≈ 6h, k ≈ 0.12/h
+        k_VII = 0.12
+        base_synthesis_VII = 0.04  # 每天合成约 4% 总量（半衰期 6h≈24%/天）
+        synthesis_factor = self.metabolic_activity * max(0.1, self.detox_capacity)
+        target_VII = base_synthesis_VII * synthesis_factor
+        self.blood.coagulation_factor_VII += (
+            (target_VII - self.blood.coagulation_factor_VII) * k_VII * dt_hour
+        )
+        self.blood.coagulation_factor_VII = max(
+            0.05, min(1.0, self.blood.coagulation_factor_VII)
+        )
+
+        # PT 估算：正常 12s，因子 VII 活性越低 PT 越长
+        base_PT = 12.0
+        PT_factor = 1.0 + (1.0 - self.blood.coagulation_factor_VII) * 1.5
+        self.blood.PT_seconds = base_PT * PT_factor
+        self.blood.INR = self.blood.PT_seconds / base_PT
 
     def compute(self, dt: float, gut_state: dict, cardiac_output: float) -> dict:
         """
@@ -324,8 +463,18 @@ class LiverModule:
         # Step 5: 胆红素代谢（时序 ODE）
         self._compute_bilirubin_metabolism(dt)
 
-        # Step 6: CYP450（占位）
-        self._compute_cyp450_drug_metabolism(dt)
+        # Step 6: CYP450 代谢 — drug_conc 通过 compute_drug_clearance() API
+        # 由 pharmacology.py 调用（per-drug），此处以 blood.drug_concentration_mg_kg
+        # 为通用药物浓度占位（多药物场景由 PharmacologyState 分别处理）
+        drug_conc = getattr(self.blood, "drug_concentration_mg_kg", 0.0)
+        cyp450_cleared = self._compute_cyp450_drug_metabolism(dt, drug_conc)
+        if cyp450_cleared > 0 and drug_conc > 0:
+            self.blood.drug_concentration_mg_kg = max(
+                0.0, self.blood.drug_concentration_mg_kg - cyp450_cleared
+            )
+
+        # Step 7: 凝血因子合成（PT/INR）
+        self._compute_coagulation_factors(dt)
 
         # 清除门户缓存（模拟肝脏对肠道吸收营养的摄取）
         # 肠道来的氨基酸被肝脏摄取用于糖异生/蛋白质合成
@@ -357,6 +506,11 @@ class LiverModule:
             "ammonia_umol_L": round(self.blood.ammonia_umol_L, 1),
             "glucose_mmol_L": round(self.blood.glucose_mmol_L, 2),
             "BUN_mg_dL": round(self.blood.bun_mg_dL, 1),
+            "lactate_consumed_mmol_L": 0.0,  # Cori cycle via consume_lactate() API
+            "cyp450_drug_cleared": round(cyp450_cleared, 4),
+            "PT_seconds": round(self.blood.PT_seconds, 1),
+            "INR": round(self.blood.INR, 2),
+            "coagulation_factor_VII": round(self.blood.coagulation_factor_VII, 3),
         }
 
     def summary(self) -> dict:
@@ -369,4 +523,6 @@ class LiverModule:
             "hepatic_flow": round(self.hepatic_blood_flow, 1),
             "albumin": round(self.blood.albumin_g_dL, 2),
             "ammonia": round(self.blood.ammonia_umol_L, 1),
+            "PT_seconds": round(self.blood.PT_seconds, 1),
+            "INR": round(self.blood.INR, 2),
         }

@@ -15,6 +15,9 @@ from kidney import KidneyModule
 from toxicology import ToxicologyModule
 from organ_health import OrganHealthTracker
 from fluid import FluidCompartment, HendersonHasselbalch
+from gut import GutModule
+from liver import LiverModule
+from lifecycle import LifecycleEngine
 from parameters import (
     DT_SECONDS, SIMULATION_STEP_MS, T_MAX_MINUTES,
     PLASMA_VOLUME_FRACTION,
@@ -80,6 +83,26 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.bilirubin_mg_dL":      ("blood", "bilirubin_mg_dL"),
     "blood.ketone_mmol_L":        ("blood", "ketone_mmol_L"),
     "blood.PLT":                  ("blood", "PLT"),
+    # Liver/gut blood markers
+    "blood.ALT":                  ("blood", "ALT_U_L"),
+    "blood.AST":                  ("blood", "AST_U_L"),
+    "blood.ALP":                  ("blood", "ALP_U_L"),
+    "blood.GGT":                  ("blood", "GGT_U_L"),
+    "blood.albumin":              ("blood", "albumin_g_dL"),
+    "blood.ammonia":              ("blood", "ammonia_umol_L"),
+    "blood.bile_acids":           ("blood", "bile_acids_umol_L"),
+    "blood.amino_acids":         ("blood", "amino_acids_g_L"),
+    "blood.fatty_acids":         ("blood", "fatty_acids_mmol_L"),
+    # Gut
+    "gut.motility":               ("gut", "gut_motility"),
+    "gut.barrier_integrity":      ("gut", "barrier_integrity"),
+    "gut.microbiome_activity":    ("gut", "microbiome_activity"),
+    # Liver
+    "liver.metabolic_activity":   ("liver", "metabolic_activity"),
+    "liver.detox_capacity":       ("liver", "detox_capacity"),
+    "liver.cyp450_activity":      ("liver", "cyp450_activity"),
+    "liver.glycogen_fraction":   ("liver", "glycogen_fraction"),
+    "liver.bilirubin_conjugation": ("liver", "bilirubin_conjugation"),
 }
 
 
@@ -103,8 +126,14 @@ class VirtualCreature:
     └──────────────────────────────────────────────┘
     """
 
-    def __init__(self, body_weight_kg: float = 20.0):
+    def __init__(
+        self,
+        body_weight_kg: float = 20.0,
+        species: str = "canine",
+        age_days: float = 0.0,
+    ):
         self.w = body_weight_kg
+        self.species = species
 
         # 根据实际体重计算 A 类参数
         _tbv = total_blood_volume_ml(body_weight_kg)
@@ -146,6 +175,11 @@ class VirtualCreature:
             hco3_meq_l=self.fluid.vascular_hco3_meq_l,
             pco2_mmHg=self.blood.arterial_PCO2_mmHg,
         )
+        self.gut = GutModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.liver = LiverModule(weight_kg=body_weight_kg, blood=self.blood)
+
+        # 生命周期引擎（驱动生长/衰老/死亡）
+        self.lifecycle = LifecycleEngine(species=species, initial_age_days=age_days)
 
         # 仿真时间
         self.current_time_s = 0.0
@@ -184,11 +218,19 @@ class VirtualCreature:
             "heart_health": [],
             "lung_health": [],
             "kidney_health": [],
+            "liver_health": [],
             # 体液三室
             "fluid_vascular_ml": [],
             "fluid_isf_ml": [],
             "fluid_icf_ml": [],
             "fluid_nfp_mmHg": [],
+            # 肝脏/肠道
+            "liver_metabolic_activity": [],
+            "liver_detox_capacity": [],
+            "liver_glycogen": [],
+            "gut_motility": [],
+            "gut_barrier": [],
+            "gut_microbiome": [],
         }
 
         # 场景事件
@@ -275,9 +317,11 @@ class VirtualCreature:
                 self.heart.blood_volume_change(vol)
                 self.event_log.append(f"[{t:.1f}s] 输液 {vol:.0f} mL")
             elif event_type == "food_intake":
-                glucose = params.get("glucose_grams", 0) * 1000 / self.w  # mg/kg
-                self.blood.glucose_mmol_L += glucose / 18.0  # mg/dL → mmol/L
-                self.event_log.append(f"[{t:.1f}s] 进食葡萄糖 {glucose:.0f} mg/kg")
+                glucose = params.get("glucose_grams", 0)
+                amino_g = params.get("amino_grams", 0)
+                fat_g = params.get("fat_grams", 0)
+                self.gut.add_food_intake(glucose, amino_g, fat_g)
+                self.event_log.append(f"[{t:.1f}s] 进食 葡萄糖{glucose:.0f}g 氨基酸{amino_g:.0f}g 脂肪{fat_g:.0f}g")
             elif event_type == "cocaine":
                 dose = params.get("dose_mg_kg", 3.0)
                 self.toxicology.administer_cocaine(dose_mg_kg=dose)
@@ -288,6 +332,16 @@ class VirtualCreature:
         self._scheduled_events = [
             (et, evt, p) for (et, evt, p) in self._scheduled_events if et > t + 1e-6
         ]
+
+    def _handle_death(self, cause: str) -> None:
+        """生命周期死亡处理：记录原因，终止仿真。"""
+        self.death_reason = cause
+        logger.info(
+            "Creature died: %s at age %.1f days (phase=%s)",
+            cause,
+            self.lifecycle.state.age_days,
+            self.lifecycle.state.phase.value,
+        )
 
     def _update_venous_gas(self):
         """
@@ -326,9 +380,13 @@ class VirtualCreature:
             self.blood.lactate_mmol_L += 0.001 * dt * (1.0 / CO_factor - 1.0)
             self.blood.lactate_mmol_L = min(10.0, self.blood.lactate_mmol_L)
 
-        # 乳酸清除（肝脏 + 肾脏）
-        lactate_clearance = 0.005 * self.blood.lactate_mmol_L
-        self.blood.lactate_mmol_L = max(0.5, self.blood.lactate_mmol_L - lactate_clearance * dt)
+        # 乳酸清除（肝脏 Cori cycle + 肾脏）
+        hepatic_lactate_consumed = self.liver.consume_lactate(dt)  # Cori cycle
+        renal_lactate_clearance = 0.002 * self.blood.lactate_mmol_L  # ~30% renal
+        lactate_net = hepatic_lactate_consumed + renal_lactate_clearance
+        self.blood.lactate_mmol_L = max(
+            0.5, self.blood.lactate_mmol_L - lactate_net * dt
+        )
 
     def step(self):
         """
@@ -353,6 +411,14 @@ class VirtualCreature:
 
         # Step 0: 事件处理（必须先于 tox.compute，确保药物注射立即生效）
         self._process_events(t)
+
+        # Step 0.5: 生命周期因子应用（年龄调整后的基线参数）
+        if not self.lifecycle.is_dead():
+            self.lifecycle.apply_age_factors(self)
+            death_cause = self.lifecycle.death_check()
+            if death_cause:
+                self._handle_death(death_cause)
+                return
 
         # Step 1: 毒理学（可卡因等药物效应）
         tox_state = self.toxicology.compute(dt)
@@ -387,9 +453,15 @@ class VirtualCreature:
         # Step 4: 肾脏泌尿（输入：MAP、CO → 输出：GFR、尿量）
         kidney_state = self.kidney.compute(dt, heart_state["MAP_mmHg"], CVP, CO)
 
+        # Step 4.5: 肠道吸收
+        gut_state = self.gut.compute(dt, CO)
+
+        # Step 4.6: 肝脏代谢
+        liver_state = self.liver.compute(dt, gut_state, CO)
+
         # Step 5: 器官衰竭追踪
         # 根据当前危险条件更新各器官健康状态
-        self.organ_health.track(dt, heart_state, lung_state, kidney_state)
+        self.organ_health.track(dt, heart_state, lung_state, kidney_state, liver_state)
 
         # 健康因子永久降低器官输出（不可逆）
         # 同时修改返回 dict 和模块内部状态，确保损伤有累积效应
@@ -481,11 +553,19 @@ class VirtualCreature:
         self.history["heart_health"].append(self.organ_health.heart_health)
         self.history["lung_health"].append(self.organ_health.lung_health)
         self.history["kidney_health"].append(self.organ_health.kidney_health)
+        self.history["liver_health"].append(self.organ_health.liver_health)
         # 体液三室
         self.history["fluid_vascular_ml"].append(fluid_state["vascular_ml"])
         self.history["fluid_isf_ml"].append(fluid_state["isf_ml"])
         self.history["fluid_icf_ml"].append(fluid_state["icf_ml"])
         self.history["fluid_nfp_mmHg"].append(fluid_state["nfp_mmHg"])
+        # 肝脏/肠道
+        self.history["liver_metabolic_activity"].append(liver_state["metabolic_activity"])
+        self.history["liver_detox_capacity"].append(liver_state["detox_capacity"])
+        self.history["liver_glycogen"].append(liver_state["glycogen_fraction"])
+        self.history["gut_motility"].append(gut_state["gut_motility"])
+        self.history["gut_barrier"].append(gut_state["barrier_integrity"])
+        self.history["gut_microbiome"].append(gut_state["microbiome_activity"])
 
         # 更新时间
         self.current_time_s += dt
@@ -494,6 +574,8 @@ class VirtualCreature:
             "heart": heart_state,
             "lung": lung_state,
             "kidney": kidney_state,
+            "gut": gut_state,
+            "liver": liver_state,
             "blood": self.blood.summary(),
             "toxicology": tox_state,
             "pharmacology": pharma_effects if (hasattr(self, "pharmacology") and self.pharmacology is not None) else {},
@@ -645,6 +727,9 @@ class VirtualCreature:
             "lung_health": round(self.organ_health.lung_health, 3),
             "kidney_health": round(self.organ_health.kidney_health, 3),
 
+            # ── Lifecycle ───────────────────────────────────────────────
+            "lifecycle": self.lifecycle.serialize(),
+
             # ── Disease state (readable summary) ────────────────────────
             "disease_state": self.disease.summary() if self.disease else None,
         }
@@ -669,6 +754,8 @@ class VirtualCreature:
         hh = self.organ_health
         if hh.heart_health < 0.95 or hh.lung_health < 0.95 or hh.kidney_health < 0.95:
             print(f"器官健康: 心={hh.heart_health:.2f}  肺={hh.lung_health:.2f}  肾={hh.kidney_health:.2f}")
+        print(f"肝脏: 代谢={self.liver.metabolic_activity:.2f}  解毒={self.liver.detox_capacity:.2f}  糖原={self.liver.glycogen_fraction:.2f}")
+        print(f"肠道: 蠕动={self.gut.gut_motility:.2f}  屏障={self.gut.barrier_integrity:.2f}  菌群={self.gut.microbiome_activity:.2f}")
 
 
 # 参数导入已移至文件顶部
