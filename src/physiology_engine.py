@@ -38,6 +38,8 @@ from liver import LiverModule
 from endocrine import EndocrineModule
 from neuro import NeuroModule
 from immune import ImmuneModule
+from coagulation import CoagulationModule
+from lymphatic import LymphaticModule
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +144,17 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "immune.acute_phase_response":  ("immune", "acute_phase_response"),
     "immune.immune_suppression":    ("immune", "immune_suppression"),
     "immune.coagulation_state":     ("immune", "coagulation_state"),
+    # Coagulation
+    "coag.PT_sec":               ("blood", "PT_sec"),
+    "coag.aPTT_sec":             ("blood", "aPTT_sec"),
+    "coag.fibrinogen_mg_dL":     ("blood", "fibrinogen_mg_dL"),
+    "coag.factor_VII":           ("coagulation", "factor_VII"),
+    "coag.coagulation_state":    ("coagulation", "coagulation_state"),
+    # Lymphatic
+    "lymph.splenic_reserve_mL":  ("blood", "splenic_reserve_mL"),
+    "blood.splenic_reserve_mL":  ("blood", "splenic_reserve_mL"),  # disease outputs use blood.*
+    "lymph.lymph_flow":          ("lymphatic", "lymph_flow_rate"),
+    "lymph.interstitial_fluid":  ("blood", "interstitial_fluid_mL"),
 }
 
 # 导出供外部使用
@@ -219,6 +232,8 @@ class PhysiologyEngine:
         self.endocrine = EndocrineModule(weight_kg=body_weight_kg, blood=self.blood)
         self.neuro = NeuroModule(weight_kg=body_weight_kg, blood=self.blood)
         self.immune = ImmuneModule(weight_kg=body_weight_kg, blood=self.blood, endocrine=self.endocrine)
+        self.coagulation = CoagulationModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.lymphatic = LymphaticModule(weight_kg=body_weight_kg, blood=self.blood)
 
         self.dt = DT_SECONDS
 
@@ -308,6 +323,22 @@ class PhysiologyEngine:
             raise ValueError(f"immune.immune_suppression out of range: {self.immune.immune_suppression}")
         if not (0 <= self.immune.coagulation_state <= 1.0):
             raise ValueError(f"immune.coagulation_state out of range: {self.immune.coagulation_state}")
+
+        # 凝血
+        if not (0 < self.blood.PT_sec <= 60.0):
+            raise ValueError(f"blood.PT_sec out of range: {self.blood.PT_sec}")
+        if not (0 < self.blood.aPTT_sec <= 120.0):
+            raise ValueError(f"blood.aPTT_sec out of range: {self.blood.aPTT_sec}")
+        if not (50 <= self.blood.fibrinogen_mg_dL <= 1000.0):
+            raise ValueError(f"blood.fibrinogen_mg_dL out of range: {self.blood.fibrinogen_mg_dL}")
+        if not (0 <= self.coagulation.coagulation_state <= 1.0):
+            raise ValueError(f"coagulation.coagulation_state out of range: {self.coagulation.coagulation_state}")
+
+        # 淋巴/脾脏
+        if not (0 <= self.blood.splenic_reserve_mL <= 200.0):
+            raise ValueError(f"blood.splenic_reserve_mL out of range: {self.blood.splenic_reserve_mL}")
+        if not (0 <= self.lymphatic.lymph_flow_rate <= 20.0):
+            raise ValueError(f"lymphatic.lymph_flow_rate out of range: {self.lymphatic.lymph_flow_rate}")
 
     def apply_factor(self, cmd: FactorCommand) -> None:
         """
@@ -452,6 +483,16 @@ class PhysiologyEngine:
         # ── Step 4.7: 内分泌轴 ───────────────────────────────────────────
         endocrine_state = self.endocrine.compute(dt)
 
+        # ── Step 4.65: 凝血系统 ──────────────────────────────────────────
+        coagulation_state = self.coagulation.compute(dt, liver_state, {})
+        for cmd in coagulation_state.get("factor_commands", []):
+            self.apply_factor(cmd)
+
+        # ── Step 4.75: 淋巴/脾脏系统 ────────────────────────────────────
+        lymphatic_state = self.lymphatic.compute(dt, gut_state, {})
+        for cmd in lymphatic_state.get("factor_commands", []):
+            self.apply_factor(cmd)
+
         # ── Step 4.8: 神经系统 ───────────────────────────────────────────
         neuro_state = self.neuro.compute(dt, heart_state, lung_state)
         for cmd in neuro_state.get("factor_commands", []):
@@ -513,6 +554,8 @@ class PhysiologyEngine:
             "endocrine": self.endocrine.summary(),
             "neuro": self.neuro.summary(),
             "immune": self.immune.summary(),
+            "coagulation": self.coagulation.summary(),
+            "lymphatic": self.lymphatic.summary(),
             "blood": self.blood.summary(),
             "toxicology": tox_state,
             "fluid": fluid_state,

@@ -419,8 +419,8 @@ class LiverModule:
         # PT 估算：正常 12s，因子 VII 活性越低 PT 越长
         base_PT = 12.0
         PT_factor = 1.0 + (1.0 - self.blood.coagulation_factor_VII) * 1.5
-        self.blood.PT_seconds = base_PT * PT_factor
-        self.blood.INR = self.blood.PT_seconds / base_PT
+        self.blood.PT_sec = base_PT * PT_factor
+        self.blood.INR = self.blood.PT_sec / base_PT
 
     def compute(self, dt: float, gut_state: dict, cardiac_output: float) -> dict:
         """
@@ -508,7 +508,7 @@ class LiverModule:
             "BUN_mg_dL": round(self.blood.bun_mg_dL, 1),
             "lactate_consumed_mmol_L": 0.0,  # Cori cycle via consume_lactate() API
             "cyp450_drug_cleared": round(cyp450_cleared, 4),
-            "PT_seconds": round(self.blood.PT_seconds, 1),
+            "PT_sec": round(self.blood.PT_sec, 1),
             "INR": round(self.blood.INR, 2),
             "coagulation_factor_VII": round(self.blood.coagulation_factor_VII, 3),
         }
@@ -523,6 +523,6 @@ class LiverModule:
             "hepatic_flow": round(self.hepatic_blood_flow, 1),
             "albumin": round(self.blood.albumin_g_dL, 2),
             "ammonia": round(self.blood.ammonia_umol_L, 1),
-            "PT_seconds": round(self.blood.PT_seconds, 1),
+            "PT_sec": round(self.blood.PT_sec, 1),
             "INR": round(self.blood.INR, 2),
         }

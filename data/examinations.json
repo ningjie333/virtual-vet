@@ -80,6 +80,15 @@
     "description": "检测PaO2、PaCO2、pH、乳酸和SpO2",
     "params": ["PaO2", "PaCO2", "pH", "Lactate", "SpO2"]
   },
+  "blood_coagulation": {
+    "name": "凝血功能检查",
+    "category": "核心诊断",
+    "tier": 3,
+    "time_cost_min": 15,
+    "latency_min": 15,
+    "description": "检测PT（凝血酶原时间）、aPTT（活化部分凝血活酶时间）、纤维蛋白原，评估凝血功能状态",
+    "params": ["PT", "aPTT", "Fibrinogen"]
+  },
   "chest_xray": {
     "name": "X光胸片",
     "category": "核心诊断",

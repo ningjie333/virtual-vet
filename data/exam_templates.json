@@ -289,6 +289,99 @@
     ],
     "findings_rules": {}
   },
+  "blood_coagulation": {
+    "name": "凝血功能检查",
+    "test_type": "blood_coagulation",
+    "handler": "blood_coagulation",
+    "vitals": [],
+    "extra_params": [
+      {
+        "param": "PT",
+        "unit": "秒",
+        "normal_range": "10-14",
+        "source": "creature.blood.PT_sec"
+      },
+      {
+        "param": "aPTT",
+        "unit": "秒",
+        "normal_range": "25-35",
+        "source": "creature.blood.aPTT_sec"
+      },
+      {
+        "param": "Fibrinogen",
+        "unit": "mg/dL",
+        "normal_range": "200-400",
+        "source": "creature.blood.fibrinogen_mg_dL"
+      }
+    ],
+    "thresholds": {
+      "pt_prolonged": 14.0,
+      "pt_severely_prolonged": 20.0,
+      "aptt_prolonged": 35.0,
+      "aptt_severely_prolonged": 50.0,
+      "fibrinogen_low": 150.0,
+      "fibrinogen_very_low": 100.0,
+      "coag_state_dic": 0.5
+    },
+    "tag_rules": [
+      {
+        "clue_id": "pt_prolonged",
+        "condition": "state.PT > thresholds.pt_prolonged"
+      },
+      {
+        "clue_id": "aptt_prolonged",
+        "condition": "state.aPTT > thresholds.aptt_prolonged"
+      },
+      {
+        "clue_id": "fibrinogen_low",
+        "condition": "state.Fibrinogen < thresholds.fibrinogen_low"
+      }
+    ],
+    "findings_rules": {
+      "pt_interpretation": [
+        {
+          "if": "state.PT <= thresholds.pt_prolonged",
+          "text": "PT正常"
+        },
+        {
+          "if": "state.PT > thresholds.pt_prolonged and state.PT <= thresholds.pt_severely_prolonged",
+          "text": "PT轻度延长（凝血因子轻度不足）"
+        },
+        {
+          "if": "state.PT > thresholds.pt_severely_prolonged",
+          "text": "PT显著延长（严重凝血障碍）"
+        }
+      ],
+      "aptt_interpretation": [
+        {
+          "if": "state.aPTT <= thresholds.aptt_prolonged",
+          "text": "aPTT正常"
+        },
+        {
+          "if": "state.aPTT > thresholds.aptt_prolonged and state.aPTT <= thresholds.aptt_severely_prolonged",
+          "text": "aPTT延长（内源性凝血途径因子缺乏）"
+        },
+        {
+          "if": "state.aPTT > thresholds.aptt_severely_prolonged",
+          "text": "aPTT显著延长（严重凝血障碍）"
+        }
+      ],
+      "fibrinogen_interpretation": [
+        {
+          "if": "state.Fibrinogen >= thresholds.fibrinogen_low",
+          "text": "纤维蛋白原正常"
+        },
+        {
+          "if": "state.Fibrinogen < thresholds.fibrinogen_low and state.Fibrinogen >= thresholds.fibrinogen_very_low",
+          "text": "纤维蛋白原轻度降低"
+        },
+        {
+          "if": "state.Fibrinogen < thresholds.fibrinogen_very_low",
+          "text": "纤维蛋白原严重降低（消耗性凝血障碍可能）"
+        }
+      ]
+    }
+  },
   "blood_biochem": {
     "name": "生化全项",
     "test_type": "blood_biochem",

@@ -9,7 +9,9 @@
     "urinary_obstruction": "尿道梗阻",
     "diabetic_ketoacidosis": "糖尿病酮症酸中毒（DKA）",
     "pericardial_effusion": "心包积液/心脏填塞",
-    "disseminated_intravascular_coagulation": "弥散性血管内凝血（DIC）"
+    "disseminated_intravascular_coagulation": "弥散性血管内凝血（DIC）",
+    "hepatic_failure_coagulopathy": "肝功能衰竭伴凝血障碍",
+    "splenic_rupture": "脾脏破裂（急性失血）"
   },
   "clues": {
     "pneumonia": [
@@ -136,6 +138,29 @@
       "weak_pulse",
       "hemorrhage",
       "petechiae"
+    ],
+    "hepatic_failure_coagulopathy": [
+      "pt_prolonged",
+      "aptt_prolonged",
+      "fibrinogen_low",
+      "albumin_low",
+      "ammonia_high",
+      "alt_high",
+      "hr_high",
+      "map_low",
+      "weak_pulse"
+    ],
+    "splenic_rupture": [
+      "splenic_mass",
+      "abdominal_pain",
+      "hr_high",
+      "map_low",
+      "weak_thready_pulse",
+      "pale_mucous_membranes",
+      "distended_abdomen",
+      "hct_low",
+      "lactate_high",
+      "hemorrhage"
     ]
   },
   "clue_descriptions": {
@@ -189,7 +214,18 @@
     "qrs_wide": "QRS增宽",
     "p_wave_absent": "P波消失",
     "usg_low": "尿比重降低",
-    "upcr_high": "尿蛋白/肌酐比升高"
+    "upcr_high": "尿蛋白/肌酐比升高",
+    "pt_prolonged": "凝血酶原时间延长",
+    "aptt_prolonged": "活化部分凝血活酶时间延长",
+    "fibrinogen_low": "纤维蛋白原降低",
+    "albumin_low": "白蛋白降低",
+    "ammonia_high": "血氨升高",
+    "alt_high": "ALT升高",
+    "splenic_mass": "脾脏肿物",
+    "abdominal_pain": "腹部疼痛",
+    "weak_thready_pulse": "脉搏细弱",
+    "pale_mucous_membranes": "黏膜苍白",
+    "distended_abdomen": "Distended Abdomen"
   },
   "clue_to_test": {
     "PaO2_low": "blood_gas",
@@ -242,7 +278,17 @@
     "qrs_wide": "ecg",
     "p_wave_absent": "ecg",
     "usg_low": "urinalysis",
-    "upcr_high": "urinalysis"
+    "upcr_high": "urinalysis",
+    "pt_prolonged": "blood_coagulation",
+    "aptt_prolonged": "blood_coagulation",
+    "fibrinogen_low": "blood_coagulation",
+    "ammonia_high": "blood_biochem",
+    "albumin_low": "blood_biochem",
+    "alt_high": "blood_biochem",
+    "splenic_mass": "ultrasound",
+    "abdominal_pain": "physical",
+    "weak_thready_pulse": "physical",
+    "pale_mucous_membranes": "inspection"
   },
   "treatment_protocols": {
     "dilated_cardiomyopathy": [
@@ -308,6 +354,22 @@
         "drug_name": "fluid_bolus",
         "volume_ml": 350
       }
+    ],
+    "hepatic_failure_coagulopathy": [
+      {
+        "drug_name": "vitamin_k",
+        "dose_mg_kg": 0.5
+      },
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 300
+      }
+    ],
+    "splenic_rupture": [
+      {
+        "drug_name": "fluid_bolus",
+        "volume_ml": 500
+      }
     ]
   },
   "messages": {
@@ -321,7 +383,9 @@
       "urinary_obstruction": "正确诊断！紧急导尿排除膀胱蓄积尿液后，患犬的高钾和酸中毒迅速纠正。",
       "diabetic_ketoacidosis": "正确诊断！积极补液+胰岛素治疗后，患犬的血糖和酮体逐渐恢复正常，酸中毒纠正。",
       "pericardial_effusion": "正确诊断！心包穿刺引流后，患犬的心脏填塞症状迅速缓解，血压回升。",
-      "disseminated_intravascular_coagulation": "正确诊断！积极补液+抗凝+输血支持治疗后，患犬的凝血功能逐渐恢复。"
+      "disseminated_intravascular_coagulation": "正确诊断！积极补液+抗凝+输血支持治疗后，患犬的凝血功能逐渐恢复。",
+      "hepatic_failure_coagulopathy": "正确诊断！维生素K1止血+输液支持后，患犬的凝血功能逐渐改善。",
+      "splenic_rupture": "正确诊断！紧急输液扩容+配血后，患犬的休克症状得到纠正。"
     },
     "loss": {
       "pneumonia": "误诊！患犬的呼吸系统症状提示存在感染性病变，请重新评估肺部检查。",
@@ -333,7 +397,9 @@
       "urinary_obstruction": "误诊！患犬的无尿、高钾和酸中毒提示尿道梗阻，请紧急导尿并复查尿液。",
       "diabetic_ketoacidosis": "误诊！患犬的高血糖、酮症酸中毒和Kussmaul呼吸提示代谢危象，请复查血糖和血气。",
       "pericardial_effusion": "误诊！患犬的颈静脉怒张、心音遥远和奇脉提示心包积液，请紧急心脏超声。",
-      "disseminated_intravascular_coagulation": "误诊！患犬的多部位出血、血小板减少和休克提示凝血功能障碍，请复查凝血功能。"
+      "disseminated_intravascular_coagulation": "误诊！患犬的多部位出血、血小板减少和休克提示凝血功能障碍，请复查凝血功能。",
+      "hepatic_failure_coagulopathy": "误诊！患犬的凝血功能异常和低白蛋白血症提示肝脏合成功能下降，请复查肝功能和凝血指标。",
+      "splenic_rupture": "误诊！患犬的失血性休克和腹部症状提示腹腔出血，请紧急腹部超声和血常规复查。"
     }
   }
 }

@@ -87,11 +87,20 @@ class BloodCompartment:
         self.drug_concentration_mg_kg = 0.0   # 通用药物浓度占位
 
         # ============================================================
-        # Coagulation factors (liver synthesis)
+        # Coagulation factors (liver synthesis) + PT/aPTT
         # ============================================================
         self.coagulation_factor_VII = 1.0     # 凝血因子 VII 活性 (0-1)
-        self.PT_seconds = 12.0                # 凝血酶原时间（正常 ~12s）
-        self.INR = 1.0                        # 国际标准化比值
+        self.PT_sec = 12.0                   # 凝血酶原时间（正常 ~12s）
+        self.aPTT_sec = 30.0                 # 活化部分凝血活酶时间（正常 ~30s）
+        self.INR = 1.0                       # 国际标准化比值
+        self.fibrinogen_mg_dL = 300.0        # 纤维蛋白原 mg/dL (正常 200-400)
+
+        # ============================================================
+        # Lymphatic / Spleen state
+        # ============================================================
+        self.splenic_reserve_mL = 75.0      # 脾脏储血量 mL
+        self.lymph_flow_mL_min = 3.0         # 淋巴回流速率 mL/min
+        self.interstitial_fluid_mL = 2500.0  # 间质液总量 mL (≈体重×40 mL/kg)
 
         # ============================================================
         # Endocrine hormones (blood concentration)
@@ -193,4 +202,12 @@ class BloodCompartment:
             "acute_phase": round(self.acute_phase_response, 3),
             "immune_suppression": round(self.immune_suppression, 3),
             "coagulation": round(self.coagulation_state, 3),
+            # Coagulation
+            "PT": round(self.PT_sec, 1),
+            "aPTT": round(self.aPTT_sec, 1),
+            "fibrinogen": round(self.fibrinogen_mg_dL, 0),
+            # Lymphatic/Spleen
+            "splenic_reserve": round(self.splenic_reserve_mL, 1),
+            "lymph_flow": round(self.lymph_flow_mL_min, 2),
+            "interstitial_fluid": round(self.interstitial_fluid_mL, 0),
         }

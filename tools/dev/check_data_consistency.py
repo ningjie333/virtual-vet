@@ -34,6 +34,8 @@ VALID_PARAM_PREFIXES = (
     "endocrine.",
     "neuro.",
     "immune.",
+    "coag.",
+    "lymph.",
 )
 
 # 可自动修复的问题类型

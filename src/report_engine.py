@@ -120,7 +120,14 @@ def get_state(creature: VirtualCreature) -> dict:
         "BV": bv,
         "contractility": ctr,
         "Urine": urine,
+        "PT": _last("coag_PT", b.PT_sec),
+        "aPTT": _last("coag_aPTT", b.aPTT_sec),
+        "Fibrinogen": _last("coag_fibrinogen", b.fibrinogen_mg_dL),
     }
+
+    # Coagulation state
+    if hasattr(creature, 'coagulation') and creature.coagulation is not None:
+        state["coagulation_state"] = creature.coagulation.coagulation_state
 
     # HH 电生理数据（如果 heart 模块有 HH 集成）
     if hasattr(creature.heart, 'hh') and creature.heart.hh is not None:
