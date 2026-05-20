@@ -219,5 +219,65 @@
     "clue_flags": {
       "high": "ketone_high"
     }
+  },
+  "PT": {
+    "unit": "sec",
+    "normal": [10.0, 15.0],
+    "critical": [8.0, 25.0],
+    "clue_flags": {
+      "high": "pt_high"
+    }
+  },
+  "aPTT": {
+    "unit": "sec",
+    "normal": [25.0, 35.0],
+    "critical": [20.0, 50.0],
+    "clue_flags": {
+      "high": "aptt_high"
+    }
+  },
+  "Fibrinogen": {
+    "unit": "mg/dL",
+    "normal": [200.0, 400.0],
+    "critical": [50.0, 800.0],
+    "clue_flags": {
+      "high": "fibrinogen_high",
+      "low": "fibrinogen_low"
+    }
+  },
+  "CRP": {
+    "unit": "mg/L",
+    "normal": [0.0, 10.0],
+    "critical": [10.0, 200.0],
+    "clue_flags": {
+      "high": "crp_high"
+    }
+  },
+  "Cortisol": {
+    "unit": "ug/dL",
+    "normal": [2.0, 10.0],
+    "critical": [0.5, 25.0],
+    "clue_flags": {
+      "high": "cortisol_high",
+      "low": "cortisol_low"
+    }
+  },
+  "T3": {
+    "unit": "ng/dL",
+    "normal": [80.0, 120.0],
+    "critical": [50.0, 150.0],
+    "clue_flags": {
+      "high": "t3_high",
+      "low": "t3_low"
+    }
+  },
+  "T4": {
+    "unit": "ug/dL",
+    "normal": [1.0, 3.0],
+    "critical": [0.5, 5.0],
+    "clue_flags": {
+      "high": "t4_high",
+      "low": "t4_low"
+    }
   }
 }

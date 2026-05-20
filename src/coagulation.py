@@ -132,10 +132,13 @@ class CoagulationModule:
         cytokine = self.blood.cytokine_level
 
         # 1. 细胞因子驱动的高凝
+        # 基线预备态: 防止完全冻结，系统随时可响应
+        baseline_coag = 0.02
         if cytokine > 0.6:
             cytokine_coag = (cytokine - 0.6) / 0.4  # 0-1
         else:
             cytokine_coag = 0.0
+        cytokine_component = max(baseline_coag, cytokine_coag)
 
         # 2. 纤维蛋白原消耗
         fibrin_ratio = self.fibrinogen / 300.0  # 相对于正常
@@ -151,8 +154,8 @@ class CoagulationModule:
         else:
             plt_coag = 0.0
 
-        # 综合凝血状态
-        raw_state = max(cytokine_coag, fibrin_coag * 0.5, plt_coag * 0.3)
+        # 综合凝血状态：使用 cytokine_component（包含 baseline）作为主成分
+        raw_state = max(cytokine_component, fibrin_coag * 0.5, plt_coag * 0.3)
         # 一阶滞后，避免突变
         tau = 900.0  # τ=900s (15分钟)
         return raw_state
@@ -193,7 +196,12 @@ class CoagulationModule:
             "factor_XI": self.factor_XI,
         }
         for name, current in targets.items():
-            synthesis = synthesis_rate * (1.0 - current) if current < 1.0 else 0.0
+            # 基线合成率: 极微弱，防止因子在1.0处完全冻结（但 liver failure 时仍能显著下降）
+            baseline_synthesis = 0.0000001
+            if current < 1.0:
+                synthesis = synthesis_rate * (1.0 - current) + baseline_synthesis
+            else:
+                synthesis = baseline_synthesis
             decay = decay_rate * (current - 0.3) if current > 0.3 else 0.0
             new_val = current + synthesis - decay
             setattr(self, name, max(0.05, min(1.5, new_val)))

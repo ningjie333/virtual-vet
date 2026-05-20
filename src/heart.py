@@ -65,7 +65,7 @@ class HeartModule:
         self.pulmonary_arterial_pressure = PULMONARY_ARTERIAL_PRESSURE_MMHG
 
         # 血液动力学
-        self.cardiac_output = 0.0  # mL/min
+        self.cardiac_output = self.heart_rate * self.stroke_volume  # mL/min（直接初始化，避免 CO=0 at t=0）
 
         # 循环血量
         self.total_BV = total_blood_volume_ml(weight_kg)

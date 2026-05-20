@@ -119,7 +119,7 @@ BASELINE_GLUCAGON_PG_ML = 80.0                   # 正常空腹胰高血糖素 p
 GLUCOSE_EUGLYCEMIA_LOW = 3.5                      # 血糖正常下限 mmol/L
 GLUCOSE_EUGLYCEMIA_HIGH = 6.0                     # 血糖正常上限 mmol/L
 GLUCAGON_HYPOGLYCEMIA_THRESHOLD = 3.5            # 低血糖刺激胰高血糖素分泌阈值
-INSULIN_HYPERGLYCEMIA_THRESHOLD = 6.0             # 高血糖刺激胰岛素分泌阈值
+INSULIN_HYPERGLYCEMIA_THRESHOLD = 5.5             # 高血糖刺激胰岛素分泌阈值（从6.0降低以提高敏感性）
 PANCREATIC_RESPONSE_TAU_SEC = 300.0               # 胰岛素分泌响应时间常数 (5min)
 
 # 肾上腺轴

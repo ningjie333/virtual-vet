@@ -81,6 +81,10 @@ def test_summary_returns_dict():
         "consciousness", "seizure", "pain", "chemoreceptor_drive",
         # Immune
         "WBC", "CRP", "cytokine", "acute_phase", "immune_suppression", "coagulation",
+        # Coagulation
+        "PT", "aPTT", "fibrinogen",
+        # Lymphatic/Spleen
+        "splenic_reserve", "lymph_flow", "interstitial_fluid",
     }
     assert isinstance(s, dict), f"Expected dict, got {type(s)}"
     assert set(s.keys()) == expected_keys, (

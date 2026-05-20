@@ -11,6 +11,7 @@ Endocrine Module - 内分泌系统
 代谢率驱动体温被动变化(无主动产热)。
 """
 
+import math
 from parameters import *
 
 
@@ -57,6 +58,7 @@ class EndocrineModule:
         self.norepinephrine_pg_mL = BASELINE_NOREPINEPHRINE_PG_ML
         self.cortisol_factor = 1.0              # 皮质醇归一化因子
         self._cortisol_target = BASELINE_CORTISOL_UG_DL
+        self._elapsed_s = 0.0                    # 用于皮质醇昼夜节律
 
         # ══════════════════════════════════════════════════════
         # 4. 甲状旁腺轴
@@ -94,6 +96,10 @@ class EndocrineModule:
           - dT/dt = (metabolic_rate - 1.0) * 0.05 C/min
           - 无主动产热机制
         """
+        # 基线昼夜节律: 24h周期，±5 ng/dL 波动
+        circadian_T3 = 5.0 * math.sin(2.0 * math.pi * self._elapsed_s / 86400.0)
+        self._T3_target = BASELINE_T3_NG_DL + circadian_T3
+
         # first_order_lag: T3向目标值平滑移动
         tau = THYROID_TAU_SEC
         alpha = dt / tau if tau > 0 else 1.0
@@ -221,6 +227,10 @@ class EndocrineModule:
           - 儿茶酚胺↑ → SVR↑, 心率↑(已在heart和pharmacology建模)
         """
         # HPA轴: 应激输入驱动logistic增长
+        # 基线昼夜节律: 维持最低激活水平，防止完全冻结
+        baseline_activity = 0.05
+        self.HPA_axis = max(self.HPA_axis, baseline_activity)
+
         if self._stress_input > 0.1:
             # 应力输入 → logistic增长
             growth_rate = 0.01 * self._stress_input
@@ -383,6 +393,7 @@ class EndocrineModule:
         Returns:
             所有轴状态dict
         """
+        self._elapsed_s += dt
         thyroid = self._compute_thyroid(dt)
         pancreatic = self._compute_pancreatic(dt)
         adrenal = self._compute_adrenal(dt)
