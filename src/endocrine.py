@@ -79,6 +79,156 @@ class EndocrineModule:
         # 内部累计量
         self._stress_input = 0.0                # 累积应激输入(用于HPA)
 
+    # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
+    # 状态变量（进入统一 y 向量）: T3, insulin, glucagon, cortisol, PTH, IGF1, HPA, Ca, phosphate
+    # 输出端口（供其他模块）: metabolic_rate, insulin_factor, glucagon_factor, cortisol_factor, calcium_factor, growth_factor
+
+    def derivatives(self, dt: float) -> tuple[dict, dict]:
+        """
+        返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
+
+        Returns:
+            (dydt, outputs):
+              dydt: dict[str, float] — 状态变量导数
+              outputs: dict[str, float] — 供其他模块使用的输出端口
+        """
+        self._elapsed_s += dt
+        glucose = self.blood.glucose_mmol_L
+
+        # ── 甲状腺轴 ───────────────────────────────────────────────────────
+        circadian_T3 = 5.0 * math.sin(2.0 * math.pi * self._elapsed_s / 86400.0)
+        T3_target = BASELINE_T3_NG_DL + circadian_T3
+        tau = THYROID_TAU_SEC
+        dT3 = (T3_target - self.T3_ng_dL) / tau if tau > 0 else 0.0
+        self.T3_ng_dL = max(0.0, self.T3_ng_dL + dT3 * dt)
+        self.T4_ug_dL = self.T3_ng_dL * 0.015
+        baseline_ratio = self.T3_ng_dL / BASELINE_T3_NG_DL
+        metabolic_rate = max(METABOLIC_RATE_MIN, min(METABOLIC_RATE_MAX, METABOLIC_RATE_NORMAL * baseline_ratio))
+        T3_factor = self.T3_ng_dL / BASELINE_T3_NG_DL
+
+        # 体温
+        dt_min = dt / 60.0
+        heat_drift = (metabolic_rate - METABOLIC_RATE_NORMAL) * 0.05 * dt_min
+        self.blood.core_temperature_C = max(37.0, min(42.0, self.blood.core_temperature_C + heat_drift))
+        baseline_pull = (38.5 - self.blood.core_temperature_C) * 0.001
+        self.blood.core_temperature_C = max(37.0, min(42.0, self.blood.core_temperature_C + baseline_pull))
+
+        # ── 胰腺轴 ────────────────────────────────────────────────────────
+        if glucose > INSULIN_HYPERGLYCEMIA_THRESHOLD:
+            excess_ratio = (glucose - INSULIN_HYPERGLYCEMIA_THRESHOLD) / INSULIN_HYPERGLYCEMIA_THRESHOLD
+            insulin_target = BASELINE_INSULIN_UU_ML * (1.0 + 2.0 * excess_ratio)
+        else:
+            insulin_target = BASELINE_INSULIN_UU_ML
+
+        if glucose < GLUCAGON_HYPOGLYCEMIA_THRESHOLD:
+            deficit_ratio = (GLUCAGON_HYPOGLYCEMIA_THRESHOLD - glucose) / GLUCAGON_HYPOGLYCEMIA_THRESHOLD
+            glucagon_target = BASELINE_GLUCAGON_PG_ML * (1.0 + 3.0 * deficit_ratio)
+        else:
+            glucagon_target = BASELINE_GLUCAGON_PG_ML
+
+        tau = PANCREATIC_RESPONSE_TAU_SEC
+        dInsulin = (insulin_target - self.insulin_uU_mL) / tau if tau > 0 else 0.0
+        dGlucagon = (glucagon_target - self.glucagon_pg_mL) / tau if tau > 0 else 0.0
+        self.insulin_uU_mL = max(0.0, self.insulin_uU_mL + dInsulin * dt)
+        self.glucagon_pg_mL = max(0.0, self.glucagon_pg_mL + dGlucagon * dt)
+        insulin_factor = self.insulin_uU_mL / BASELINE_INSULIN_UU_ML
+        glucagon_factor = self.glucagon_pg_mL / BASELINE_GLUCAGON_PG_ML
+
+        # 被动血糖调节
+        insulin_effect = (insulin_factor - 1.0) * 0.01 * dt
+        glucagon_effect = (1.0 - glucagon_factor) * 0.005 * dt
+        net_glucose_shift = insulin_effect - glucagon_effect
+        if self.insulin_uU_mL > BASELINE_INSULIN_UU_ML * 1.5:
+            self.blood.glucose_mmol_L = max(2.0, self.blood.glucose_mmol_L + net_glucose_shift)
+        elif self.glucagon_pg_mL > BASELINE_GLUCAGON_PG_ML * 1.5:
+            self.blood.glucose_mmol_L = min(12.0, self.blood.glucose_mmol_L - net_glucose_shift)
+
+        # ── 肾上腺轴 ───────────────────────────────────────────────────────
+        baseline_activity = 0.05
+        self.HPA_axis = max(self.HPA_axis, baseline_activity)
+        if self._stress_input > 0.1:
+            growth_rate = 0.01 * self._stress_input
+            self.HPA_axis += growth_rate * self.HPA_axis * (1.0 - self.HPA_axis) * dt
+            self.HPA_axis = max(0.0, min(1.0, self.HPA_axis))
+
+        cortisol_range = CORTISOL_STRESS_MAX - BASELINE_CORTISOL_UG_DL
+        cortisol_target = BASELINE_CORTISOL_UG_DL + cortisol_range * self.HPA_axis
+        tau = CORTISOL_TAU_SEC
+        dCortisol = (cortisol_target - self.cortisol_ug_dL) / tau if tau > 0 else 0.0
+        self.cortisol_ug_dL = max(0.0, self.cortisol_ug_dL + dCortisol * dt)
+        cortisol_factor = self.cortisol_ug_dL / BASELINE_CORTISOL_UG_DL
+        self.epinephrine_pg_mL = BASELINE_EPINEPHRINE_PG_ML * (1.0 + 5.0 * self.HPA_axis)
+        self.norepinephrine_pg_mL = BASELINE_NOREPINEPHRINE_PG_ML * (1.0 + 3.0 * self.HPA_axis)
+        self._stress_input = max(0.0, self._stress_input - 0.01 * dt)
+
+        # ── 甲状旁腺轴 ────────────────────────────────────────────────────
+        calcium_deviation = CALCIUM_NORMAL_LOW - self.calcium_mg_dL
+        if calcium_deviation > 0:
+            pth_stimulus = calcium_deviation * PTH_CALCIUM_SENSITIVITY
+            pth_target = BASELINE_PTH_PG_ML * (1.0 + pth_stimulus)
+        else:
+            pth_target = BASELINE_PTH_PG_ML
+
+        tau = PTH_TAU_SEC
+        dPTH = (pth_target - self.PTH_pg_mL) / tau if tau > 0 else 0.0
+        self.PTH_pg_mL = max(0.0, self.PTH_pg_mL + dPTH * dt)
+
+        if abs(calcium_deviation) > 0.5:
+            self.calcium_mg_dL += calcium_deviation * 0.002 * dt
+
+        phosphate_error = self.blood.phosphate_mg_dL - BASELINE_PHOSPHATE_MG_DL
+        if self.PTH_pg_mL > BASELINE_PTH_PG_ML:
+            self.phosphate_mg_dL = max(1.5, self.phosphate_mg_dL - 0.001 * (self.PTH_pg_mL / BASELINE_PTH_PG_ML - 1.0) * dt)
+
+        calcium_factor = self.calcium_mg_dL / BASELINE_CALCIUM_MG_DL
+        self.blood.PTH_pg_mL = self.PTH_pg_mL
+        self.blood.calcium_mg_dL = self.calcium_mg_dL
+        self.blood.phosphate_mg_dL = self.phosphate_mg_dL
+
+        # ── 生长轴 ─────────────────────────────────────────────────────────
+        nutrition_factor = 1.0
+        if glucose < 3.5:
+            nutrition_factor = 0.5
+        if self.blood.albumin_g_dL < 2.5:
+            nutrition_factor = 0.7
+
+        igf1_target = BASELINE_IGF1_NMOL_L * nutrition_factor
+        tau = GROWTH_TAU_SEC
+        dIGF1 = (igf1_target - self.IGF1_nmol_L) / tau if tau > 0 else 0.0
+        self.IGF1_nmol_L = max(0.0, self.IGF1_nmol_L + dIGF1 * dt)
+        growth_factor = self.IGF1_nmol_L / BASELINE_IGF1_NMOL_L
+        self.GH_ng_mL = BASELINE_GH_NG_ML * (0.8 + 0.2 * growth_factor)
+        if growth_factor > 1.05:
+            self.blood.albumin_g_dL = min(4.5, self.blood.albumin_g_dL + (growth_factor - 1.0) * 0.001 * dt)
+
+        dydt = {
+            "T3": dT3,
+            "insulin": dInsulin,
+            "glucagon": dGlucagon,
+            "cortisol": dCortisol,
+            "PTH": dPTH,
+            "IGF1": dIGF1,
+            "HPA_axis": 0.0,
+            "calcium": 0.0,
+            "phosphate": 0.0,
+        }
+
+        outputs = {
+            "metabolic_rate": metabolic_rate,
+            "T3_factor": T3_factor,
+            "insulin_factor": insulin_factor,
+            "glucagon_factor": glucagon_factor,
+            "cortisol_factor": cortisol_factor,
+            "calcium_factor": calcium_factor,
+            "growth_factor": growth_factor,
+            "core_temperature_C": self.blood.core_temperature_C,
+            "epinephrine_pg_mL": self.epinephrine_pg_mL,
+            "norepinephrine_pg_mL": self.norepinephrine_pg_mL,
+            "GH_ng_mL": self.GH_ng_mL,
+        }
+
+        return dydt, outputs
+
     # ══════════════════════════════════════════════════════════
     # 甲状腺轴
     # ══════════════════════════════════════════════════════════

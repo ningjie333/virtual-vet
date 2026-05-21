@@ -90,6 +90,97 @@ class LungModule:
             rr_rest=base_RR / 60.0,  # 转换为 Hz
         )
 
+    # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
+    # 状态变量（进入统一 y 向量）: RR, TV, VQ_ratio
+    # 输出端口（供其他模块）: arterial_PO2, arterial_PCO2, arterial_saturation, minute_vent
+
+    def derivatives(self, dt: float, co_input: float = None) -> tuple[dict, dict]:
+        """
+        返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
+
+        Args:
+            dt: 时间步长（秒）
+            co_input: 心输出量 mL/min（来自心脏模块，若为 None 则用当前 self.cardiac_output）
+
+        Returns:
+            (dydt, outputs):
+              dydt: dict[str, float] — 状态变量导数
+              outputs: dict[str, float] — 供其他模块使用的输出端口
+        """
+        # ── 1. 分钟通气量（代数） ─────────────────────────────────────────────
+        minute_ventilation = self.respiratory_rate * self.tidal_volume  # mL/min
+
+        # ── 2. PACO2（代数） ──────────────────────────────────────────────────
+        vent_ratio = minute_ventilation / self.base_minute_ventilation
+        alveolar_PCO2 = 40.0 / vent_ratio
+        alveolar_PCO2 = max(15.0, min(80.0, alveolar_PCO2))
+
+        # ── 3. PAO2（代数） ──────────────────────────────────────────────────
+        alveolar_PO2 = self._alveolar_gas_equation(
+            self.respiratory_rate, self.tidal_volume, alveolar_PCO2)
+
+        # ── 4. 气体扩散（代数） ──────────────────────────────────────────────
+        PO2_gradient = alveolar_PO2 - self.blood.arterial_PO2_mmHg
+        VO2 = self.diffusion_coefficient * PO2_gradient * self.VQ_ratio
+        VO2 = max(0.0, VO2)
+        self.O2_consumption = VO2
+
+        PCO2_gradient = self.blood.venous_PCO2_mmHg - alveolar_PCO2
+        VCO2 = self.diffusion_coefficient * 0.2 * PCO2_gradient * self.VQ_ratio
+        VCO2 = max(0.0, VCO2)
+        self.CO2_production = VCO2
+
+        # ── 5. 动脉血气（代数） ──────────────────────────────────────────────
+        aa_gradient = 10.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 30.0
+        a_PO2 = max(40.0, min(110.0, alveolar_PO2 - aa_gradient))
+        a_PCO2 = max(15.0, min(80.0, alveolar_PCO2))
+        self.blood.arterial_PO2_mmHg = a_PO2
+        self.blood.arterial_PCO2_mmHg = a_PCO2
+
+        # ── 6. 血氧饱和度（代数） ───────────────────────────────────────────
+        self.blood.arterial_saturation = self._oxygen_saturation_curve(a_PO2)
+
+        # ── 7. pH（代数） ─────────────────────────────────────────────────────
+        HCO3 = HCO3_EXTRACELLULAR_MEQ_L
+        pH = 6.1 + math.log10(HCO3 / (0.03 * a_PCO2)) if a_PCO2 > 0 else 7.4
+        self.blood.arterial_pH = max(7.0, min(7.8, pH))
+
+        # ── 8. VdP 振荡器推进（获取目标 RR/TV） ──────────────────────────────
+        self._vdp.update(pco2=a_PCO2, po2=a_PO2, ph=self.blood.arterial_pH)
+        target_rr = self._vdp.respiratory_rate
+        target_tv_factor = 1.0 + 0.7 * max(0.0, (self._vdp.amplitude - 0.8) / 1.2) if self._vdp.amplitude > 0.8 else 1.0
+        target_tv = self.base_tidal_volume * target_tv_factor
+
+        # ── 9. 状态变量导数（dRR/dt, dTV/dt） ────────────────────────────────
+        alpha = min(1.0, dt / 0.5)
+        dRR = (target_rr - self.respiratory_rate) * alpha
+        dTV = (target_tv - self.tidal_volume) * alpha
+
+        # VQ_ratio 缓慢适应（由其他模块调节，本身为慢变量）
+        dVQ = 0.0  # 保持不变
+
+        dydt = {
+            "RR": dRR,
+            "TV": dTV,
+            "VQ": dVQ,
+        }
+
+        outputs = {
+            "arterial_PO2_mmHg": a_PO2,
+            "arterial_PCO2_mmHg": a_PCO2,
+            "arterial_saturation": self.blood.arterial_saturation,
+            "minute_ventilation": minute_ventilation,
+            "O2_consumption_mL_min": VO2,
+            "CO2_production_mL_min": VCO2,
+            "alveolar_PO2_mmHg": alveolar_PO2,
+            "alveolar_PCO2_mmHg": alveolar_PCO2,
+            "vdp_amplitude": self._vdp.amplitude,
+            "vdp_phase": self._vdp.phase,
+            "vdp_is_inspiration": self._vdp.is_inspiration,
+        }
+
+        return dydt, outputs
+
     def _alveolar_gas_equation(self, RR: float, Vt: float, PACO2: float) -> float:
         """
         肺泡气体方程

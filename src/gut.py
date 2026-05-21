@@ -62,6 +62,91 @@ class GutModule:
         self._TAU_GASTRIC_EMPTYING = 5.0   # 胃排空时间常数 min
         self._TAU_ABSORPTION = 3.0         # 吸收时间常数 min
 
+    # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
+    # 状态变量（进入统一 y 向量）: gut_motility, barrier_integrity, microbiome_activity
+    # 输出端口（供其他模块）: portal_flow, amino_acids_g_L, fatty_acids_mmol_L
+
+    def derivatives(self, dt: float, co_input: float) -> tuple[dict, dict]:
+        """
+        返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
+
+        Args:
+            dt: 时间步长（秒）
+            co_input: 心输出量 mL/min
+
+        Returns:
+            (dydt, outputs):
+              dydt: dict[str, float] — 状态变量导数
+              outputs: dict[str, float] — 供其他模块使用的输出端口
+        """
+        # ── 1. 门静脉血流（代数） ─────────────────────────────────────────────
+        portal_flow = 0.15 * co_input
+
+        # ── 2. 胃排空（代数，腔内营养作为缓存） ───────────────────────────────
+        dt_min = dt / 60.0
+        # 一阶衰减：dLumen/dt = -Lumen / tau（转化为导数）
+        # 慢变量，仅在有食物时需要更新
+        dLumen_glucose = -self.lumen_glucose_g / self._TAU_GASTRIC_EMPTYING * dt_min / dt if self.lumen_glucose_g > 0 else 0.0
+        dLumen_amino = -self.lumen_amino_g / self._TAU_GASTRIC_EMPTYING * dt_min / dt if self.lumen_amino_g > 0 else 0.0
+        dLumen_fat = -self.lumen_fat_g / self._TAU_GASTRIC_EMPTYING * dt_min / dt if self.lumen_fat_g > 0 else 0.0
+
+        # ── 3. 吸收（代数） ───────────────────────────────────────────────────
+        efficiency = (
+            self.base_absorption_rate
+            * self.gut_motility
+            * self.barrier_integrity
+            * (0.5 + 0.5 * self.microbiome_activity)
+        )
+        glucose_rate = (self.lumen_glucose_g / self._TAU_ABSORPTION) if self.lumen_glucose_g > 0 else 0.0
+        amino_rate = (self.lumen_amino_g / self._TAU_ABSORPTION) if self.lumen_amino_g > 0 else 0.0
+        fat_rate = (self.lumen_fat_g / self._TAU_ABSORPTION) if self.lumen_fat_g > 0 else 0.0
+
+        glucose_abs = min(self.lumen_glucose_g, glucose_rate * dt * efficiency)
+        amino_abs = min(self.lumen_amino_g, amino_rate * dt * efficiency)
+        fat_abs = min(self.lumen_fat_g, fat_rate * dt * efficiency)
+
+        # ── 4. SCFA（慢动力学） ───────────────────────────────────────────────
+        target_scfa = self.microbiome_activity * 0.3
+        dSCFA = (target_scfa - self.SCFA_mmol_L) * dt / 10.0
+
+        # ── 5. 血液门静脉缓存（代数） ────────────────────────────────────────
+        if portal_flow > 0:
+            amino_conc_g_L = (amino_abs / portal_flow) * 1000.0
+            fat_conc_mmol_L = (fat_abs / portal_flow) * 1000.0 / 0.885
+            self.blood.amino_acids_g_L = max(0.0, amino_conc_g_L)
+            self.blood.fatty_acids_mmol_L = max(0.0, fat_conc_mmol_L)
+        else:
+            self.blood.amino_acids_g_L = 0.0
+            self.blood.fatty_acids_mmol_L = 0.0
+
+        # ── 6. 存储吸收数据（供 liver 耦合） ─────────────────────────────────
+        self._portal_glucose_absorption_g_min = glucose_abs / dt if dt > 0 else 0.0
+        self._portal_amino_absorption_g_min = amino_abs / dt if dt > 0 else 0.0
+        self._portal_fat_absorption_g_min = fat_abs / dt if dt > 0 else 0.0
+
+        # 状态变量导数（慢变量，主要由外部因子驱动）
+        # motility, barrier, microbiome 本身由疾病调制，这里设为其慢变导数为 0
+        dydt = {
+            "motility": 0.0,
+            "barrier": 0.0,
+            "microbiome": 0.0,
+            "lumen_glucose": dLumen_glucose,
+            "lumen_amino": dLumen_amino,
+            "lumen_fat": dLumen_fat,
+            "SCFA": dSCFA,
+        }
+
+        outputs = {
+            "portal_blood_flow_mL_min": portal_flow,
+            "amino_acids_g_L": self.blood.amino_acids_g_L,
+            "fatty_acids_mmol_L": self.blood.fatty_acids_mmol_L,
+            "glucose_absorption_g_min": self._portal_glucose_absorption_g_min,
+            "amino_absorption_g_min": self._portal_amino_absorption_g_min,
+            "fat_absorption_g_min": self._portal_fat_absorption_g_min,
+        }
+
+        return dydt, outputs
+
     def _update_portal_flow(self, CO: float):
         """更新门静脉血流量（≈15% CO）"""
         self.portal_blood_flow = 0.15 * CO

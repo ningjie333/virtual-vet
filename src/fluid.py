@@ -161,6 +161,72 @@ class FluidCompartment:
         self.cumulative_vascular_input_ml = 0.0
         self.cumulative_vascular_loss_ml = 0.0
 
+    # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
+    # 状态变量（进入统一 y 向量）: vascular_volume, isf_volume, icf_volume
+    # 输出端口（供其他模块）: starling_flow, osmotic_shift, nfp
+
+    def derivatives(self, dt: float, map_input: float = None) -> tuple[dict, dict]:
+        """
+        返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
+
+        Args:
+            dt: 时间步长（秒）
+            map_input: 平均动脉压 mmHg（影响毛细血管静水压，若为 None 则用当前值）
+
+        Returns:
+            (dydt, outputs):
+              dydt: dict[str, float] — 状态变量导数（mL/s）
+              outputs: dict[str, float] — 供其他模块使用的输出端口
+        """
+        if map_input is None:
+            map_input = self.capillary_hydrostatic_mmHg
+
+        # ── 1. Starling Forces（代数） ─────────────────────────────────────────
+        hydrostatic_gradient = map_input - BASE_TISSUE_HYDROSTATIC_MMHG
+        osmotic_gradient = BASE_PLASMA_COLLOID_MMHG - BASE_TISSUE_COLLOID_MMHG
+        nfp = hydrostatic_gradient - osmotic_gradient
+
+        # ── 2. ISF↔ICF 渗透压梯度（代数） ───────────────────────────────────
+        isf_osm = 2.0 * self.isf_na_meq_l
+        icf_osm = 2.0 * self.icf_k_meq_l
+        osmotic_gradient_isf_icf = isf_osm - icf_osm
+
+        # ── 3. 交换量（导数 = 速率，不乘 dt） ────────────────────────────────
+        # Starling: exchange_mL/min = Kf × NFP
+        starling_rate_ml_min = Kf_ML_MIN_MMHG * nfp
+        # 转换为 mL/s
+        starling_rate_ml_s = starling_rate_ml_min / 60.0
+
+        # 限幅（稳定区域）
+        max_rate = min(abs(self.vascular_volume_ml), abs(self.isf_volume_ml)) * 0.05 / dt if dt > 0 else 0.05 / 0.1
+        starling_rate_ml_s = max(-max_rate, min(max_rate, starling_rate_ml_s))
+
+        # Osmotic: shift_mL/s = LP × osmotic_gradient
+        osmotic_rate_ml_s = LP_ISF_ICF * osmotic_gradient_isf_icf
+        max_osm_rate = min(self.isf_volume_ml, self.icf_volume_ml) * 0.02 / dt if dt > 0 else 0.02 / 0.1
+        osmotic_rate_ml_s = max(-max_osm_rate, min(max_osm_rate, osmotic_rate_ml_s))
+
+        dV_vascular = -starling_rate_ml_s
+        dV_isf = starling_rate_ml_s - osmotic_rate_ml_s
+        dV_icf = osmotic_rate_ml_s
+
+        dydt = {
+            "V_vascular": dV_vascular,
+            "V_isf": dV_isf,
+            "V_icf": dV_icf,
+        }
+
+        outputs = {
+            "starling_flow_mL_min": starling_rate_ml_min,
+            "osmotic_shift_mL_min": osmotic_rate_ml_s * 60.0,
+            "nfp_mmHg": nfp,
+            "vascular_osmolality": self.vascular_osmolality,
+            "isf_osmolality": isf_osm,
+            "icf_osmolality": icf_osm,
+        }
+
+        return dydt, outputs
+
     # ── 外部操作 ────────────────────────────────────────────────────────────
 
     def add_vascular_fluid(self, volume_ml: float) -> None:

@@ -88,6 +88,125 @@ class KidneyModule:
         # 尿量导致的循环血量损失
         self.blood_volume_loss_rate = 0.0  # mL/min
 
+    # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
+    # 状态变量（进入统一 y 向量）: GFR, RBF, urine_output, ADH
+    # 输出端口（供其他模块）: bun, creatinine, plasma_osmolality, blood_volume_loss_rate
+
+    def derivatives(self, dt: float, map_input: float, cvp_input: float, co_input: float) -> tuple[dict, dict]:
+        """
+        返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
+
+        Args:
+            dt: 时间步长（秒）
+            map_input: 平均动脉压 mmHg
+            cvp_input: 中心静脉压 mmHg
+            co_input: 心输出量 mL/min
+
+        Returns:
+            (dydt, outputs):
+              dydt: dict[str, float] — 状态变量导数
+              outputs: dict[str, float] — 供其他模块使用的输出端口
+        """
+        # ── 1. 肾血流量（与心输出量成正比，代数） ─────────────────────────────
+        co_fraction = co_input / base_cardiac_output_ml_min(self.w)
+        renal_blood_flow = self.base_renal_blood_flow * co_fraction
+
+        # ── 2. RAAS 系统（代数） ─────────────────────────────────────────────
+        map_deficit = (MEAN_ARTERIAL_PRESSURE_MMHG - map_input) / MEAN_ARTERIAL_PRESSURE_MMHG
+        Na_conc = self.blood.sodium_mEq_L
+        Na_deficit = max(0.0, (145.0 - Na_conc) / 145.0)
+
+        renin = max(0.0, 0.5 * map_deficit + 0.5 * Na_deficit)
+        angiotensin_II = renin * 2.0
+        aldosterone = angiotensin_II * 0.5
+
+        water_reabsorption = min(0.999, TUBULAR_WATER_REABSORPTION * (1.0 + 0.1 * aldosterone))
+
+        # ── 3. GFR（代数） ───────────────────────────────────────────────────
+        PGC = map_input * _GFR_PGC_MAP_RATIO
+        PBS = cvp_input + _GFR_PBS_CVP_OFFSET
+        plasma_colloid = PLASMA_COLLOID_OSMOTIC_MMHG
+        filtration_pressure = PGC - PBS - plasma_colloid
+        Kf = _GFR_KF
+        GFR = max(0.0, Kf * filtration_pressure) * self._disease_gfr_multiplier
+
+        # ── 4. 钠平衡（代数） ─────────────────────────────────────────────────
+        filtered_sodium_load = GFR * Na_conc
+        reabsorp_rate = min(0.999, 0.99 * (1.0 + 0.01 * aldosterone))
+        reabsorbed_sodium = filtered_sodium_load * reabsorp_rate
+        excreted_sodium = filtered_sodium_load - reabsorbed_sodium
+
+        # ── 5. 尿量（代数） ───────────────────────────────────────────────────
+        filtered_water = GFR
+        proximal_reabsorption = 0.67 * filtered_water
+        distal_reabsorption_fraction = 0.97 + 0.013 * self.ADH_level
+        distal_reabsorption = (filtered_water - proximal_reabsorption) * distal_reabsorption_fraction
+        urine_output = max(0.0, filtered_water - proximal_reabsorption - distal_reabsorption)
+
+        # 渗透性利尿
+        glucose = self.blood.glucose_mmol_L
+        if glucose > 8.0:
+            urine_output *= (1.0 + (glucose - 8.0) * 0.3)
+
+        # MAP 无尿阈值
+        if map_input < 60.0:
+            map_factor = max(0.0, (map_input - 30.0) / 30.0)
+            urine_output *= map_factor
+
+        # ── 6. 血浆渗透压（代数） ────────────────────────────────────────────
+        plasma_osmolality = 2 * Na_conc + 5 + 10
+
+        # ── 7. BUN / 肌酐（代数 + 低通） ───────────────────────────────────
+        if GFR > 0.5:
+            bun_target = (self.base_GFR / GFR) * 15.0
+        else:
+            bun_target = 150.0
+        bun_target = min(150.0, bun_target)
+        dBUN = (bun_target - self.blood.bun_mg_dL) * 0.05
+        self.blood.bun_mg_dL = max(5.0, self.blood.bun_mg_dL + dBUN * dt)
+
+        if GFR > 0.01:
+            crea_target = (self.base_GFR / GFR) * 1.0
+        else:
+            crea_target = 5.0
+        crea_target = min(5.0, crea_target)
+        dCreat = (crea_target - self.blood.creatinine_mg_dL) * 0.1
+        self.blood.creatinine_mg_dL = max(0.5, self.blood.creatinine_mg_dL + dCreat * dt)
+
+        # ── 8. ADH（代数） ──────────────────────────────────────────────────
+        osmotic_pressure = plasma_osmolality - 295.0
+        if osmotic_pressure > 10:
+            ADH_target = min(1.0, self.ADH_level + 0.1 * osmotic_pressure / 10)
+        else:
+            ADH_target = max(0.1, self.ADH_level - 0.01)
+        dADH = (ADH_target - self.ADH_level) * min(1.0, dt / 5.0)
+
+        # ── 9. 血容量损失率（代数） ─────────────────────────────────────────
+        blood_volume_loss_rate = urine_output * 0.30
+
+        dydt = {
+            "GFR": 0.0,  # 代数约束（MAP/CVP 决定，无固有动力学）
+            "RBF": 0.0,  # 与 CO 强耦合，无独立动力学
+            "urine_output": 0.0,  # GFR 和 ADH 决定，无固有动力学
+            "ADH": dADH,
+        }
+
+        outputs = {
+            "bun_mg_dL": self.blood.bun_mg_dL,
+            "creatinine_mg_dL": self.blood.creatinine_mg_dL,
+            "plasma_osmolality_mOsm_kg": plasma_osmolality,
+            "blood_volume_loss_rate_mL_min": blood_volume_loss_rate,
+            "urine_output_mL_min": urine_output,
+            "renin_activity": renin,
+            "angiotensin_II": angiotensin_II,
+            "aldosterone": aldosterone,
+            "ADH_level": self.ADH_level,
+            "filtered_sodium_mEq_min": filtered_sodium_load,
+            "excreted_sodium_mEq_min": excreted_sodium,
+        }
+
+        return dydt, outputs
+
     def _apply_RAAS(self, MAP: float, CVP: float, Na_conc: float):
         """
         肾素-血管紧张素-醛固酮系统（RAAS）

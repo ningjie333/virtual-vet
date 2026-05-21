@@ -61,6 +61,103 @@ class CoagulationModule:
         # 肝脏健康（用于因子合成计算）
         self._liver_health = 1.0
 
+    # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
+    # 状态变量（进入统一 y 向量）: factor_VII, factor_V, factor_II, factor_IX, factor_X, factor_XI, fibrinogen, coagulation_state
+    # 输出端口（供其他模块）: PT_sec, aPTT_sec, coagulation_state, fibrinogen
+
+    def derivatives(self, dt: float, liver_health_factor: float = 1.0, immune_cytokine: float = 0.0) -> tuple[dict, dict]:
+        """
+        返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
+
+        Returns:
+            (dydt, outputs):
+              dydt: dict[str, float] — 状态变量导数
+              outputs: dict[str, float] — 供其他模块使用的输出端口
+        """
+        dt_min = dt / 60.0
+
+        # ── 炎症抑制因子 ────────────────────────────────────────────────────
+        cytokine = self.blood.cytokine_level if immune_cytokine == 0.0 else immune_cytokine
+        if cytokine > 0.4:
+            suppression = (cytokine - 0.4) / 0.6 * 0.6
+            inflammation_factor = max(0.4, 1.0 - suppression)
+        else:
+            inflammation_factor = 1.0
+
+        # ── 因子动力学 ────────────────────────────────────────────────────
+        synthesis_rate = 0.005 * dt_min * liver_health_factor * inflammation_factor
+        decay_rate = 0.001 * dt_min
+
+        factors = ["factor_VII", "factor_V", "factor_II", "factor_IX", "factor_X", "factor_XI"]
+        factor_derivatives = {}
+        for name in factors:
+            current = getattr(self, name)
+            baseline_synthesis = 0.0000001
+            if current < 1.0:
+                synthesis = synthesis_rate * (1.0 - current) + baseline_synthesis
+            else:
+                synthesis = baseline_synthesis
+            decay = decay_rate * (current - 0.3) if current > 0.3 else 0.0
+            new_val = current + synthesis - decay
+            new_val = max(0.05, min(1.5, new_val))
+            setattr(self, name, new_val)
+            dFactor = (new_val - current) / dt if dt > 0 else 0.0
+            factor_derivatives[name] = dFactor
+
+        # ── PT / aPTT（写入 blood） ─────────────────────────────────────────
+        effective_pt = self.factor_VII * self.factor_X * self.factor_V * self.factor_II
+        effective_pt = max(0.1, effective_pt)
+        pt_sec = max(10.0, min(60.0, 12.0 / effective_pt))
+
+        effective_aptt = self.factor_VII * 0.5 + self.factor_IX * self.factor_XI * self.factor_X
+        effective_aptt = max(0.1, effective_aptt)
+        aptt_sec = max(20.0, min(120.0, 30.0 / effective_aptt))
+
+        tau_pt = 300.0
+        alpha_pt = dt / tau_pt if tau_pt > 0 else 1.0
+        self.blood.PT_sec += alpha_pt * (pt_sec - self.blood.PT_sec)
+        self.blood.aPTT_sec += alpha_pt * (aptt_sec - self.blood.aPTT_sec)
+
+        # ── 纤维蛋白原 ─────────────────────────────────────────────────────
+        if cytokine > 0.3:
+            fibrin_synthesis = (cytokine - 0.3) / 0.7 * 0.5 * dt_min
+        else:
+            fibrin_synthesis = 0.0
+
+        if self.coagulation_state > 0.5:
+            fibrin_consumption = self.coagulation_state * 0.005 * dt_min
+        else:
+            fibrin_consumption = 0.0
+
+        fibrin_net = fibrin_synthesis - fibrin_consumption
+        self.fibrinogen = max(50.0, min(800.0, self.fibrinogen + fibrin_net))
+        self.blood.fibrinogen_mg_dL = self.fibrinogen
+        dFibrinogen = fibrin_net / dt if dt > 0 else 0.0
+
+        # ── 凝血状态 ─────────────────────────────────────────────────────
+        target_coag_state = self._compute_coagulation_state()
+        tau_coag = 900.0
+        dCoag = (target_coag_state - self.coagulation_state) / tau_coag if tau_coag > 0 else 0.0
+        self.coagulation_state = max(0.0, min(1.0, self.coagulation_state + dCoag * dt))
+        self.blood.coagulation_state = self.coagulation_state
+
+        dydt = {**factor_derivatives, "fibrinogen": dFibrinogen, "coagulation_state": dCoag}
+
+        outputs = {
+            "PT_sec": self.blood.PT_sec,
+            "aPTT_sec": self.blood.aPTT_sec,
+            "coagulation_state": self.coagulation_state,
+            "fibrinogen_mg_dL": self.fibrinogen,
+            "factor_VII": self.factor_VII,
+            "factor_V": self.factor_V,
+            "factor_II": self.factor_II,
+            "factor_IX": self.factor_IX,
+            "factor_X": self.factor_X,
+            "factor_XI": self.factor_XI,
+        }
+
+        return dydt, outputs
+
     def _compute_liver_synthesis(self, liver_state: dict) -> float:
         """
         计算肝脏合成因子能力。

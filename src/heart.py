@@ -25,6 +25,9 @@ class HeartModule:
     """
     心血管模块：模拟心脏泵血功能与血压调节
     状态变量：HR, SV, MAP, CVP, blood_volume
+
+    derivatives() 方法为 P0-B（统一 Radau 求解器）提供导数。
+    compute() 保持向后兼容（Euler 步进，供 step() 使用）。
     """
 
     def __init__(
@@ -33,8 +36,8 @@ class HeartModule:
         blood,
         HR_rest: float = HEART_RATE_REST_BPM,
         HR_max: float = HEART_RATE_STRESS_BPM,
-        sv_ml: float = None,           # 若为 None 则按 1.0 mL/kg 计算
-        base_co_ml_min: float = None,  # 若为 None 则按 HR_rest × sv_ml 计算
+        sv_ml: float = None,
+        base_co_ml_min: float = None,
         SVR: float = SYSTEMIC_VASCULAR_RESISTANCE,
         MAP_baseline: float = 60.0,
         MAP_target: float = MEAN_ARTERIAL_PRESSURE_MMHG,
@@ -47,25 +50,25 @@ class HeartModule:
         self.HR_max = HR_max
         self.heart_rate = HR_rest
 
-        # 每搏输出量（外部传入或按 1.0 mL/kg 计算）
+        # 每搏输出量
         _sv = sv_ml if sv_ml is not None else 1.0 * weight_kg
         self.base_SV = _sv
         self.stroke_volume = _sv
 
-        # 血管阻力（mmHg·s/mL = PRU）
+        # 血管阻力
         self.SVR = SVR
         self.SVR_baseline = SVR
-        self.SVR_max = SVR * 3.0  # 交感神经最大收缩时的阻力
+        self.SVR_max = SVR * 3.0
 
         # 血压
-        self.MAP_baseline = MAP_baseline  # 基础血管张力（mmHg）
+        self.MAP_baseline = MAP_baseline
         self.MAP_target = MAP_target
         self.mean_arterial_pressure = MAP_target
         self.central_venous_pressure = CENTRAL_VENOUS_PRESSURE_MMHG
         self.pulmonary_arterial_pressure = PULMONARY_ARTERIAL_PRESSURE_MMHG
 
         # 血液动力学
-        self.cardiac_output = self.heart_rate * self.stroke_volume  # mL/min（直接初始化，避免 CO=0 at t=0）
+        self.cardiac_output = self.heart_rate * self.stroke_volume
 
         # 循环血量
         self.total_BV = total_blood_volume_ml(weight_kg)
@@ -84,6 +87,99 @@ class HeartModule:
 
         # 电生理计算器（Noble 1962 浦肯野纤维，扩展 HH）
         self.hh = NoblePurkinjeFiber()
+
+    # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
+    # 状态变量（进入统一 y 向量）: HR, SV, SVR
+    # 输出变量（供其他模块）: CO, MAP, CVP, PAP
+
+    def derivatives(self, dt: float, svr_factor: float = 1.0) -> tuple[dict, dict]:
+        """
+        返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
+
+        不修改任何内部状态，只返回数学导数。
+
+        Args:
+            dt: 时间步长（秒），供低通滤波 time constant 计算用
+            svr_factor: 外部 SVR 倍数（ToxicologyModule 输出，1.0 = 无调制）
+
+        Returns:
+            (dydt, outputs):
+              dydt: dict[str, float] — 状态变量导数
+              outputs: dict[str, float] — 供其他模块使用的输出端口
+        """
+        # ── 1. Frank-Starling: dSV/dt ──────────────────────────────────────
+        vol_ratio = self.circulating_volume_ml / self.total_BV
+        if 0.5 <= vol_ratio <= 1.2:
+            target_SV = self.base_SV * (0.6 + 0.4 * vol_ratio)
+        elif vol_ratio < 0.5:
+            target_SV = self.base_SV * 0.5
+        else:
+            target_SV = self.base_SV * 1.05
+
+        effective_target = target_SV * self.contractility_factor
+        pH_factor = self._pH_contractility_effect(self.blood.arterial_pH)
+        effective_target *= pH_factor
+        coronary_factor = self._coronary_perfusion_effect(self.mean_arterial_pressure)
+        effective_target *= coronary_factor
+
+        alpha_sv = 0.3
+        dSV = (effective_target - self.stroke_volume) * alpha_sv / dt
+        # clamp
+        next_sv = self.stroke_volume + dSV * dt
+        next_sv = max(self.base_SV * 0.15, next_sv)
+        dSV = (next_sv - self.stroke_volume) / dt
+
+        # ── 2. 心输出量（代数） ─────────────────────────────────────────────
+        CO = self.heart_rate * self.stroke_volume
+
+        # ── 3. SVR 代偿（代数+动态） ─────────────────────────────────────────
+        effective_SVR = self.SVR * svr_factor
+        pressure_contribution = (CO / 60.0) * effective_SVR
+        raw_MAP = self.MAP_baseline + pressure_contribution
+        if vol_ratio < 0.7:
+            raw_MAP = raw_MAP * (0.5 + 0.5 * vol_ratio / 0.7)
+        raw_MAP = max(30.0, min(180.0, raw_MAP))
+
+        # ── 4. 压力感受器反馈: dHR/dt, dSVR/dt ──────────────────────────────
+        error = (self.MAP_target - raw_MAP) / self.MAP_target
+
+        sym_target = self._clamp(SYMPATHETIC_BASELINE + 0.7 * max(0.0, error), 0.0, 1.0)
+        d_sym = (sym_target - self.sympathetic) * min(1.0, dt / 2.0) / dt
+
+        para_target = self._clamp(0.7 - 0.5 * error, 0.0, 1.0)
+        d_para = (para_target - self.parasympathetic) * min(1.0, dt / 5.0) / dt
+
+        HR_para = -self.parasympathetic * 15.0 * max(0.0, -error)
+        HR_symp = self.sympathetic * 50.0 * max(0.0, error)
+        dHR = (HR_para + HR_symp) * dt / dt
+        # K⁺ 毒性
+        k_factor = self._potassium_cardiac_effect(self.blood.potassium_mEq_L)
+        dHR_net = dHR * k_factor
+        next_HR = self.heart_rate + dHR_net * dt
+        next_HR = max(5.0, min(self.HR_max, next_HR))
+        dHR = (next_HR - self.heart_rate) / dt
+
+        SVR_increase = 1.0 + 2.0 * self.sympathetic * max(0.0, error)
+        target_SVR = min(self.SVR_max, self.SVR_baseline * SVR_increase)
+        alpha_svr = 0.1
+        dSVR = (target_SVR - self.SVR) * alpha_svr / dt
+
+        dydt = {
+            "HR": dHR,
+            "SV": dSV,
+            "SVR": dSVR,
+        }
+
+        outputs = {
+            "cardiac_output": CO,
+            "MAP": raw_MAP,
+            "CVP": max(0.0, CENTRAL_VENOUS_PRESSURE_MMHG * (1.0 - 0.5 * (1.0 - vol_ratio))),
+            "PAP": max(10.0, min(35.0, raw_MAP * 0.15)),
+            "blood_volume_ratio": vol_ratio,
+            "MAP_filtered": raw_MAP,  # 代数输出，用于低通滤波
+        }
+
+        return dydt, outputs
 
     def blood_volume_change(self, delta_ml: float):
         """外部调用：改变血容量"""

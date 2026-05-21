@@ -57,6 +57,97 @@ class NeuroModule:
         # 用于存储上次状态(计算delta)
         self._prev_heart_rate = 85.0
 
+    # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
+    # 状态变量（进入统一 y 向量）: sympathetic_tone, parasympathetic_tone, consciousness, seizure, pain, chemoreceptor
+    # 输出端口（供其他模块）: chemoreceptor_drive, pain_level, seizure, consciousness
+
+    def derivatives(self, dt: float, map_input: float = None, heart_hr: float = None, lung_rr: float = None) -> tuple[dict, dict]:
+        """
+        返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
+
+        Returns:
+            (dydt, outputs):
+              dydt: dict[str, float] — 状态变量导数
+              outputs: dict[str, float] — 供其他模块使用的输出端口
+        """
+        # 化学感受器驱动
+        PO2 = self.blood.arterial_PO2_mmHg
+        PCO2 = self.blood.arterial_PCO2_mmHg
+        pH = self.blood.arterial_pH
+
+        if PO2 < 70.0:
+            hypoxic_drive = (70.0 - PO2) / 70.0
+        else:
+            hypoxic_drive = 0.0
+
+        if PCO2 > 50.0:
+            hypercapnic_drive = (PCO2 - 50.0) / 50.0
+        else:
+            hypercapnic_drive = 0.0
+
+        if pH < 7.35:
+            acid_drive = (7.35 - pH) / 0.35
+        else:
+            acid_drive = 0.0
+
+        chemoreceptor_drive = min(1.0, hypoxic_drive * 0.3 + hypercapnic_drive * 0.5 + acid_drive * 0.2)
+        self.chemoreceptor_drive = chemoreceptor_drive
+
+        # 疼痛趋向目标值（一阶 lag）
+        dPain = (self._pain_target - self.pain_level) / 10.0 if self._pain_target != self.pain_level else 0.0
+        self.pain_level = max(0.0, min(10.0, self.pain_level + dPain * dt))
+
+        # 癫痫计时器消退
+        if self._seizure_timer > 0:
+            self._seizure_timer = max(0.0, self._seizure_timer - dt)
+            if self._seizure_timer <= 0:
+                self.seizure = 0.0
+
+        # 意识水平（MAP 驱动）
+        if map_input is not None:
+            if map_input < 40.0:
+                consciousness_target = 0.2
+            elif map_input < 60.0:
+                consciousness_target = 0.5 + 0.75 * (map_input - 40.0) / 20.0
+            elif map_input < 80.0:
+                consciousness_target = 0.75 + 0.20 * (map_input - 60.0) / 20.0
+            else:
+                consciousness_target = 1.0
+            dConsciousness = (consciousness_target - self.consciousness) / 30.0
+            self.consciousness = max(0.0, min(1.0, self.consciousness + dConsciousness * dt))
+
+        # 交感/副交感张力（slow adaptation）
+        # 疼痛 → 交感↑; 低灌注 → 交感↑; 癫痫 → 交感风暴
+        pain_sympathetic_effect = self.pain_level / 10.0 * 0.3
+        seizure_sympathetic_effect = self.seizure * 0.4
+        target_sympathetic = max(0.0, min(1.0, 0.3 + pain_sympathetic_effect + seizure_sympathetic_effect + chemoreceptor_drive * 0.2))
+        target_parasympathetic = max(0.0, min(1.0, 0.7 - pain_sympathetic_effect * 0.5))
+
+        dSympathetic = (target_sympathetic - self.sympathetic_tone) / 20.0
+        dParasympathetic = (target_parasympathetic - self.parasympathetic_tone) / 30.0
+        self.sympathetic_tone = max(0.0, min(1.0, self.sympathetic_tone + dSympathetic * dt))
+        self.parasympathetic_tone = max(0.0, min(1.0, self.parasympathetic_tone + dParasympathetic * dt))
+
+        dydt = {
+            "sympathetic_tone": dSympathetic,
+            "parasympathetic_tone": dParasympathetic,
+            "consciousness": dConsciousness if map_input is not None else 0.0,
+            "seizure": 0.0,
+            "pain": dPain,
+            "chemoreceptor": 0.0,
+        }
+
+        outputs = {
+            "chemoreceptor_drive": chemoreceptor_drive,
+            "pain_level": self.pain_level,
+            "seizure": self.seizure,
+            "consciousness": self.consciousness,
+            "sympathetic_tone": self.sympathetic_tone,
+            "parasympathetic_tone": self.parasympathetic_tone,
+        }
+
+        return dydt, outputs
+
     def set_pain_target(self, value: float) -> None:
         """外部调用: 设置疼痛目标值(由疾病通过FactorCommand或直接调用)"""
         self._pain_target = max(0.0, min(10.0, value))

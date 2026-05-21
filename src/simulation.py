@@ -184,6 +184,7 @@ class VirtualCreature:
         body_weight_kg: float = 20.0,
         species: str = "canine",
         age_days: float = 0.0,
+        dt: float = None,
     ):
         self.w = body_weight_kg
         self.species = species
@@ -241,7 +242,7 @@ class VirtualCreature:
 
         # 仿真时间
         self.current_time_s = 0.0
-        self.dt = DT_SECONDS                       # 积分步长（秒）
+        self.dt = DT_SECONDS if dt is None else dt  # dt=None → 0.1s (production); dt=float → override (testing)
 
         # 事件系统
         self.events = []                            # 待处理事件列表
@@ -737,6 +738,99 @@ class VirtualCreature:
                 print(f"  t={t:.1f}s, HR={self.history['HR_bpm'][-1]:.0f}, "
                       f"MAP={self.history['MAP_mmHg'][-1]:.1f}, "
                       f"GFR={self.history['GFR'][-1]:.1f}")
+
+    # ── solve_ivp Radau 引擎（Phase 2: 替换 Euler 求解器）────────────────────────
+
+    def _build_ivp_state_map(self) -> dict[tuple[str, str], int]:
+        """建立 (module_name, var_name) → y-array index 映射表。"""
+        ivp_state_map: dict[tuple[str, str], int] = {}
+        idx = 0
+        for module_name in self._get_ivp_disease_modules():
+            module = getattr(self, module_name)
+            for var_name in module._state_vars:
+                ivp_state_map[(module_name, var_name)] = idx
+                idx += 1
+        return ivp_state_map
+
+    def _get_ivp_disease_modules(self) -> list[str]:
+        """返回带有疾病 ODE 状态变量的模块名列表。"""
+        # 疾病状态存在 disease 模块里
+        modules = []
+        if self.disease is not None and hasattr(self.disease, 'compute_derivatives'):
+            modules.append('disease')
+        return modules
+
+    def _pack_disease_state(self) -> np.ndarray:
+        """将当前疾病状态打包成 numpy 向量 y0。"""
+        state_map = self._build_ivp_state_map()
+        n = len(state_map)
+        y0 = np.zeros(n)
+        for (mname, vname), idx in state_map.items():
+            if mname == 'disease':
+                y0[idx] = self.disease._state_vars[vname]
+        return y0
+
+    def _unpack_disease_state(self, y: np.ndarray) -> None:
+        """将 numpy 向量 y 分解到各疾病模块的 _state_vars。"""
+        state_map = self._build_ivp_state_map()
+        for (mname, vname), idx in state_map.items():
+            if mname == 'disease':
+                self.disease._state_vars[vname] = y[idx]
+
+    def _get_engine_state(self) -> dict:
+        """收集当前血液/器官状态（供导数计算用）。"""
+        return {
+            "heart": {
+                "heart_rate_bpm": self.heart.heart_rate,
+                "MAP_mmHg": self.heart.mean_arterial_pressure,
+                "cardiac_output_ml_min": self.heart.cardiac_output,
+            },
+            "lung": {"arterial_PO2": self.blood.arterial_PO2_mmHg},
+            "kidney": {"GFR_ml_min": self.kidney.GFR},
+        }
+
+    def _ivp_rhs(self, t: float, y: np.ndarray) -> np.ndarray:
+        """ODE 右端函数（供 solve_ivp 调用）。"""
+        self._unpack_disease_state(y)
+        engine_state = self._get_engine_state()
+        state_map = self._build_ivp_state_map()
+        n = len(state_map)
+        dydt = np.zeros(n)
+
+        for (mname, vname), idx in state_map.items():
+            if mname == 'disease':
+                derivs = self.disease.compute_derivatives(engine_state)
+                dydt[idx] = derivs.get(vname, 0.0)
+
+        return dydt
+
+    def run_ivp(self, t_end: float, dt_save: float = 1.0):
+        """使用 Radau 隐式求解器跑 ODE 疾病子系统。
+
+        Args:
+            t_end: 仿真结束时间（秒）
+            dt_save: 采样间隔（秒）
+
+        Returns:
+            solve_ivp result object with sol.t, sol.y
+        """
+        from scipy.integrate import solve_ivp
+
+        y0 = self._pack_disease_state()
+        t_eval = np.arange(0.0, t_end + dt_save, dt_save)
+
+        sol = solve_ivp(
+            self._ivp_rhs,
+            [0.0, t_end],
+            y0,
+            method='Radau',
+            rtol=1e-6,
+            atol=1e-9,
+            t_eval=t_eval,
+            dense_output=True,
+            vectorized=False,
+        )
+        return sol
 
     def run_scenario(self, scenario_name: str):
         """

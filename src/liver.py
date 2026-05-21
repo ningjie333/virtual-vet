@@ -73,6 +73,195 @@ class LiverModule:
         self.cumulative_urea_production_mmol = 0.0
         self.cumulative_albumin_production_g = 0.0
 
+    # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
+    # 状态变量（进入统一 y 向量）: glycogen_fraction, bilirubin_accumulation
+    # 输出端口（供其他模块）: glucose_output, ammonia_umol_L, albumin_g_dL, etc.
+
+    def derivatives(self, dt: float, co_input: float, gut_state: dict) -> tuple[dict, dict]:
+        """
+        返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
+
+        Args:
+            dt: 时间步长（秒）
+            co_input: 心输出量 mL/min
+            gut_state: dict（包含 gut.derivatives() 的输出端口，如 amino_absorption_g_min）
+
+        Returns:
+            (dydt, outputs):
+              dydt: dict[str, float] — 状态变量导数
+              outputs: dict[str, float] — 供其他模块使用的输出端口
+        """
+        dt_min = dt / 60.0
+        dt_hour = dt / 3600.0
+        dt_day = dt / 86400.0
+
+        # ── 1. 肝血流量（代数） ─────────────────────────────────────────────
+        hepatic_flow = 0.25 * co_input
+
+        # ── 2. 葡萄糖稳态（代数 + 状态更新） ───────────────────────────────
+        glucose = self.blood.glucose_mmol_L
+
+        # 低血糖：糖原分解
+        if glucose < 3.5:
+            base_rate = 0.3 * self.glycogen_fraction
+            rate = base_rate * self.metabolic_activity
+            if glucose < 2.5:
+                rate *= 3.0
+            elif glucose < 3.0:
+                rate *= 1.5
+            glycogen_consumed_g = rate * dt_min * _MAX_GLYCOGEN_G
+            dGlycogen = -glycogen_consumed_g / _MAX_GLYCOGEN_G
+            glucose_output = rate
+        else:
+            dGlycogen = 0.0
+            glucose_output = 0.0
+
+        # 高血糖：糖原合成
+        if glucose > 6.0:
+            base_rate = 0.2 * self.metabolic_activity
+            if glucose > 8.0:
+                base_rate *= 2.0
+            elif glucose > 7.0:
+                base_rate *= 1.5
+            glycogen_synthesized_g = base_rate * dt_min * _MAX_GLYCOGEN_G
+            dGlycogen += glycogen_synthesized_g / _MAX_GLYCOGEN_G
+
+        # 氨抑制
+        if self.blood.ammonia_umol_L > 100:
+            glucose_output *= max(0.3, 1.0 - (self.blood.ammonia_umol_L - 100) / 400)
+
+        # 糖异生（利用氨基酸）
+        amino_g_min = gut_state.get("amino_absorption_g_min", 0.0)
+        if glucose < 3.5 and self.metabolic_activity > 0.3:
+            gluconeogenesis = amino_g_min * 0.6 * self.metabolic_activity
+            glucose_output += gluconeogenesis
+
+        self.glycogen_fraction = max(0.0, min(1.0, self.glycogen_fraction + dGlycogen))
+
+        # ── 3. 氨解毒（代数更新到 blood.ammonia） ───────────────────────────
+        k = 1.0 * self.detox_capacity
+        gut_ammonia_rate = amino_g_min * _AMINO_TO_AMMONIA_UMOL_PER_G
+        total_production = self.endogenous_ammonia_rate + gut_ammonia_rate
+
+        if k > 1e-6:
+            new_ammonia = (
+                self.blood.ammonia_umol_L * math.exp(-k * dt_min)
+                + (total_production / k) * (1.0 - math.exp(-k * dt_min))
+            )
+            new_ammonia = max(0.0, new_ammonia)
+            self.blood.ammonia_umol_L = new_ammonia
+
+        # 尿素产生
+        ammonia_consumed = max(0.0, self.blood.ammonia_umol_L - new_ammonia) if k > 1e-6 else 0.0
+        urea_mmol = ammonia_consumed / 2.0
+        if urea_mmol > 0:
+            self.blood.bun_mg_dL += urea_mmol * _UREA_MMOL_TO_BUN_MG_DL * dt_min
+
+        # ── 4. 白蛋白合成（代数更新到 blood.albumin） ───────────────────────
+        base_rate_g_day = 0.5 * self.w
+        amino_factor = min(2.0, self.blood.amino_acids_g_L / 1.0)
+        synthesis_rate = base_rate_g_day * self.metabolic_activity * amino_factor
+        albumin_change = synthesis_rate * dt_hour / 24.0
+        self.blood.albumin_g_dL = max(1.0, min(5.0, self.blood.albumin_g_dL + albumin_change))
+        self.cumulative_albumin_production_g += synthesis_rate * dt_min / 60.0
+
+        # ── 5. 胆红素代谢（时序 ODE → 状态变量） ───────────────────────────
+        normal_production = _NORMAL_BILIRUBIN_MG_DL_PER_KG * self.w
+        conj = self.bilirubin_conjugation
+        k_clear = 0.5 * conj
+        production_input = normal_production * (1.0 - conj)
+
+        if k_clear > 1e-6:
+            new_accum = (
+                self._bilirubin_accumulation * math.exp(-k_clear * dt_day)
+                + (production_input / k_clear) * (1.0 - math.exp(-k_clear * dt_day))
+            )
+        else:
+            new_accum = self._bilirubin_accumulation + production_input * dt_day
+        new_accum = max(0.0, new_accum)
+        dBilirubin_accum = (new_accum - self._bilirubin_accumulation) / dt  # 转换为 /s
+        self._bilirubin_accumulation = new_accum
+
+        bilirubin_level = _BILIRUBIN_AXIS_INTERCEPT + new_accum * _BILIRUBIN_SEVERITY_SLOPE
+        self.blood.bilirubin_mg_dL = max(0.1, min(15.0, bilirubin_level))
+
+        # 肝酶
+        if conj < 0.8:
+            self.blood.ALT_U_L = 25.0 + (1.0 - conj) * 150.0
+            self.blood.AST_U_L = 25.0 + (1.0 - conj) * 200.0
+            self.blood.ALP_U_L = 30.0 + (1.0 - conj) * 300.0
+
+        # ── 6. 凝血因子（代数更新到 blood） ──────────────────────────────────
+        k_VII = 0.12
+        target_VII = 0.04 * self.metabolic_activity * max(0.1, conj)
+        self.blood.coagulation_factor_VII += (target_VII - self.blood.coagulation_factor_VII) * k_VII * dt_hour
+        self.blood.coagulation_factor_VII = max(0.05, min(1.0, self.blood.coagulation_factor_VII))
+        PT_factor = 1.0 + (1.0 - self.blood.coagulation_factor_VII) * 1.5
+        self.blood.PT_sec = 12.0 * PT_factor
+        self.blood.INR = self.blood.PT_sec / 12.0
+
+        # ── 7. CYP450（代数） ───────────────────────────────────────────────
+        drug_conc = getattr(self.blood, "drug_concentration_mg_kg", 0.0)
+        if drug_conc > 0 and self.cyp450_activity > 0:
+            baseline_flow = 0.25 * base_cardiac_output_ml_min(self.w)
+            hepatic_factor = min(1.0, hepatic_flow / baseline_flow)
+            Vmax = _CYP450_BASE_CAPACITY * self.metabolic_activity * self.cyp450_activity * hepatic_factor
+            metabolism_rate = Vmax * drug_conc / (_CYP450_KM + drug_conc)
+            max_clearance = drug_conc / dt if dt > 0 else 0.0
+            cleared = min(metabolism_rate, max_clearance)
+            self.blood.drug_concentration_mg_kg = max(0.0, drug_conc - cleared)
+
+        # ── 8. 肠道氨基酸清除 ────────────────────────────────────────────────
+        if hepatic_flow > 0:
+            amino_removed_g_L = amino_g_min * dt_min / (hepatic_flow / 1000)
+            self.blood.amino_acids_g_L = max(0.1, self.blood.amino_acids_g_L - amino_removed_g_L)
+
+        self.hepatic_blood_flow = hepatic_flow
+        self.cumulative_glucose_production_g += glucose_output * dt_min
+        self.cumulative_urea_production_mmol += total_production * dt_min / 2.0
+
+        # ── 9. Cori cycle（代数更新到 blood.lactate 和 blood.glucose） ─────
+        lactate = self.blood.lactate_mmol_L
+        if lactate > 0.1:
+            baseline_flow = 0.25 * base_cardiac_output_ml_min(self.w)
+            hepatic_factor = min(1.0, hepatic_flow / baseline_flow)
+            uptake_rate = (
+                _CORI_VMAX_MMOL_L_MIN * self.metabolic_activity * hepatic_factor
+                * lactate / (_CORI_KM_MMOL_L + lactate)
+            )
+            lactate_consumed = uptake_rate * dt_min
+            glucose_from_lactate = lactate_consumed / 2.0
+            self.blood.glucose_mmol_L = min(25.0, self.blood.glucose_mmol_L + glucose_from_lactate)
+
+        # ── 状态变量导数 ───────────────────────────────────────────────────
+        dydt = {
+            "glycogen_fraction": dGlycogen / dt if dt > 0 else 0.0,
+            "bilirubin_accumulation": dBilirubin_accum,
+        }
+
+        outputs = {
+            "glucose_output_g_min": glucose_output,
+            "ammonia_umol_L": self.blood.ammonia_umol_L,
+            "albumin_g_dL": self.blood.albumin_g_dL,
+            "bilirubin_mg_dL": self.blood.bilirubin_mg_dL,
+            "ALT_U_L": self.blood.ALT_U_L,
+            "AST_U_L": self.blood.AST_U_L,
+            "ALP_U_L": self.blood.ALP_U_L,
+            "GGT_U_L": self.blood.GGT_U_L,
+            "hepatic_blood_flow_mL_min": hepatic_flow,
+            "coagulation_factor_VII": self.blood.coagulation_factor_VII,
+            "PT_sec": self.blood.PT_sec,
+            "INR": self.blood.INR,
+            "fibrinogen_mg_dL": self.blood.fibrinogen_mg_dL,
+            "metabolic_activity": self.metabolic_activity,
+            "detox_capacity": self.detox_capacity,
+            "cyp450_activity": self.cyp450_activity,
+            "glycogen_fraction": self.glycogen_fraction,
+            "bilirubin_conjugation": conj,
+        }
+
+        return dydt, outputs
+
     def _update_hepatic_flow(self, CO: float):
         """更新肝血流量（≈25% CO）"""
         if CO <= 0:

@@ -77,7 +77,63 @@ def _eval_fn(code, namespace: dict) -> float:
         return 0.0
 
 
-# ── 内置 ODE 求解器 ----------------------------------------------------------
+# ── 内置 ODE 导数求解器（Phase 2: 供 solve_ivp 调用）───────────────────────────
+# 这些函数只返回导数，不做时间推进。
+# 引擎层统一由 scipy.integrate.solve_ivp(method='Radau') 调用。
+_DERIVATIVE_SOLVERS: dict[str, Callable] = {}
+
+
+def _register_derivative_solvers() -> None:
+    """注册导数求解器（供 compute_derivatives() 使用）。"""
+    global _DERIVATIVE_SOLVERS
+
+    def _deriv_logistic(value, params, state_vars, engine_state):
+        rate = params.get("rate", 0.0)
+        K = params.get("K", 1.0)
+        growth = rate * value * (1.0 - value / K) if K > 0 else 0.0
+        threshold = params.get("seed_threshold", 0.0)
+        if value < threshold:
+            seed_boost = params.get("seed_boost", 0.0)
+            code = params.get("seed_boost_fn")
+            if code is not None:
+                namespace = _ns(state_vars, params, engine_state)
+                seed_boost = _eval_fn(code, namespace)
+            growth += seed_boost
+        return growth
+
+    def _deriv_algebraic(value, params, state_vars, engine_state):
+        return 0.0  # 在 compute_derivatives() 里单独处理
+
+    def _deriv_first_order_lag(value, params, state_vars, engine_state):
+        tau = params.get("tau", 1.0)
+        if tau <= 0:
+            return 0.0
+        namespace = _ns(state_vars, params, engine_state)
+        if params.get("target_source") == "engine":
+            target = _eval_fn(params.get("target_fn"), namespace)
+        elif "target_fn" in params and params["target_fn"] is not None:
+            target = _eval_fn(params["target_fn"], namespace)
+        else:
+            target = params.get("target", 0.0)
+        return (target - value) / tau
+
+    def _deriv_custom(value, params, state_vars, engine_state):
+        code = params.get("derivative_fn")
+        namespace = _ns(state_vars, params, engine_state)
+        return _eval_fn(code, namespace)
+
+    _DERIVATIVE_SOLVERS = {
+        "logistic": _deriv_logistic,
+        "algebraic": _deriv_algebraic,
+        "first_order_lag": _deriv_first_order_lag,
+        "custom": _deriv_custom,
+    }
+
+
+_register_derivative_solvers()
+
+
+# ── 内置 ODE 求解器（向后兼容：compute() 使用 Euler 推进）───────────────────
 
 def _solve_logistic(
     value: float, params: dict, state_vars: dict, engine_state: dict, dt: float
@@ -86,7 +142,6 @@ def _solve_logistic(
     rate = params.get("rate", 0.0)
     K = params.get("K", 1.0)
     growth = rate * value * (1.0 - value / K) if K > 0 else 0.0
-    # seed boost: 当状态变量很小时允许缓慢进展
     threshold = params.get("seed_threshold", 0.0)
     if value < threshold:
         seed_boost = params.get("seed_boost", 0.0)
@@ -147,7 +202,7 @@ def _solve_custom(
     return _clamp(new_val, lo, hi)
 
 
-# 注册内置求解器
+# 注册内置求解器（向后兼容：compute() 使用）
 _ODE_SOLVERS["logistic"] = _solve_logistic
 _ODE_SOLVERS["algebraic"] = _solve_algebraic
 _ODE_SOLVERS["first_order_lag"] = _solve_first_order_lag
@@ -268,7 +323,7 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
         # 构建命名空间：状态变量 + 参数（过滤 code 对象）
         namespace = _ns(self._state_vars, self._params, engine_state)
 
-        # Step 1: 更新所有状态变量
+        # Step 1: 更新所有状态变量（Forward Euler 推进，用于向后兼容）
         for var_name, meta in self._var_meta.items():
             ode_type = meta["ode_type"]
             solver = _ODE_SOLVERS.get(ode_type)
@@ -298,6 +353,39 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
             commands.append(cmd)
 
         return commands
+
+    def compute_derivatives(self, engine_state: dict) -> dict[str, float]:
+        """返回所有状态变量的导数（供 solve_ivp Radau 调用）。
+
+        algebraic 变量用极小 tau=0.001s 的一阶 lag 近似，使其可融入 ODE 框架。
+        所有导数均未做 clamp——clamp 由 solve_ivp 的 atol 或后处理负责。
+        """
+        if not self.active:
+            return {var: 0.0 for var in self._state_vars}
+
+        namespace = _ns(self._state_vars, self._params, engine_state)
+        derivatives: dict[str, float] = {}
+        TAU_INSTANT = 0.001  # 极小时间常数 ≈ 瞬时响应
+
+        for var_name, meta in self._var_meta.items():
+            ode_type = meta["ode_type"]
+            solver = _DERIVATIVE_SOLVERS.get(ode_type)
+            if solver is None:
+                derivatives[var_name] = 0.0
+                continue
+
+            if ode_type == "algebraic":
+                # 代数约束 S = fn(other_vars) → 用一阶 lag 近似
+                code = meta["params"].get("fn")
+                target_val = _eval_fn(code, namespace)
+                current_val = self._state_vars[var_name]
+                derivatives[var_name] = (target_val - current_val) / TAU_INSTANT
+            else:
+                derivatives[var_name] = solver(
+                    self._state_vars[var_name], meta["params"], self._state_vars, engine_state
+                )
+
+        return derivatives
 
     def summary(self) -> dict:
         result = {"name": self.name, "active": self.active}
