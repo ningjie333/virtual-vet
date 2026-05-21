@@ -159,6 +159,92 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
 }
 
 
+# ── CONNECTIONS 表 — 统一 ODE 系统的模块间数据路由 ──────────────────────────
+# 格式: { (from_module, from_var): [(to_module, to_var), ...], ... }
+# 用于 _unified_rhs 中，将上一时间步的 outputs 路由为当前时间步的 inputs
+# 采用半隐式耦合：模块在 rhs(t,y) 调用时使用上一 rhs 调用的 outputs 作为输入
+
+CONNECTIONS: dict[tuple[str, str], list[tuple[str, str]]] = {
+    # Heart → kidney, fluid, neuro
+    ("heart", "cardiac_output"):    [("kidney", "co_input"), ("lung", "co_input"), ("gut", "co_input")],
+    ("heart", "MAP"):                [("kidney", "map_input"), ("fluid", "map_input"), ("neuro", "map_input")],
+    ("heart", "CVP"):               [("kidney", "cvp_input")],
+    ("heart", "blood_volume_ratio"): [("fluid", "blood_volume_ratio")],
+
+    # Lung → blood, neuro
+    ("lung", "arterial_PO2_mmHg"):  [("blood", "arterial_PO2"), ("neuro", "PO2")],
+    ("lung", "arterial_PCO2_mmHg"): [("blood", "arterial_PCO2"), ("neuro", "PCO2")],
+    ("lung", "arterial_saturation"): [("blood", "arterial_saturation")],
+    ("lung", "arterial_pH"):         [("blood", "arterial_pH")],
+    ("lung", "respiratory_rate"):   [("neuro", "lung_rr")],
+
+    # Blood → kidney, neuro, endocrine, immune
+    ("blood", "potassium_mEq_L"):    [("kidney", "blood_K"), ("endocrine", "K"), ("heart", "potassium_mEq_L")],
+    ("blood", "sodium_mEq_L"):      [("kidney", "blood_Na")],
+    ("blood", "glucose_mmol_L"):    [("kidney", "blood_glucose"), ("endocrine", "glucose")],
+    ("blood", "arterial_pH"):        [("kidney", "blood_pH"), ("heart", "arterial_pH")],
+    ("blood", "arterial_PO2_mmHg"): [("neuro", "PO2")],
+    ("blood", "arterial_PCO2_mmHg"): [("neuro", "PCO2")],
+
+    # Kidney → fluid, blood
+    ("kidney", "ADH_level"):         [("fluid", "ADH")],
+    ("kidney", "urine_output_mL_min"): [("fluid", "urine_output")],
+    ("kidney", "angiotensin_II"):    [("fluid", "RAAS_activity")],
+    ("kidney", "blood_volume_loss_rate_mL_min"): [("blood", "urine_loss")],
+
+    # Fluid → heart, blood, lymphatic
+    ("fluid", "V_vascular_mL"):      [("heart", "preload_volume")],
+    ("fluid", "V_isf_mL"):           [("lymphatic", "isf_input")],
+
+    # Endocrine → immune, liver, heart, kidney
+    ("endocrine", "cortisol_ug_dL"): [("immune", "endocrine_cortisol")],
+    ("endocrine", "T3_factor"):     [("heart", "T3")],
+    ("endocrine", "insulin_uU_mL"):  [("liver", "insulin")],
+    ("endocrine", "glucagon_pg_mL"): [("liver", "glucagon")],
+    ("endocrine", "PTH_pg_mL"):      [("kidney", "PTH")],
+    ("endocrine", "calcium_mg_dL"): [("kidney", "calcium")],
+
+    # Neuro → heart, kidney, endocrine
+    ("neuro", "sympathetic_tone"):   [("heart", "sympathetic_tone")],
+    ("neuro", "parasympathetic_tone"): [("heart", "parasympathetic_tone")],
+    ("neuro", "pain_level"):         [("endocrine", "pain_stress")],
+    ("neuro", "heart_rate_bpm"):     [("lymphatic", "hr_input")],
+
+    # Immune → neuro, liver, coagulation, lymphatic
+    ("immune", "cytokine_level"):    [("neuro", "cytokine"), ("coagulation", "immune_cytokine"), ("lymphatic", "cytokine_input"), ("liver", "inflammation")],
+    ("immune", "coagulation_state"): [("coagulation", "immune_coagulation_state")],
+    ("immune", "wbc_count"):         [("blood", "WBC")],
+    ("immune", "capillary_leak_factor"): [("blood", "capillary_leak")],
+
+    # Coagulation → blood, immune
+    ("coagulation", "PT_sec"):        [("blood", "PT_sec")],
+    ("coagulation", "aPTT_sec"):     [("blood", "aPTT_sec")],
+    ("coagulation", "fibrinogen_mg_dL"): [("blood", "fibrinogen_mg_dL")],
+    ("coagulation", "coagulation_state"): [("blood", "coagulation_state")],
+
+    # Liver → blood
+    ("liver", "metabolic_activity"):  [("coagulation", "liver_health_factor")],
+    ("liver", "glucose_output"):      [("blood", "liver_glucose")],
+    ("liver", "ammonia_umol_L"):      [("blood", "ammonia_umol_L")],
+    ("liver", "albumin_g_dL"):       [("blood", "albumin_g_dL")],
+    ("liver", "bilirubin_mg_dL"):    [("blood", "bilirubin_mg_dL")],
+
+    # Gut → liver
+    ("gut", "amino_absorption_g_min"): [("liver", "amino_absorption_g_min")],
+    ("gut", "portal_flow"):           [("liver", "portal_flow")],
+    ("gut", "fat_absorption_active"):  [("lymphatic", "gut_fat_absorption")],
+
+    # Lymphatic → blood
+    ("lymphatic", "splenic_reserve_mL"): [("blood", "splenic_reserve_mL")],
+    ("lymphatic", "lymph_flow_rate"): [("blood", "lymph_flow_mL_min")],
+    ("lymphatic", "interstitial_fluid_mL"): [("blood", "interstitial_fluid_mL")],
+
+    # Disease outputs (from disease.derivatives) → target modules
+    # disease.compute_derivatives returns FactorCommand-style outputs
+    # routed via CONNECTIONS as a special "disease" module
+}
+
+
 class VirtualCreature:
     """
     虚拟生物体：整合所有器官模块的耦合仿真
@@ -236,6 +322,12 @@ class VirtualCreature:
         self.immune = ImmuneModule(weight_kg=body_weight_kg, blood=self.blood, endocrine=self.endocrine)
         self.coagulation = CoagulationModule(weight_kg=body_weight_kg, blood=self.blood)
         self.lymphatic = LymphaticModule(weight_kg=body_weight_kg, blood=self.blood)
+
+        # ── 统一 ODE 求解器缓存（半隐式耦合）────────────────────────────
+        # _cached_inputs[module_name][input_name] = value
+        # 在 rhs(t,y) 调用时，用上一 rhs 调用的 outputs 填充 inputs
+        self._cached_inputs: dict[str, dict[str, float]] = {}
+        self._current_outputs: dict[str, dict[str, float]] = {}
 
         # 生命周期引擎（驱动生长/衰老/死亡）
         self.lifecycle = LifecycleEngine(species=species, initial_age_days=age_days)
@@ -741,6 +833,341 @@ class VirtualCreature:
 
     # ── solve_ivp Radau 引擎（Phase 2: 替换 Euler 求解器）────────────────────────
 
+    # ── 统一 ODE 状态映射（器官 + 疾病）────────────────────────────────────
+    # 每个模块的名称、状态变量名列表、模块实例
+    # 状态变量 = 进入统一 y 向量的变量（而非仅代数输出的变量）
+    _UNIFIED_MODULES = [
+        # name, state_var_names, module_attr
+        ("heart",       ["HR", "SV", "SVR"],                    "heart"),
+        ("lung",        ["RR", "TV", "VQ"],                    "lung"),
+        ("kidney",      ["GFR", "RBF", "urine_output", "ADH"], "kidney"),
+        ("fluid",       ["V_vascular", "V_isf", "V_icf"],      "fluid"),
+        ("gut",         ["motility", "barrier", "microbiome"],  "gut"),
+        ("liver",       ["glycogen_fraction", "bilirubin_accumulation"], "liver"),
+        ("endocrine",   ["T3", "insulin", "glucagon", "cortisol", "PTH", "IGF1", "HPA_axis"], "endocrine"),
+        ("neuro",       ["sympathetic_tone", "parasympathetic_tone", "consciousness", "seizure", "pain"], "neuro"),
+        ("immune",      ["cytokine", "acute_phase", "wbc", "coagulation_state"], "immune"),
+        ("coagulation", ["factor_VII", "factor_V", "factor_II", "factor_IX", "factor_X", "factor_XI", "fibrinogen", "coagulation_state"], "coagulation"),
+        ("lymphatic",   ["splenic_reserve_mL", "interstitial_fluid_mL"], "lymphatic"),
+    ]
+
+    def _build_unified_state_map(self) -> dict[tuple[str, str], int]:
+        """建立 (module_name, var_name) → y-array index 映射表（器官 + 疾病）。"""
+        state_map: dict[tuple[str, str], int] = {}
+        idx = 0
+
+        # 器官状态变量
+        for mname, var_names, _ in self._UNIFIED_MODULES:
+            for vname in var_names:
+                state_map[(mname, vname)] = idx
+                idx += 1
+
+        # 疾病状态变量
+        if self.disease is not None and hasattr(self.disease, '_state_vars'):
+            for vname in self.disease._state_vars:
+                state_map[("disease", vname)] = idx
+                idx += 1
+
+        return state_map
+
+    def _pack_unified_state(self) -> np.ndarray:
+        """将所有器官 + 疾病状态打包成 numpy 向量 y0。"""
+        state_map = self._build_unified_state_map()
+        n = len(state_map)
+        y0 = np.zeros(n)
+
+        # 器官状态
+        for mname, var_names, attr_name in self._UNIFIED_MODULES:
+            module = getattr(self, attr_name)
+            for vname in var_names:
+                idx = state_map[(mname, vname)]
+                # 从模块实例属性读取状态
+                if mname == "heart":
+                    if vname == "HR": y0[idx] = module.heart_rate
+                    elif vname == "SV": y0[idx] = module.stroke_volume
+                    elif vname == "SVR": y0[idx] = module.SVR
+                elif mname == "lung":
+                    if vname == "RR": y0[idx] = module.respiratory_rate
+                    elif vname == "TV": y0[idx] = module.tidal_volume
+                    elif vname == "VQ": y0[idx] = module.VQ_ratio
+                elif mname == "kidney":
+                    if vname == "GFR": y0[idx] = module.GFR
+                    elif vname == "RBF": y0[idx] = module.renin_activity  # RBF 用 renin_activity 代
+                    elif vname == "ADH": y0[idx] = module.ADH_level
+                    elif vname == "urine_output": y0[idx] = module.urine_output
+                elif mname == "fluid":
+                    if vname == "V_vascular": y0[idx] = module.vascular_volume_ml
+                    elif vname == "V_isf": y0[idx] = module.isf_volume_ml
+                    elif vname == "V_icf": y0[idx] = module.icf_volume_ml
+                elif mname == "gut":
+                    if vname == "motility": y0[idx] = module.gut_motility
+                    elif vname == "barrier": y0[idx] = module.barrier_integrity
+                    elif vname == "microbiome": y0[idx] = module.microbiome_activity
+                elif mname == "liver":
+                    if vname == "glycogen_fraction": y0[idx] = module.glycogen_fraction
+                    elif vname == "bilirubin_accumulation": y0[idx] = module._bilirubin_accumulation
+                elif mname == "endocrine":
+                    if vname == "T3": y0[idx] = module.T3_ng_dL
+                    elif vname == "insulin": y0[idx] = module.insulin_uU_mL
+                    elif vname == "glucagon": y0[idx] = module.glucagon_pg_mL
+                    elif vname == "cortisol": y0[idx] = module.cortisol_ug_dL
+                    elif vname == "PTH": y0[idx] = module.PTH_pg_mL
+                    elif vname == "IGF1": y0[idx] = module.IGF1_nmol_L
+                    elif vname == "HPA_axis": y0[idx] = module.HPA_axis
+                elif mname == "neuro":
+                    if vname == "sympathetic_tone": y0[idx] = module.sympathetic_tone
+                    elif vname == "parasympathetic_tone": y0[idx] = module.parasympathetic_tone
+                    elif vname == "consciousness": y0[idx] = module.consciousness
+                    elif vname == "seizure": y0[idx] = module.seizure
+                    elif vname == "pain": y0[idx] = module.pain_level
+                elif mname == "immune":
+                    if vname == "cytokine": y0[idx] = module.cytokine_level
+                    elif vname == "acute_phase": y0[idx] = module.acute_phase_response
+                    elif vname == "wbc": y0[idx] = module.wbc_count
+                    elif vname == "coagulation_state": y0[idx] = module.coagulation_state
+                elif mname == "coagulation":
+                    attr_map = {
+                        "factor_VII": "factor_VII", "factor_V": "factor_V",
+                        "factor_II": "factor_II", "factor_IX": "factor_IX",
+                        "factor_X": "factor_X", "factor_XI": "factor_XI",
+                        "fibrinogen": "fibrinogen", "coagulation_state": "coagulation_state",
+                    }
+                    if vname in attr_map:
+                        y0[idx] = getattr(module, attr_map[vname])
+                elif mname == "lymphatic":
+                    if vname == "splenic_reserve_mL": y0[idx] = module.splenic_reserve_mL
+                    elif vname == "interstitial_fluid_mL": y0[idx] = module.interstitial_fluid_mL
+
+        # 疾病状态
+        if self.disease is not None and hasattr(self.disease, '_state_vars'):
+            for vname in self.disease._state_vars:
+                idx = state_map[("disease", vname)]
+                y0[idx] = self.disease._state_vars[vname]
+
+        return y0
+
+    def _unpack_unified_state(self, y: np.ndarray) -> None:
+        """将 numpy 向量 y 分解到各模块的实例属性。"""
+        state_map = self._build_unified_state_map()
+
+        for mname, var_names, attr_name in self._UNIFIED_MODULES:
+            module = getattr(self, attr_name)
+            for vname in var_names:
+                idx = state_map[(mname, vname)]
+                val = y[idx]
+
+                if mname == "heart":
+                    if vname == "HR": module.heart_rate = val
+                    elif vname == "SV": module.stroke_volume = val
+                    elif vname == "SVR": module.SVR = val
+                elif mname == "lung":
+                    if vname == "RR": module.respiratory_rate = val
+                    elif vname == "TV": module.tidal_volume = val
+                    elif vname == "VQ": module.VQ_ratio = val
+                elif mname == "kidney":
+                    if vname == "GFR": module.GFR = val
+                    elif vname == "ADH": module.ADH_level = val
+                elif mname == "fluid":
+                    if vname == "V_vascular": module.vascular_volume_ml = val
+                    elif vname == "V_isf": module.isf_volume_ml = val
+                    elif vname == "V_icf": module.icf_volume_ml = val
+                elif mname == "gut":
+                    if vname == "motility": module.gut_motility = val
+                    elif vname == "barrier": module.barrier_integrity = val
+                    elif vname == "microbiome": module.microbiome_activity = val
+                elif mname == "liver":
+                    if vname == "glycogen_fraction": module.glycogen_fraction = val
+                    elif vname == "bilirubin_accumulation": module._bilirubin_accumulation = val
+                elif mname == "endocrine":
+                    if vname == "T3": module.T3_ng_dL = val
+                    elif vname == "insulin": module.insulin_uU_mL = val
+                    elif vname == "glucagon": module.glucagon_pg_mL = val
+                    elif vname == "cortisol": module.cortisol_ug_dL = val
+                    elif vname == "PTH": module.PTH_pg_mL = val
+                    elif vname == "IGF1": module.IGF1_nmol_L = val
+                    elif vname == "HPA_axis": module.HPA_axis = val
+                elif mname == "neuro":
+                    if vname == "sympathetic_tone": module.sympathetic_tone = val
+                    elif vname == "parasympathetic_tone": module.parasympathetic_tone = val
+                    elif vname == "consciousness": module.consciousness = val
+                    elif vname == "seizure": module.seizure = val
+                    elif vname == "pain": module.pain_level = val
+                elif mname == "immune":
+                    if vname == "cytokine": module.cytokine_level = val
+                    elif vname == "acute_phase": module.acute_phase_response = val
+                    elif vname == "wbc": module.wbc_count = val
+                    elif vname == "coagulation_state": module.coagulation_state = val
+                elif mname == "coagulation":
+                    attr_map = {
+                        "factor_VII": "factor_VII", "factor_V": "factor_V",
+                        "factor_II": "factor_II", "factor_IX": "factor_IX",
+                        "factor_X": "factor_X", "factor_XI": "factor_XI",
+                        "fibrinogen": "fibrinogen", "coagulation_state": "coagulation_state",
+                    }
+                    if vname in attr_map:
+                        setattr(module, attr_map[vname], val)
+                elif mname == "lymphatic":
+                    if vname == "splenic_reserve_mL": module.splenic_reserve_mL = val
+                    elif vname == "interstitial_fluid_mL": module.interstitial_fluid_mL = val
+
+        # 疾病状态
+        if self.disease is not None and hasattr(self.disease, '_state_vars'):
+            for vname in self.disease._state_vars:
+                idx = state_map[("disease", vname)]
+                self.disease._state_vars[vname] = y[idx]
+
+    def _unified_rhs(self, t: float, y: np.ndarray) -> np.ndarray:
+        """
+        统一 ODE 右端函数（供 solve_ivp Radau 调用）。
+
+        半隐式耦合策略：
+        - 在 rhs(t,y) 调用时，用上一 rhs 调用的 outputs 路由为当前 inputs
+        - 每个模块的 derivatives() 只读 inputs（不读其他模块的当前状态）
+        - Radau 的 Newton 迭代会自动收敛到耦合解
+
+        数据流：
+        1. 解包 y → 模块实例属性
+        2. 用 _cached_inputs 填充每个模块的 inputs
+        3. 调用各模块 derivatives() → dydt + outputs
+        4. 将 outputs 存入 _current_outputs
+        5. 在连接表上路由：_current_outputs → _cached_inputs（下次调用用）
+        6. 打包 dydt → numpy 向量
+        """
+        # 1. 解包状态
+        self._unpack_unified_state(y)
+
+        # 2. 准备各模块的 inputs（用 cached 值 + 当前输出填充）
+        all_outputs: dict[str, dict[str, float]] = {}
+        module_inputs: dict[str, dict] = {}
+
+        # 初始化 inputs 为 cached_inputs（上一调用输出的值）
+        for mname, _, _ in self._UNIFIED_MODULES:
+            module_inputs[mname] = dict(self._cached_inputs.get(mname, {}))
+            all_outputs[mname] = {}
+
+        # 3a. 第一批：不需要其他模块输出作为输入的模块
+        # 所有模块的 derivatives（dt=1e-9 避免除零，同时保持瞬时导数精度）
+        _EPS = 1e-9
+
+        # 心脏
+        module = getattr(self, "heart")
+        dydt, outputs = module.derivatives(dt=_EPS, svr_factor=1.0)
+        all_outputs["heart"] = outputs
+
+        # 肺部 — co_input 从缓存
+        module = getattr(self, "lung")
+        co_input = module_inputs.get("lung", {}).get("co_input")
+        dydt, outputs = module.derivatives(dt=_EPS, co_input=co_input)
+        all_outputs["lung"] = outputs
+
+        # 肾脏 — 三个必需位置参数都从缓存
+        module = getattr(self, "kidney")
+        kidney_in = module_inputs.get("kidney", {})
+        dydt, outputs = module.derivatives(
+            dt=_EPS,
+            map_input=kidney_in.get("map_input", 90.0),
+            cvp_input=kidney_in.get("cvp_input", 5.0),
+            co_input=kidney_in.get("co_input", 1500.0),
+        )
+        all_outputs["kidney"] = outputs
+
+        # 肠道 — co_input 从缓存；输出是 gut_state dict，存入 all_outputs["gut"]
+        module = getattr(self, "gut")
+        gut_in = module_inputs.get("gut", {})
+        dydt, gut_gut_outputs = module.derivatives(dt=_EPS, co_input=gut_in.get("co_input", 1500.0))
+        all_outputs["gut"] = gut_gut_outputs
+
+        # 肝脏 — co_input 从缓存，gut_state 取自肠道输出
+        module = getattr(self, "liver")
+        liver_in = module_inputs.get("liver", {})
+        dydt, outputs = module.derivatives(
+            dt=_EPS,
+            co_input=liver_in.get("co_input", 1500.0),
+            gut_state=gut_gut_outputs,  # 肠道输出作为 liver 的输入
+        )
+        all_outputs["liver"] = outputs
+
+        # 内分泌 — 无外部输入
+        module = getattr(self, "endocrine")
+        dydt, outputs = module.derivatives(dt=0.0)
+        all_outputs["endocrine"] = outputs
+
+        # 神经 — map_input, lung_rr 从缓存
+        module = getattr(self, "neuro")
+        neuro_in = module_inputs.get("neuro", {})
+        dydt, outputs = module.derivatives(
+            dt=_EPS,
+            map_input=neuro_in.get("map_input", 90.0),
+            heart_hr=neuro_in.get("heart_rate_bpm", 80.0),
+            lung_rr=neuro_in.get("lung_rr", 15.0),
+        )
+        all_outputs["neuro"] = outputs
+
+        # 免疫 — endocrine_cortisol 从缓存
+        module = getattr(self, "immune")
+        immune_in = module_inputs.get("immune", {})
+        dydt, outputs = module.derivatives(
+            dt=_EPS,
+            endocrine_cortisol=immune_in.get("endocrine_cortisol"),
+        )
+        all_outputs["immune"] = outputs
+
+        # 凝血 — liver_health_factor, immune_cytokine 从缓存
+        module = getattr(self, "coagulation")
+        coag_in = module_inputs.get("coagulation", {})
+        dydt, outputs = module.derivatives(
+            dt=_EPS,
+            liver_health_factor=coag_in.get("liver_health_factor", 1.0),
+            immune_cytokine=coag_in.get("immune_cytokine", 0.0),
+        )
+        all_outputs["coagulation"] = outputs
+
+        # 淋巴 — map_input, hr_input, cytokine_input, gut_fat_absorption
+        module = getattr(self, "lymphatic")
+        lymph_in = module_inputs.get("lymphatic", {})
+        dydt, outputs = module.derivatives(
+            dt=_EPS,
+            map_input=lymph_in.get("map_input", 80.0),
+            hr_input=lymph_in.get("hr_input", 80.0),
+            cytokine_input=lymph_in.get("cytokine_input", 0.0),
+            gut_fat_absorption=lymph_in.get("gut_fat_absorption", False),
+        )
+        all_outputs["lymphatic"] = outputs
+
+        # 体液 — map_input 从缓存
+        module = getattr(self, "fluid")
+        fluid_in = module_inputs.get("fluid", {})
+        dydt, outputs = module.derivatives(dt=0.0, map_input=fluid_in.get("map_input"))
+        all_outputs["fluid"] = outputs
+
+        # 疾病
+        if self.disease is not None and hasattr(self.disease, 'compute_derivatives'):
+            engine_state = self._get_engine_state()
+            disease_dydt = self.disease.compute_derivatives(engine_state)
+            all_outputs["disease"] = disease_dydt
+
+        # 4. 按 CONNECTIONS 表路由 outputs → cached inputs（供下次 rhs 调用用）
+        for (src_mod, src_var), targets in CONNECTIONS.items():
+            val = all_outputs.get(src_mod, {}).get(src_var)
+            if val is not None:
+                for (tgt_mod, tgt_var) in targets:
+                    if tgt_mod not in self._cached_inputs:
+                        self._cached_inputs[tgt_mod] = {}
+                    self._cached_inputs[tgt_mod][tgt_var] = val
+
+        # 5. 打包 dydt
+        state_map = self._build_unified_state_map()
+        n = len(state_map)
+        dydt_vec = np.zeros(n)
+
+        for (mname, vname), idx in state_map.items():
+            if mname == "disease":
+                dydt_vec[idx] = all_outputs.get("disease", {}).get(vname, 0.0)
+            else:
+                dydt_vec[idx] = all_outputs.get(mname, {}).get(vname, 0.0)
+
+        return dydt_vec
+
     def _build_ivp_state_map(self) -> dict[tuple[str, str], int]:
         """建立 (module_name, var_name) → y-array index 映射表。"""
         ivp_state_map: dict[tuple[str, str], int] = {}
@@ -829,6 +1256,47 @@ class VirtualCreature:
             t_eval=t_eval,
             dense_output=True,
             vectorized=False,
+        )
+        return sol
+
+    def run_unified_ivp(self, t_end: float, dt_save: float = 1.0):
+        """使用 Radau 隐式求解器跑统一 ODE 系统（所有器官 + 疾病）。
+
+        半隐式耦合：_cached_inputs 在每次 rhs 调用时从上一输出的 outputs 填充。
+        Radau 的 Newton 迭代会收敛耦合解。
+
+        Args:
+            t_end: 仿真结束时间（秒）
+            dt_save: 采样间隔（秒）
+
+        Returns:
+            solve_ivp result object with sol.t, sol.y
+        """
+        from scipy.integrate import solve_ivp
+
+        # 初始化缓存（启动时为空，使用模块默认值）
+        self._cached_inputs.clear()
+
+        y0 = self._pack_unified_state()
+        state_map = self._build_unified_state_map()
+
+        # 预热：调用一次 rhs 以初始化 _cached_inputs
+        if len(y0) > 0:
+            _ = self._unified_rhs(0.0, y0)
+
+        t_eval = np.arange(0.0, t_end + dt_save, dt_save)
+
+        sol = solve_ivp(
+            self._unified_rhs,
+            [0.0, t_end],
+            y0,
+            method='Radau',
+            rtol=1e-5,
+            atol=1e-8,
+            t_eval=t_eval,
+            dense_output=True,
+            vectorized=False,
+            max_steps=2000,
         )
         return sol
 
