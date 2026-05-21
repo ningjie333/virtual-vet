@@ -92,7 +92,7 @@ class CoagulationModule:
         factor_derivatives = {}
         for name in factors:
             current = getattr(self, name)
-            baseline_synthesis = 0.0000001
+            baseline_synthesis = 0.0000001 * dt_min  # baseline_synthesis_per_min × dt_min
             if current < 1.0:
                 synthesis = synthesis_rate * (1.0 - current) + baseline_synthesis
             else:
@@ -101,7 +101,7 @@ class CoagulationModule:
             new_val = current + synthesis - decay
             new_val = max(0.05, min(1.5, new_val))
             setattr(self, name, new_val)
-            dFactor = (new_val - current) / dt if dt > 0 else 0.0
+            dFactor = (new_val - current) / 60.0  # convert per-min to per-sec (dt_min = dt/60)
             factor_derivatives[name] = dFactor
 
         # ── PT / aPTT（写入 blood） ─────────────────────────────────────────

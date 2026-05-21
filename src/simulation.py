@@ -1047,17 +1047,22 @@ class VirtualCreature:
 
         # 3a. 第一批：不需要其他模块输出作为输入的模块
         # 所有模块的 derivatives（dt=1e-9 避免除零，同时保持瞬时导数精度）
+        # dydt 收集到 module_dydt（用于打包 return dydt_vec）
+        # outputs 收集到 all_outputs（用于 CONNECTIONS 路由和供其他模块调用）
         _EPS = 1e-9
+        module_dydt: dict[str, dict] = {}
 
         # 心脏
         module = getattr(self, "heart")
         dydt, outputs = module.derivatives(dt=_EPS, svr_factor=1.0)
+        module_dydt["heart"] = dydt
         all_outputs["heart"] = outputs
 
         # 肺部 — co_input 从缓存
         module = getattr(self, "lung")
         co_input = module_inputs.get("lung", {}).get("co_input")
         dydt, outputs = module.derivatives(dt=_EPS, co_input=co_input)
+        module_dydt["lung"] = dydt
         all_outputs["lung"] = outputs
 
         # 肾脏 — 三个必需位置参数都从缓存
@@ -1069,12 +1074,14 @@ class VirtualCreature:
             cvp_input=kidney_in.get("cvp_input", 5.0),
             co_input=kidney_in.get("co_input", 1500.0),
         )
+        module_dydt["kidney"] = dydt
         all_outputs["kidney"] = outputs
 
         # 肠道 — co_input 从缓存；输出是 gut_state dict，存入 all_outputs["gut"]
         module = getattr(self, "gut")
         gut_in = module_inputs.get("gut", {})
         dydt, gut_gut_outputs = module.derivatives(dt=_EPS, co_input=gut_in.get("co_input", 1500.0))
+        module_dydt["gut"] = dydt
         all_outputs["gut"] = gut_gut_outputs
 
         # 肝脏 — co_input 从缓存，gut_state 取自肠道输出
@@ -1085,11 +1092,13 @@ class VirtualCreature:
             co_input=liver_in.get("co_input", 1500.0),
             gut_state=gut_gut_outputs,  # 肠道输出作为 liver 的输入
         )
+        module_dydt["liver"] = dydt
         all_outputs["liver"] = outputs
 
         # 内分泌 — 无外部输入
         module = getattr(self, "endocrine")
         dydt, outputs = module.derivatives(dt=0.0)
+        module_dydt["endocrine"] = dydt
         all_outputs["endocrine"] = outputs
 
         # 神经 — map_input, lung_rr 从缓存
@@ -1101,6 +1110,7 @@ class VirtualCreature:
             heart_hr=neuro_in.get("heart_rate_bpm", 80.0),
             lung_rr=neuro_in.get("lung_rr", 15.0),
         )
+        module_dydt["neuro"] = dydt
         all_outputs["neuro"] = outputs
 
         # 免疫 — endocrine_cortisol 从缓存
@@ -1110,6 +1120,7 @@ class VirtualCreature:
             dt=_EPS,
             endocrine_cortisol=immune_in.get("endocrine_cortisol"),
         )
+        module_dydt["immune"] = dydt
         all_outputs["immune"] = outputs
 
         # 凝血 — liver_health_factor, immune_cytokine 从缓存
@@ -1120,6 +1131,7 @@ class VirtualCreature:
             liver_health_factor=coag_in.get("liver_health_factor", 1.0),
             immune_cytokine=coag_in.get("immune_cytokine", 0.0),
         )
+        module_dydt["coagulation"] = dydt
         all_outputs["coagulation"] = outputs
 
         # 淋巴 — map_input, hr_input, cytokine_input, gut_fat_absorption
@@ -1132,12 +1144,14 @@ class VirtualCreature:
             cytokine_input=lymph_in.get("cytokine_input", 0.0),
             gut_fat_absorption=lymph_in.get("gut_fat_absorption", False),
         )
+        module_dydt["lymphatic"] = dydt
         all_outputs["lymphatic"] = outputs
 
         # 体液 — map_input 从缓存
         module = getattr(self, "fluid")
         fluid_in = module_inputs.get("fluid", {})
         dydt, outputs = module.derivatives(dt=0.0, map_input=fluid_in.get("map_input"))
+        module_dydt["fluid"] = dydt
         all_outputs["fluid"] = outputs
 
         # 疾病
@@ -1155,16 +1169,18 @@ class VirtualCreature:
                         self._cached_inputs[tgt_mod] = {}
                     self._cached_inputs[tgt_mod][tgt_var] = val
 
-        # 5. 打包 dydt
+        # 5. 打包 dydt — 使用各模块 derivatives() 返回的 dydt（而非 outputs）
+        # outputs 包含代数端口量，直接使用会导致状态变量被设为当前值而非导数
+        # 各模块已在上面调用 derivatives()，dydt 存在 module_dydt 中
         state_map = self._build_unified_state_map()
         n = len(state_map)
         dydt_vec = np.zeros(n)
 
         for (mname, vname), idx in state_map.items():
             if mname == "disease":
-                dydt_vec[idx] = all_outputs.get("disease", {}).get(vname, 0.0)
+                dydt_vec[idx] = module_dydt.get("disease", {}).get(vname, 0.0)
             else:
-                dydt_vec[idx] = all_outputs.get(mname, {}).get(vname, 0.0)
+                dydt_vec[idx] = module_dydt.get(mname, {}).get(vname, 0.0)
 
         return dydt_vec
 

@@ -162,7 +162,8 @@ class HeartModule:
         SVR_increase = 1.0 + 2.0 * self.sympathetic * max(0.0, error)
         target_SVR = min(self.SVR_max, self.SVR_baseline * SVR_increase)
         alpha_svr = 0.1
-        dSVR = (target_SVR - self.SVR) * alpha_svr / dt
+        # τ = 1/alpha_svr = 10s, so dSVR = (target - current) / τ
+        dSVR = (target_SVR - self.SVR) * alpha_svr
 
         dydt = {
             "HR": dHR,

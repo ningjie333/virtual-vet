@@ -234,8 +234,10 @@ class LiverModule:
             self.blood.glucose_mmol_L = min(25.0, self.blood.glucose_mmol_L + glucose_from_lactate)
 
         # ── 状态变量导数 ───────────────────────────────────────────────────
+        # dGlycogen 已经是 per-second rate (dt_min/dt 抵消)，无需再除以 dt
+        dGlycogen_net = dGlycogen  # per-second rate
         dydt = {
-            "glycogen_fraction": dGlycogen / dt if dt > 0 else 0.0,
+            "glycogen_fraction": dGlycogen_net,
             "bilirubin_accumulation": dBilirubin_accum,
         }
 

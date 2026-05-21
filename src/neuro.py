@@ -104,6 +104,8 @@ class NeuroModule:
                 self.seizure = 0.0
 
         # 意识水平（MAP 驱动）
+        # dConsciousness 是 per-second rate（τ=30s），无需除以 dt
+        dConsciousness = 0.0
         if map_input is not None:
             if map_input < 40.0:
                 consciousness_target = 0.2
@@ -131,7 +133,7 @@ class NeuroModule:
         dydt = {
             "sympathetic_tone": dSympathetic,
             "parasympathetic_tone": dParasympathetic,
-            "consciousness": dConsciousness if map_input is not None else 0.0,
+            "consciousness": dConsciousness,
             "seizure": 0.0,
             "pain": dPain,
             "chemoreceptor": 0.0,

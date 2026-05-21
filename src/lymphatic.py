@@ -136,8 +136,14 @@ class LymphaticModule:
         dISF = capillary_leak - lymph_drainage
 
         max_isf = self.w * 60.0
-        new_isf = max(1000.0, min(max_isf, self.interstitial_fluid_mL + dISF))
-        dISF_final = (new_isf - self.interstitial_fluid_mL) / dt if dt > 0 else 0.0
+        # Soft floor: compute dISF but clamp it so derivative doesn't explode at dt=1e-9
+        # At dt=1e-9, dISF/dt = (dISF/dt) would be enormous; instead compute per-second rate
+        raw_dISF = dISF  # mL change in this call (already in mL units)
+        if raw_dISF < 0 and self.interstitial_fluid_mL + raw_dISF < 1000.0:
+            # Would hit floor — clamp dISF to avoid discontinuity at dt=1e-9
+            raw_dISF = 1000.0 - self.interstitial_fluid_mL - 0.01  # allow tiny negative room
+        new_isf = max(1000.0, min(max_isf, self.interstitial_fluid_mL + raw_dISF))
+        dISF_final = (new_isf - self.interstitial_fluid_mL) / 60.0  # per-second rate (not /dt)
         self.interstitial_fluid_mL = new_isf
 
         self.blood.interstitial_fluid_mL = self.interstitial_fluid_mL
