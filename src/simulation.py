@@ -204,9 +204,7 @@ CONNECTIONS: dict[tuple[str, str], list[tuple[str, str]]] = {
     ("endocrine", "PTH_pg_mL"):      [("kidney", "PTH")],
     ("endocrine", "calcium_mg_dL"): [("kidney", "calcium")],
 
-    # Neuro → heart, kidney, endocrine
-    ("neuro", "sympathetic_tone"):   [("heart", "sympathetic_tone")],
-    ("neuro", "parasympathetic_tone"): [("heart", "parasympathetic_tone")],
+    # Neuro → kidney, endocrine, lymphatic
     ("neuro", "pain_level"):         [("endocrine", "pain_stress")],
     ("neuro", "heart_rate_bpm"):     [("lymphatic", "hr_input")],
 
@@ -329,7 +327,14 @@ class VirtualCreature:
         self._cached_inputs: dict[str, dict[str, float]] = {}
         self._current_outputs: dict[str, dict[str, float]] = {}
 
-        # 生命周期引擎（驱动生长/衰老/死亡）
+        # ── 连续失血模型（A3：替代 schedule_event 用于 Radau）──────────
+        # sigmoid 失血：dV/dt = -k * sigmoid((t-t_onset)/width)
+        # k = blood_loss_total / duration  (mL/s)
+        # 累积失血量通过 Radau 积分（每次 rhs 调用应用微小损失）
+        self._blood_loss_config: dict[str, float] | None = None
+        self._cumulative_blood_loss_ml: float = 0.0  # 累积失血量（每次 rhs 调用累加）
+
+        # ── 生命周期引擎（驱动生长/衰老/死亡）──────────────────────────
         self.lifecycle = LifecycleEngine(species=species, initial_age_days=age_days)
 
         # 仿真时间
@@ -422,6 +427,29 @@ class VirtualCreature:
         - 'food_intake': params = {'glucose_grams': 50}
         """
         self._scheduled_events.append((time_s, event_type, params))
+
+    def set_blood_loss_scenario(self, t_onset: float, total_ml: float, duration: float = 300.0, width: float = 5.0):
+        """
+        设置连续 ODE 失血场景（替代 schedule_event，用于 Radau/Euler 仿真）。
+
+        失血模型：dV/dt = -k * sigmoid_on(t) * (1 - sigmoid_off(t))
+                  bell curve 面积 = k * 3 * width
+                  → k = total_ml / (3 * width)
+
+        Args:
+            t_onset:   失血开始时间（s）
+            total_ml:  总失血量（mL）
+            duration:  失血持续时间窗口（参考值，默认 300s）
+            width:     sigmoid 上升沿/下降沿宽度（s），默认 5s
+        """
+        k = total_ml / (3.0 * width)
+        self._blood_loss_config = {
+            "t_onset": t_onset,
+            "total_ml": total_ml,
+            "duration": duration,
+            "width": width,
+            "k": k,
+        }
 
     def attach_disease(self, disease_module):
         """
@@ -586,6 +614,21 @@ class VirtualCreature:
 
         # Step 0: 事件处理（必须先于 tox.compute，确保药物注射立即生效）
         self._process_events(t)
+
+        # Step 0.1: 连续失血模型（sigmoid + 累积截止，用于 Euler step 路径）
+        # 两条路径独立：Euler→step() 用这里，Radau→_unified_rhs() 用下面的逻辑
+        if self._blood_loss_config is not None:
+            cfg = self._blood_loss_config
+            t_rel = t - cfg["t_onset"]
+            if t_rel >= 0:
+                # bell curve: rise sigmoid × (1 - fall sigmoid)
+                sigmoid_on = 1.0 / (1.0 + np.exp(-t_rel / cfg["width"]))
+                t_fall = t_rel - 3 * cfg["width"]
+                sigmoid_off = 1.0 / (1.0 + np.exp(-t_fall / cfg["width"]))
+                rate = cfg["k"] * sigmoid_on * (1.0 - sigmoid_off)
+                self.heart.circulating_volume_ml -= rate * dt
+                if self.heart.circulating_volume_ml < 0:
+                    self.heart.circulating_volume_ml = 0
 
         # Step 0.5: 生命周期因子应用（年龄调整后的基线参数）
         if not self.lifecycle.is_dead():
@@ -838,7 +881,7 @@ class VirtualCreature:
     # 状态变量 = 进入统一 y 向量的变量（而非仅代数输出的变量）
     _UNIFIED_MODULES = [
         # name, state_var_names, module_attr
-        ("heart",       ["HR", "SV", "SVR"],                    "heart"),
+        ("heart",       ["HR", "SV", "SVR", "blood_volume", "sympathetic", "parasympathetic"], "heart"),
         ("lung",        ["RR", "TV", "VQ"],                    "lung"),
         ("kidney",      ["GFR", "RBF", "urine_output", "ADH"], "kidney"),
         ("fluid",       ["V_vascular", "V_isf", "V_icf"],      "fluid"),
@@ -886,6 +929,9 @@ class VirtualCreature:
                     if vname == "HR": y0[idx] = module.heart_rate
                     elif vname == "SV": y0[idx] = module.stroke_volume
                     elif vname == "SVR": y0[idx] = module.SVR
+                    elif vname == "blood_volume": y0[idx] = module.circulating_volume_ml
+                    elif vname == "sympathetic": y0[idx] = module.sympathetic
+                    elif vname == "parasympathetic": y0[idx] = module.parasympathetic
                 elif mname == "lung":
                     if vname == "RR": y0[idx] = module.respiratory_rate
                     elif vname == "TV": y0[idx] = module.tidal_volume
@@ -960,6 +1006,21 @@ class VirtualCreature:
                     if vname == "HR": module.heart_rate = val
                     elif vname == "SV": module.stroke_volume = val
                     elif vname == "SVR": module.SVR = val
+                    elif vname == "blood_volume": module.circulating_volume_ml = val
+                    elif vname == "sympathetic": module.sympathetic = val
+                    elif vname == "parasympathetic": module.parasympathetic = val
+                    # 同步 filtered MAP（低通滤波），与 heart.compute() 的 α=0.3 一致
+                    # 在 blood_volume unpack 后计算（确保 vol_ratio 正确）
+                    # mean_arterial_pressure 不在 y 向量里，需要主动同步
+                    if vname == "blood_volume":
+                        CO = module.heart_rate * module.stroke_volume
+                        vol_ratio = module.circulating_volume_ml / module.total_BV
+                        MAP_base = module.MAP_baseline
+                        raw_MAP = MAP_base + (CO / 60.0) * module.SVR
+                        if vol_ratio < 0.7:
+                            raw_MAP = raw_MAP * (0.5 + 0.5 * vol_ratio / 0.7)
+                        raw_MAP = max(30.0, min(180.0, raw_MAP))
+                        module.mean_arterial_pressure = raw_MAP  # 直接赋值，无状态记忆
                 elif mname == "lung":
                     if vname == "RR": module.respiratory_rate = val
                     elif vname == "TV": module.tidal_volume = val
@@ -1033,10 +1094,22 @@ class VirtualCreature:
         5. 在连接表上路由：_current_outputs → _cached_inputs（下次调用用）
         6. 打包 dydt → numpy 向量
         """
-        # 1. 解包状态
+        # 1. 连续失血模型（sigmoid，用于 Radau 积分路径）
+        # 与 step() 里的公式保持一致：bell curve = sigmoid_on × (1 - sigmoid_off)
+        blood_loss_rate_ml_s = 0.0
+        if self._blood_loss_config is not None:
+            cfg = self._blood_loss_config
+            t_rel = t - cfg["t_onset"]
+            if t_rel >= 0:
+                sigmoid_on = 1.0 / (1.0 + np.exp(-t_rel / cfg["width"]))
+                t_fall = t_rel - 3 * cfg["width"]
+                sigmoid_off = 1.0 / (1.0 + np.exp(-t_fall / cfg["width"]))
+                blood_loss_rate_ml_s = cfg["k"] * sigmoid_on * (1.0 - sigmoid_off)
+
+        # 2. 解包状态
         self._unpack_unified_state(y)
 
-        # 2. 准备各模块的 inputs（用 cached 值 + 当前输出填充）
+        # 3. 准备各模块的 inputs（用 cached 值 + 当前输出填充）
         all_outputs: dict[str, dict[str, float]] = {}
         module_inputs: dict[str, dict] = {}
 
@@ -1046,22 +1119,25 @@ class VirtualCreature:
             all_outputs[mname] = {}
 
         # 3a. 第一批：不需要其他模块输出作为输入的模块
-        # 所有模块的 derivatives（dt=1e-9 避免除零，同时保持瞬时导数精度）
+        # 所有模块的 derivatives（用 time-constant 参数 dt，别用 _USE_DT）
         # dydt 收集到 module_dydt（用于打包 return dydt_vec）
         # outputs 收集到 all_outputs（用于 CONNECTIONS 路由和供其他模块调用）
-        _EPS = 1e-9
+        # 注：这里 dt 只用于低通滤波时间常数的计算（如 dHR/dt 中的 alpha/dt），
+        # 不影响 dydt 的物理量纲。Radau 积分器自己管理步长，不受这里 dt 值影响。
+        _USE_DT = 0.01  # 代表性时间步长，保证 alpha/dt 不会溢出
         module_dydt: dict[str, dict] = {}
 
-        # 心脏
+        # 心脏 — 传入当前失血率（用于 blood_volume dydt）
         module = getattr(self, "heart")
-        dydt, outputs = module.derivatives(dt=_EPS, svr_factor=1.0)
+        dydt, outputs = module.derivatives(dt=_USE_DT, svr_factor=1.0,
+                                            blood_loss_rate_ml_s=blood_loss_rate_ml_s)
         module_dydt["heart"] = dydt
         all_outputs["heart"] = outputs
 
         # 肺部 — co_input 从缓存
         module = getattr(self, "lung")
         co_input = module_inputs.get("lung", {}).get("co_input")
-        dydt, outputs = module.derivatives(dt=_EPS, co_input=co_input)
+        dydt, outputs = module.derivatives(dt=_USE_DT, co_input=co_input)
         module_dydt["lung"] = dydt
         all_outputs["lung"] = outputs
 
@@ -1069,7 +1145,7 @@ class VirtualCreature:
         module = getattr(self, "kidney")
         kidney_in = module_inputs.get("kidney", {})
         dydt, outputs = module.derivatives(
-            dt=_EPS,
+            dt=_USE_DT,
             map_input=kidney_in.get("map_input", 90.0),
             cvp_input=kidney_in.get("cvp_input", 5.0),
             co_input=kidney_in.get("co_input", 1500.0),
@@ -1080,7 +1156,7 @@ class VirtualCreature:
         # 肠道 — co_input 从缓存；输出是 gut_state dict，存入 all_outputs["gut"]
         module = getattr(self, "gut")
         gut_in = module_inputs.get("gut", {})
-        dydt, gut_gut_outputs = module.derivatives(dt=_EPS, co_input=gut_in.get("co_input", 1500.0))
+        dydt, gut_gut_outputs = module.derivatives(dt=_USE_DT, co_input=gut_in.get("co_input", 1500.0))
         module_dydt["gut"] = dydt
         all_outputs["gut"] = gut_gut_outputs
 
@@ -1088,7 +1164,7 @@ class VirtualCreature:
         module = getattr(self, "liver")
         liver_in = module_inputs.get("liver", {})
         dydt, outputs = module.derivatives(
-            dt=_EPS,
+            dt=_USE_DT,
             co_input=liver_in.get("co_input", 1500.0),
             gut_state=gut_gut_outputs,  # 肠道输出作为 liver 的输入
         )
@@ -1105,7 +1181,7 @@ class VirtualCreature:
         module = getattr(self, "neuro")
         neuro_in = module_inputs.get("neuro", {})
         dydt, outputs = module.derivatives(
-            dt=_EPS,
+            dt=_USE_DT,
             map_input=neuro_in.get("map_input", 90.0),
             heart_hr=neuro_in.get("heart_rate_bpm", 80.0),
             lung_rr=neuro_in.get("lung_rr", 15.0),
@@ -1117,7 +1193,7 @@ class VirtualCreature:
         module = getattr(self, "immune")
         immune_in = module_inputs.get("immune", {})
         dydt, outputs = module.derivatives(
-            dt=_EPS,
+            dt=_USE_DT,
             endocrine_cortisol=immune_in.get("endocrine_cortisol"),
         )
         module_dydt["immune"] = dydt
@@ -1127,7 +1203,7 @@ class VirtualCreature:
         module = getattr(self, "coagulation")
         coag_in = module_inputs.get("coagulation", {})
         dydt, outputs = module.derivatives(
-            dt=_EPS,
+            dt=_USE_DT,
             liver_health_factor=coag_in.get("liver_health_factor", 1.0),
             immune_cytokine=coag_in.get("immune_cytokine", 0.0),
         )
@@ -1138,7 +1214,7 @@ class VirtualCreature:
         module = getattr(self, "lymphatic")
         lymph_in = module_inputs.get("lymphatic", {})
         dydt, outputs = module.derivatives(
-            dt=_EPS,
+            dt=_USE_DT,
             map_input=lymph_in.get("map_input", 80.0),
             hr_input=lymph_in.get("hr_input", 80.0),
             cytokine_input=lymph_in.get("cytokine_input", 0.0),
@@ -1169,9 +1245,9 @@ class VirtualCreature:
                         self._cached_inputs[tgt_mod] = {}
                     self._cached_inputs[tgt_mod][tgt_var] = val
 
-        # 5. 打包 dydt — 使用各模块 derivatives() 返回的 dydt（而非 outputs）
-        # outputs 包含代数端口量，直接使用会导致状态变量被设为当前值而非导数
-        # 各模块已在上面调用 derivatives()，dydt 存在 module_dydt 中
+        # ── 5. 打包 dydt — 使用各模块 derivatives() 返回的 dydt（而非 outputs）
+        # blood_volume 的 dydt 现在由 heart.derivatives() 直接提供（blood_loss_rate_ml_s）
+        # Radau 通过 y 向量积分 blood_volume 状态变量，不再需要外部应用
         state_map = self._build_unified_state_map()
         n = len(state_map)
         dydt_vec = np.zeros(n)
@@ -1301,6 +1377,7 @@ class VirtualCreature:
             _ = self._unified_rhs(0.0, y0)
 
         t_eval = np.arange(0.0, t_end + dt_save, dt_save)
+        t_eval = t_eval[t_eval <= t_end]  # clip to t_span
 
         sol = solve_ivp(
             self._unified_rhs,
@@ -1312,7 +1389,6 @@ class VirtualCreature:
             t_eval=t_eval,
             dense_output=True,
             vectorized=False,
-            max_steps=2000,
         )
         return sol
 

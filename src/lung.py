@@ -84,10 +84,12 @@ class LungModule:
         self.respiratory_compensation = 0.0         # 呼吸代偿程度
 
         # Van der Pol 呼吸节律振荡器（替代线性反馈）
+        # 注：静息 RR=15/min（2026-05-22 修正以匹配 PaCO2=40 mmHg）
+        # 不同于 parameters.RESPIRATORY_RATE_REST=18（用于分钟通气量计算）
         dt = DT_SECONDS  # 与仿真步长一致
         self._vdp = VanDerPolRespiratoryRhythm(
             dt=dt,
-            rr_rest=base_RR / 60.0,  # 转换为 Hz
+            rr_rest=15.0 / 60.0,  # 15/min → 0.25 Hz
         )
 
     # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
@@ -152,9 +154,13 @@ class LungModule:
         target_tv = self.base_tidal_volume * target_tv_factor
 
         # ── 9. 状态变量导数（dRR/dt, dTV/dt） ────────────────────────────────
-        alpha = min(1.0, dt / 0.5)
-        dRR = (target_rr - self.respiratory_rate) * alpha
-        dTV = (target_tv - self.tidal_volume) * alpha
+        # dRR/dt = (target_rr - RR) / τ_RR, τ_RR = 0.5s → rate = 2.0 * error
+        # dTV/dt = (target_tv - TV) / τ_TV, τ_TV = 0.5s → rate = 2.0 * error
+        # 使用 time-constant 公式（不依赖 dt），使 RHS 与求解器 dt 解耦
+        tau_rr = 0.5  # s
+        tau_tv = 0.5  # s
+        dRR = (target_rr - self.respiratory_rate) / tau_rr
+        dTV = (target_tv - self.tidal_volume) / tau_tv
 
         # VQ_ratio 缓慢适应（由其他模块调节，本身为慢变量）
         dVQ = 0.0  # 保持不变
@@ -225,18 +231,27 @@ class LungModule:
         - 高碳酸血症 → VdP ω↑ + μ↑ → RR 加快 + 深度增大
         - 低氧血症  → VdP ω↑ → RR 加快
         - 酸中毒    → VdP ω↑ + μ↑ → Kussmaul 呼吸
+
+        注：VDP 每步迭代次数 = max(1, round(dt/DT_SECONDS))，确保每步恰好模拟 dt 秒的
+        物理时间，避免 dt 减小导致的 VDP 过度推进（3000 次/秒 vs 300 次/秒）。
         """
         # 获取当前 pH
         arterial_pH = self.blood.arterial_pH
 
-        # 推进 VdP 振荡器
-        self._vdp.update(pco2=arterial_PCO2, po2=arterial_PO2, ph=arterial_pH)
+        # VDP 迭代次数：每步恰好模拟 dt 秒物理时间
+        # dt=0.1  → 1 次迭代（0.1s VDP 时间）→ 300 次/物理秒
+        # dt=0.01 → 1 次迭代（0.01s VDP 时间）→ 1000 次/物理秒
+        # dt=0.05 → 1 次迭代（0.05s VDP 时间）→ 200 次/物理秒
+        n_vdp_iterations = max(1, round(dt / DT_SECONDS))
+
+        for _ in range(n_vdp_iterations):
+            self._vdp.update(pco2=arterial_PCO2, po2=arterial_PO2, ph=arterial_pH)
 
         # 从 VdP 输出获取目标呼吸频率
         target_rr = self._vdp.respiratory_rate
 
         # 平滑过渡（避免数值振荡）
-        alpha = min(1.0, dt / 0.5)  # 500ms 时间常数
+        alpha = dt / 0.5  # 500ms 时间常数
         self.respiratory_rate += (target_rr - self.respiratory_rate) * alpha
 
         # 限幅

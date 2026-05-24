@@ -56,9 +56,14 @@ class HeartModule:
         self.stroke_volume = _sv
 
         # 血管阻力
-        self.SVR = SVR
-        self.SVR_baseline = SVR
-        self.SVR_max = SVR * 3.0
+        # 校准：MAP = MAP_base + CO × SVR
+        # CO = HR × SV，MAP_base = 基础血管张力（60 mmHg）
+        # SVR = (MAP_target - MAP_base) / (CO_baseline/60)，单位 mmHg·s/mL
+        # 例：SVR = (100-60) / (1700/60) = 1.41 mmHg·s/mL
+        CO_baseline_mL_min = HEART_RATE_REST_BPM * stroke_volume_ml(self.w)  # 85 × 20 = 1700 mL/min
+        self.SVR = (MEAN_ARTERIAL_PRESSURE_MMHG - MAP_baseline) / (CO_baseline_mL_min / 60.0)
+        self.SVR_baseline = self.SVR
+        self.SVR_max = self.SVR * 3.0
 
         # 血压
         self.MAP_baseline = MAP_baseline
@@ -92,7 +97,7 @@ class HeartModule:
     # 状态变量（进入统一 y 向量）: HR, SV, SVR
     # 输出变量（供其他模块）: CO, MAP, CVP, PAP
 
-    def derivatives(self, dt: float, svr_factor: float = 1.0) -> tuple[dict, dict]:
+    def derivatives(self, dt: float, svr_factor: float = 1.0, blood_loss_rate_ml_s: float = 0.0) -> tuple[dict, dict]:
         """
         返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
 
@@ -101,18 +106,30 @@ class HeartModule:
         Args:
             dt: 时间步长（秒），供低通滤波 time constant 计算用
             svr_factor: 外部 SVR 倍数（ToxicologyModule 输出，1.0 = 无调制）
+            blood_loss_rate_ml_s: 当前失血率（mL/s），由连续失血模型提供
 
         Returns:
             (dydt, outputs):
               dydt: dict[str, float] — 状态变量导数
               outputs: dict[str, float] — 供其他模块使用的输出端口
         """
+        # ── 0. 诊断：检测 dt=1e-9（Pure Euler / convergence study 路径）
+        # if dt < 1e-6:
+        #     vol_ratio = self.circulating_volume_ml / self.total_BV
+        #     CO = self.heart_rate * self.stroke_volume
+        #     print(f"⚠️  dt={dt:.1e}, vol_ratio={vol_ratio:.3f}, CO={CO:.1f}, stroke_vol={self.stroke_volume:.3f}")
         # ── 1. Frank-Starling: dSV/dt ──────────────────────────────────────
+        # 生理学：每搏输出量由静脉回流（前负荷）决定
+        # 失血 → 静脉回流↓ → 前负荷↓ → SV↓
+        # 公式：SV = base_SV × f(vol_ratio)，非线性响应
         vol_ratio = self.circulating_volume_ml / self.total_BV
         if 0.5 <= vol_ratio <= 1.2:
-            target_SV = self.base_SV * (0.6 + 0.4 * vol_ratio)
+            # 失血 >15%BV 时需要显著 SV 下降才能触发压力感受器代偿
+            # 曲线：vol_ratio=0.85 → SV≈17.5（-12.5%），vol_ratio=0.75 → SV≈14.5（-27.5%）
+            #      vol_ratio=0.65 → SV≈11.5（-42.5%）
+            target_SV = self.base_SV * (0.05 + 0.95 * vol_ratio ** 2.5)
         elif vol_ratio < 0.5:
-            target_SV = self.base_SV * 0.5
+            target_SV = self.base_SV * 0.3
         else:
             target_SV = self.base_SV * 1.05
 
@@ -122,20 +139,22 @@ class HeartModule:
         coronary_factor = self._coronary_perfusion_effect(self.mean_arterial_pressure)
         effective_target *= coronary_factor
 
-        alpha_sv = 0.3
-        dSV = (effective_target - self.stroke_volume) * alpha_sv / dt
-        # clamp
-        next_sv = self.stroke_volume + dSV * dt
-        next_sv = max(self.base_SV * 0.15, next_sv)
-        dSV = (next_sv - self.stroke_volume) / dt
+        # Frank-Starling: τ = 1/alpha_sv ≈ 3.3s
+        # 连续形式: τ · dSV/dt + SV = effective_target
+        # Anti-windup clamp on target (not derivative): prevents >100% change in one τ
+        clamped_target = max(self.base_SV * 0.15, min(self.base_SV * 2.0, effective_target))
+        tau_sv = 1.0 / 0.3  # ≈ 3.33s
+        dSV = (clamped_target - self.stroke_volume) / tau_sv
 
         # ── 2. 心输出量（代数） ─────────────────────────────────────────────
         CO = self.heart_rate * self.stroke_volume
 
-        # ── 3. SVR 代偿（代数+动态） ─────────────────────────────────────────
+        # ── 3. SVR 代偿（代数+动态）─────────────────────────────────────────
         effective_SVR = self.SVR * svr_factor
-        pressure_contribution = (CO / 60.0) * effective_SVR
-        raw_MAP = self.MAP_baseline + pressure_contribution
+        # 生理学：MAP = MAP_base + CO × SVR
+        MAP_base = self.MAP_baseline
+        raw_MAP = MAP_base + (CO / 60.0) * effective_SVR
+        # 当血容量严重不足（vol_ratio < 0.7）时，静脉回流减少进一步降低 MAP
         if vol_ratio < 0.7:
             raw_MAP = raw_MAP * (0.5 + 0.5 * vol_ratio / 0.7)
         raw_MAP = max(30.0, min(180.0, raw_MAP))
@@ -143,32 +162,36 @@ class HeartModule:
         # ── 4. 压力感受器反馈: dHR/dt, dSVR/dt ──────────────────────────────
         error = (self.MAP_target - raw_MAP) / self.MAP_target
 
+        # 交感/副交感 baroreflex (τ_symp=2s, τ_para=5s)
+        # dS/dt = (target - S) / τ  (一阶低通，物理时间常数，不依赖 dt)
         sym_target = self._clamp(SYMPATHETIC_BASELINE + 0.7 * max(0.0, error), 0.0, 1.0)
-        d_sym = (sym_target - self.sympathetic) * min(1.0, dt / 2.0) / dt
-
         para_target = self._clamp(0.7 - 0.5 * error, 0.0, 1.0)
-        d_para = (para_target - self.parasympathetic) * min(1.0, dt / 5.0) / dt
+        tau_symp = 2.0   # 交感响应时间常数 (s)
+        tau_para = 5.0   # 副交感响应时间常数 (s)
+        d_sym = (sym_target - self.sympathetic) / tau_symp
+        d_para = (para_target - self.parasympathetic) / tau_para
 
+        # dHR/dt: HR rate in beats/s per second (units: 1/s)
         HR_para = -self.parasympathetic * 15.0 * max(0.0, -error)
         HR_symp = self.sympathetic * 50.0 * max(0.0, error)
-        dHR = (HR_para + HR_symp) * dt / dt
+        dHR = (HR_para + HR_symp)  # 已经是 1/s 单位
         # K⁺ 毒性
         k_factor = self._potassium_cardiac_effect(self.blood.potassium_mEq_L)
-        dHR_net = dHR * k_factor
-        next_HR = self.heart_rate + dHR_net * dt
-        next_HR = max(5.0, min(self.HR_max, next_HR))
-        dHR = (next_HR - self.heart_rate) / dt
+        dHR = dHR * k_factor
 
+        # SVR 补偿（τ = 1/alpha_svr = 10s）
         SVR_increase = 1.0 + 2.0 * self.sympathetic * max(0.0, error)
         target_SVR = min(self.SVR_max, self.SVR_baseline * SVR_increase)
         alpha_svr = 0.1
-        # τ = 1/alpha_svr = 10s, so dSVR = (target - current) / τ
-        dSVR = (target_SVR - self.SVR) * alpha_svr
+        dSVR = (target_SVR - self.SVR) * alpha_svr  # τ=10s
 
         dydt = {
             "HR": dHR,
             "SV": dSV,
             "SVR": dSVR,
+            "blood_volume": -blood_loss_rate_ml_s,  # 负值 = 血容量减少
+            "sympathetic": d_sym,
+            "parasympathetic": d_para,
         }
 
         outputs = {
@@ -284,10 +307,12 @@ class HeartModule:
 
         # 血容量充足时：SV 随血容量增加而增加
         if 0.5 <= vol_ratio <= 1.2:
-            target_SV = self.base_SV * (0.6 + 0.4 * vol_ratio)
+            # 失血 >15%BV 时需要显著 SV 下降才能触发压力感受器代偿
+            # 曲线：vol_ratio=0.85 → SV≈17.5（-12.5%），vol_ratio=0.75 → SV≈14.5（-27.5%）
+            #      vol_ratio=0.65 → SV≈11.5（-42.5%）
+            target_SV = self.base_SV * (0.05 + 0.95 * vol_ratio ** 2.5)
         elif vol_ratio < 0.5:
-            # 严重低血容量：SV 下降，但下降速率受限制
-            target_SV = self.base_SV * 0.5
+            target_SV = self.base_SV * 0.3
         else:
             target_SV = self.base_SV * 1.05
 
@@ -321,15 +346,17 @@ class HeartModule:
         """
         error = (self.MAP_target - MAP) / self.MAP_target
 
-        # 交感活动动态更新
+        # 交感/副交感 baroreflex (τ_symp=2s, τ_para=5s)
+        # 与 derivatives() 的公式一致：dS/dt = (target - S) / τ
         sym_target = self._clamp(SYMPATHETIC_BASELINE + 0.7 * max(0.0, error), 0.0, 1.0)
-        self.sympathetic += (sym_target - self.sympathetic) * min(1.0, dt / 2.0)
-
-        # 副交感活动动态更新
         para_target = self._clamp(0.7 - 0.5 * error, 0.0, 1.0)
-        self.parasympathetic += (para_target - self.parasympathetic) * min(1.0, dt / 5.0)
+        tau_symp = 2.0
+        tau_para = 5.0
+        self.sympathetic += (sym_target - self.sympathetic) / tau_symp * dt
+        self.parasympathetic += (para_target - self.parasympathetic) / tau_para * dt
 
         # HR 计算：副交感在MAP偏高时减速，交感在MAP偏低时加速
+        # 与 derivatives() 一致：dHR/dt = (HR_para + HR_symp) * k_factor (单位 1/s)
         HR_para = -self.parasympathetic * 15.0 * max(0.0, -error)
         HR_symp = self.sympathetic * 50.0 * max(0.0, error)
         HR_delta = (HR_para + HR_symp) * dt
@@ -373,10 +400,10 @@ class HeartModule:
         # Step 2: 心输出量
         self.cardiac_output = self.heart_rate * self.stroke_volume  # mL/min
 
-        # Step 3: 平均动脉压（含外部 SVR 调制，如可卡因交感收缩）
+        # Step 3: 平均动脉压（MAP = MAP_base + CO × SVR）
+        MAP_base = self.MAP_baseline
         effective_SVR = self.SVR * svr_factor
-        pressure_contribution = (self.cardiac_output / 60.0) * effective_SVR
-        raw_MAP = self.MAP_baseline + pressure_contribution
+        raw_MAP = MAP_base + (self.cardiac_output / 60.0) * effective_SVR
 
         # 血容量严重不足时血压下降
         vol_ratio = self.circulating_volume_ml / self.total_BV

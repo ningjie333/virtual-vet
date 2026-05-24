@@ -332,9 +332,9 @@ class TestThreeModelIntegration:
         for _ in range(200):
             v.step()
 
-        # VdP: RR should be ~18/min
+        # VdP: RR should be ~15/min (2026-05-22: corrected for PaCO2=40)
         rr = v.lung.respiratory_rate
-        assert 16.0 <= rr <= 20.0, f"RR={rr}, expected ~18/min"
+        assert 13.0 <= rr <= 17.0, f"RR={rr}, expected ~15/min"
 
         # HH: K⁺ toxicity factor should be ~1.0 (normal K⁺)
         k_tox = v.heart.hh.k_toxicity_factor
@@ -385,9 +385,9 @@ class TestThreeModelIntegration:
         for _ in range(200):
             v.step()
 
-        # VdP: stable RR
+        # VdP: stable RR ~15/min (2026-05-22: corrected from ~18)
         rr = v.lung.respiratory_rate
-        assert 16.0 <= rr <= 20.0, f"RR={rr}, expected ~18/min"
+        assert 13.0 <= rr <= 17.0, f"RR={rr}, expected ~15/min"
 
         # VdP: oscillating (not stuck)
         vdp_state = v.lung._vdp.get_state()

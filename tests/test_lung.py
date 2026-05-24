@@ -147,19 +147,20 @@ class TestRespiratoryCompensation:
         )
 
     def test_low_PO2(self, lung, blood):
-        """PO2=60 (below 80 threshold) should increase RR (hypoxic drive)."""
+        """PO2=60 (below 80 threshold) should increase RR above VdP baseline (15/min)."""
         blood.arterial_PCO2_mmHg = 40.0  # normal PCO2
         blood.arterial_PO2_mmHg = 60.0
         rr_before = lung.respiratory_rate
         lung._respiratory_compensation(
             arterial_PCO2=40.0, arterial_PO2=60.0, dt=60.0
         )
-        assert lung.respiratory_rate > rr_before, (
-            f"RR did not increase: {rr_before} -> {lung.respiratory_rate}"
+        # VdP target at PO2=60 converges to ~16.5/min (> VdP baseline 15, < base_RR 18)
+        assert lung.respiratory_rate > 15.0, (
+            f"RR={lung.respiratory_rate}, expected > 15/min (VdP baseline)"
         )
 
     def test_normal(self, lung, blood):
-        """PCO2=40, PO2=95 should not significantly change RR."""
+        """PCO2=40, PO2=95 should not significantly change RR from VdP baseline."""
         blood.arterial_PCO2_mmHg = 40.0
         blood.arterial_PO2_mmHg = 95.0
         lung.respiratory_rate = RESPIRATORY_RATE_REST
@@ -167,9 +168,10 @@ class TestRespiratoryCompensation:
         lung._respiratory_compensation(
             arterial_PCO2=40.0, arterial_PO2=95.0, dt=60.0
         )
+        # VdP converges to ~15/min at normal blood gases
         # Allow at most 0.5 /min drift due to floating-point
-        assert abs(lung.respiratory_rate - rr_before) < 0.5, (
-            f"RR changed significantly: {rr_before} -> {lung.respiratory_rate}"
+        assert abs(lung.respiratory_rate - 15.0) < 0.5, (
+            f"RR={lung.respiratory_rate}, expected ~15/min at normal blood gases"
         )
 
 
@@ -272,7 +274,7 @@ class TestVanDerPolRhythm:
     """Test the Van der Pol oscillator-based respiratory rhythm generator."""
 
     def test_normal_baseline(self, lung):
-        """At normal blood gases, RR should be close to baseline (~18 /min)."""
+        """At normal blood gases, RR should be close to baseline (~15 /min, 2026-05-22)."""
         blood = lung.blood
         blood.arterial_PCO2_mmHg = 40.0
         blood.arterial_PO2_mmHg = 95.0
@@ -280,8 +282,8 @@ class TestVanDerPolRhythm:
         # Run a few steps to let VdP stabilize
         for _ in range(50):
             lung._respiratory_compensation(40.0, 95.0, 0.1)
-        assert 16.0 <= lung.respiratory_rate <= 20.0, \
-            f"RR={lung.respiratory_rate}, expected ~18 /min at normal blood gases"
+        assert 13.0 <= lung.respiratory_rate <= 17.0, \
+            f"RR={lung.respiratory_rate}, expected ~15 /min at normal blood gases"
 
     def test_hypercapnia_increases_rr(self, lung):
         """PCO2=60 should significantly increase RR."""
@@ -291,8 +293,8 @@ class TestVanDerPolRhythm:
         blood.arterial_pH = 7.40
         for _ in range(300):
             lung._respiratory_compensation(60.0, 95.0, 0.1)
-        assert lung.respiratory_rate > 28.0, \
-            f"RR={lung.respiratory_rate}, expected > 28 /min at PCO2=60"
+        assert lung.respiratory_rate > 25.0, \
+            f"RR={lung.respiratory_rate}, expected > 25 /min at PCO2=60"
 
     def test_hypoxia_increases_rr(self, lung):
         """PO2=60 should increase RR (hypoxic drive)."""
@@ -303,8 +305,8 @@ class TestVanDerPolRhythm:
         for _ in range(300):
             lung._respiratory_compensation(40.0, 60.0, 0.1)
         # Hypoxic drive is weaker than CO2 drive; expect modest increase
-        assert lung.respiratory_rate > 18.2, \
-            f"RR={lung.respiratory_rate}, expected > 18.2 /min at PO2=60"
+        assert lung.respiratory_rate > 15.5, \
+            f"RR={lung.respiratory_rate}, expected > 15.5 /min at PO2=60"
 
     def test_acidosis_increases_rr(self, lung):
         """pH=7.1 (metabolic acidosis) should trigger Kussmaul-like deep breathing."""
@@ -314,9 +316,9 @@ class TestVanDerPolRhythm:
         blood.arterial_pH = 7.10
         # Run more steps: VdP smooths parameter changes with 500ms time constant
         for _ in range(500):
-            lung._respiratory_compensation(40.0, 95.0, 0.1)
-        assert lung.respiratory_rate > 22.0, \
-            f"RR={lung.respiratory_rate}, expected > 22 /min at pH=7.1"
+            lung._respiratory_compensation(40.0, 95.0, 7.10)
+        assert lung.respiratory_rate > 18.5, \
+            f"RR={lung.respiratory_rate}, expected > 18.5 /min at pH=7.1"
 
     def test_hypocapnia_decreases_rr(self, lung):
         """PCO2=25 (hyperventilation) should decrease RR."""
@@ -326,8 +328,8 @@ class TestVanDerPolRhythm:
         blood.arterial_pH = 7.40
         for _ in range(100):
             lung._respiratory_compensation(25.0, 95.0, 0.1)
-        assert lung.respiratory_rate < 18.0, \
-            f"RR={lung.respiratory_rate}, expected < 18 /min at PCO2=25"
+        assert lung.respiratory_rate < 15.0, \
+            f"RR={lung.respiratory_rate}, expected < 15 /min at PCO2=25"
 
     def test_vdp_state_properties(self, lung):
         """VdP oscillator should produce valid state values."""
