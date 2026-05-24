@@ -238,7 +238,7 @@ class VanDerPolRespiratoryRhythm:
 
         # 振荡幅度（滑动窗口 RMS 估计）
         instant_amp = math.sqrt(self.x ** 2 + (self.v / self.omega) ** 2)
-        alpha_amp = min(1.0, self.dt / 0.1)  # 100ms 平滑
+        alpha_amp = self.dt / 0.1  # 100ms 平滑
         self.amplitude += (instant_amp - self.amplitude) * alpha_amp
 
         # 呼吸相位 (0-1)

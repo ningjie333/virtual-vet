@@ -114,7 +114,7 @@ class CoagulationModule:
         aptt_sec = max(20.0, min(120.0, 30.0 / effective_aptt))
 
         tau_pt = 300.0
-        alpha_pt = dt / tau_pt if tau_pt > 0 else 1.0
+        alpha_pt = dt / tau_pt if tau_pt > 0 else 0.0
         self.blood.PT_sec += alpha_pt * (pt_sec - self.blood.PT_sec)
         self.blood.aPTT_sec += alpha_pt * (aptt_sec - self.blood.aPTT_sec)
 

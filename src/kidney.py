@@ -179,7 +179,7 @@ class KidneyModule:
             ADH_target = min(1.0, self.ADH_level + 0.1 * osmotic_pressure / 10)
         else:
             ADH_target = max(0.1, self.ADH_level - 0.01)
-        dADH = (ADH_target - self.ADH_level) * min(1.0, dt / 5.0)
+        dADH = (ADH_target - self.ADH_level) / 5.0
 
         # ── 9. 血容量损失率（代数） ─────────────────────────────────────────
         blood_volume_loss_rate = urine_output * 0.30

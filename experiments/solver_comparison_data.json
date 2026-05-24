@@ -1,0 +1,103 @@
+{
+  "config": {
+    "weight_kg": 20.0,
+    "t_end_s": 30.0,
+    "dt_save": 10.0,
+    "reference_HR": 85.08672017487328,
+    "reference_MAP": 100.0,
+    "reference_PaCO2": 39.999998681783545,
+    "reference_pH": 7.401030009976335
+  },
+  "results": {
+    "RK45": {
+      "solver": "RK45",
+      "success": false,
+      "time_s": 0.008406599999943865,
+      "nfev": null,
+      "n_steps": null,
+      "n_accept": null,
+      "message": "nsteps",
+      "final_HR": null,
+      "final_MAP": null,
+      "final_PaCO2": null,
+      "final_pH": null,
+      "HR_drift": null,
+      "MAP_drift": null
+    },
+    "Euler dt=0.001": {
+      "solver": "Euler dt=0.001",
+      "success": true,
+      "time_s": 11.965843500000119,
+      "nfev": 30000,
+      "n_steps": 30000,
+      "n_accept": 30000,
+      "message": "Integration successful",
+      "final_HR": 113.30662109303184,
+      "final_MAP": 113.10153496650314,
+      "final_PaCO2": 30.58536751191255,
+      "final_pH": 7.517576283670735,
+      "HR_drift": 28.306621093031836,
+      "MAP_drift": 13.101534966503138
+    },
+    "Euler dt=0.005": {
+      "solver": "Euler dt=0.005",
+      "success": true,
+      "time_s": 2.0319236000000274,
+      "nfev": 6000,
+      "n_steps": 6000,
+      "n_accept": 6000,
+      "message": "Integration successful",
+      "final_HR": 113.04195107099376,
+      "final_MAP": 113.1006730745815,
+      "final_PaCO2": 30.482049421627437,
+      "final_pH": 7.519045824108421,
+      "HR_drift": 28.04195107099376,
+      "MAP_drift": 13.100673074581493
+    },
+    "Euler dt=0.01": {
+      "solver": "Euler dt=0.01",
+      "success": true,
+      "time_s": 1.0088623000001462,
+      "nfev": 3000,
+      "n_steps": 3000,
+      "n_accept": 3000,
+      "message": "Integration successful",
+      "final_HR": 113.01410533604536,
+      "final_MAP": 113.10168753849976,
+      "final_PaCO2": 30.307011647748467,
+      "final_pH": 7.521546871108492,
+      "HR_drift": 28.01410533604536,
+      "MAP_drift": 13.10168753849976
+    },
+    "Euler dt=0.05": {
+      "solver": "Euler dt=0.05",
+      "success": true,
+      "time_s": 0.1910261999996692,
+      "nfev": 600,
+      "n_steps": 600,
+      "n_accept": 600,
+      "message": "Integration successful",
+      "final_HR": 111.10235662196877,
+      "final_MAP": 112.21042698601488,
+      "final_PaCO2": 30.48176018182677,
+      "final_pH": 7.519049945086103,
+      "HR_drift": 26.102356621968767,
+      "MAP_drift": 12.21042698601488
+    },
+    "Euler dt=0.1": {
+      "solver": "Euler dt=0.1",
+      "success": true,
+      "time_s": 0.09812130000000252,
+      "nfev": 300,
+      "n_steps": 300,
+      "n_accept": 300,
+      "message": "Integration successful",
+      "final_HR": 101.78916603325146,
+      "final_MAP": 107.80578364489008,
+      "final_PaCO2": 30.307462976526377,
+      "final_pH": 7.521540403689646,
+      "HR_drift": 16.789166033251462,
+      "MAP_drift": 7.805783644890084
+    }
+  }
+}

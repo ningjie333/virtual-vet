@@ -197,13 +197,13 @@ class FluidCompartment:
         # 转换为 mL/s
         starling_rate_ml_s = starling_rate_ml_min / 60.0
 
-        # 限幅（稳定区域）
-        max_rate = min(abs(self.vascular_volume_ml), abs(self.isf_volume_ml)) * 0.05 / dt if dt > 0 else 0.05 / 0.1
+        # 限幅（稳定区域，速率上限 mL/s）
+        max_rate = min(abs(self.vascular_volume_ml), abs(self.isf_volume_ml)) * 0.05
         starling_rate_ml_s = max(-max_rate, min(max_rate, starling_rate_ml_s))
 
         # Osmotic: shift_mL/s = LP × osmotic_gradient
         osmotic_rate_ml_s = LP_ISF_ICF * osmotic_gradient_isf_icf
-        max_osm_rate = min(self.isf_volume_ml, self.icf_volume_ml) * 0.02 / dt if dt > 0 else 0.02 / 0.1
+        max_osm_rate = min(self.isf_volume_ml, self.icf_volume_ml) * 0.02
         osmotic_rate_ml_s = max(-max_osm_rate, min(max_osm_rate, osmotic_rate_ml_s))
 
         dV_vascular = -starling_rate_ml_s

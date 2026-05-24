@@ -325,8 +325,8 @@ class EndocrineModule:
 
         # first_order_lag平滑
         tau = PANCREATIC_RESPONSE_TAU_SEC
-        alpha_insulin = min(1.0, dt / tau)
-        alpha_glucagon = min(1.0, dt / tau)
+        alpha_insulin = dt / tau
+        alpha_glucagon = dt / tau
         self.insulin_uU_mL += (self._insulin_target - self.insulin_uU_mL) * alpha_insulin
         self.glucagon_pg_mL += (self._glucagon_target - self.glucagon_pg_mL) * alpha_glucagon
 

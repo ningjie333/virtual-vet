@@ -109,7 +109,7 @@ class LymphaticModule:
             dSplenic = 0.0
 
         new_splenic = max(0.0, min(max_reserve, self.splenic_reserve_mL + dSplenic))
-        dSplenic_final = (new_splenic - self.splenic_reserve_mL) / dt if dt > 0 else 0.0
+        dSplenic_final = (new_splenic - self.splenic_reserve_mL) / 1.0
         self.splenic_reserve_mL = new_splenic
 
         # ── 淋巴回流速率（代数） ───────────────────────────────────────────

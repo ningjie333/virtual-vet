@@ -179,7 +179,7 @@ class LiverModule:
         else:
             new_accum = self._bilirubin_accumulation + production_input * dt_day
         new_accum = max(0.0, new_accum)
-        dBilirubin_accum = (new_accum - self._bilirubin_accumulation) / dt  # 转换为 /s
+        dBilirubin_accum = (new_accum - self._bilirubin_accumulation) / dt_day  # 转换为 /s
         self._bilirubin_accumulation = new_accum
 
         bilirubin_level = _BILIRUBIN_AXIS_INTERCEPT + new_accum * _BILIRUBIN_SEVERITY_SLOPE
@@ -207,7 +207,7 @@ class LiverModule:
             hepatic_factor = min(1.0, hepatic_flow / baseline_flow)
             Vmax = _CYP450_BASE_CAPACITY * self.metabolic_activity * self.cyp450_activity * hepatic_factor
             metabolism_rate = Vmax * drug_conc / (_CYP450_KM + drug_conc)
-            max_clearance = drug_conc / dt if dt > 0 else 0.0
+            max_clearance = drug_conc
             cleared = min(metabolism_rate, max_clearance)
             self.blood.drug_concentration_mg_kg = max(0.0, drug_conc - cleared)
 
@@ -502,7 +502,7 @@ class LiverModule:
         metabolism_rate = Vmax_eff * drug_conc / (_CYP450_KM + drug_conc)
 
         # 限制最大清除速率（防止负浓度）
-        max_clearance = drug_conc / dt if dt > 0 else 0.0
+        max_clearance = drug_conc
         cleared = min(metabolism_rate, max_clearance)
         # 返回清除量（非速率），供调用方直接减 Drug.concentration
         return cleared * dt

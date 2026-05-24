@@ -83,12 +83,11 @@ class GutModule:
         portal_flow = 0.15 * co_input
 
         # ── 2. 胃排空（代数，腔内营养作为缓存） ───────────────────────────────
-        dt_min = dt / 60.0
-        # 一阶衰减：dLumen/dt = -Lumen / tau（转化为导数）
-        # 慢变量，仅在有食物时需要更新
-        dLumen_glucose = -self.lumen_glucose_g / self._TAU_GASTRIC_EMPTYING * dt_min / dt if self.lumen_glucose_g > 0 else 0.0
-        dLumen_amino = -self.lumen_amino_g / self._TAU_GASTRIC_EMPTYING * dt_min / dt if self.lumen_amino_g > 0 else 0.0
-        dLumen_fat = -self.lumen_fat_g / self._TAU_GASTRIC_EMPTYING * dt_min / dt if self.lumen_fat_g > 0 else 0.0
+        # 一阶衰减：dLumen/dt = -Lumen / tau（tau 已从分钟转为秒）
+        tau_gastric_s = self._TAU_GASTRIC_EMPTYING * 60.0
+        dLumen_glucose = -self.lumen_glucose_g / tau_gastric_s if self.lumen_glucose_g > 0 else 0.0
+        dLumen_amino = -self.lumen_amino_g / tau_gastric_s if self.lumen_amino_g > 0 else 0.0
+        dLumen_fat = -self.lumen_fat_g / tau_gastric_s if self.lumen_fat_g > 0 else 0.0
 
         # ── 3. 吸收（代数） ───────────────────────────────────────────────────
         efficiency = (
@@ -105,9 +104,10 @@ class GutModule:
         amino_abs = min(self.lumen_amino_g, amino_rate * dt * efficiency)
         fat_abs = min(self.lumen_fat_g, fat_rate * dt * efficiency)
 
-        # ── 4. SCFA（慢动力学） ───────────────────────────────────────────────
+        # ── 4. SCFA（慢动力学，τ=10s） ─────────────────────────────────────────
         target_scfa = self.microbiome_activity * 0.3
-        dSCFA = (target_scfa - self.SCFA_mmol_L) * dt / 10.0
+        tau_scfa = 10.0
+        dSCFA = (target_scfa - self.SCFA_mmol_L) / tau_scfa
 
         # ── 5. 血液门静脉缓存（代数） ────────────────────────────────────────
         if portal_flow > 0:
