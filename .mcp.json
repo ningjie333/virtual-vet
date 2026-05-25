@@ -2,10 +2,7 @@
   "mcpServers": {
     "anysearch": {
       "command": "npx",
-      "args": ["-y", "@anyresearch/anysearch-mcp"],
-      "env": {
-        "ANYSEARCH_API_KEY": "as_sk_0d7361f2fac70c29e6fe91d1417921fc"
-      }
+      "args": ["-y", "mcp-remote", "https://api.anysearch.com/mcp", "--header", "Authorization: Bearer as_sk_0d7361f2fac70c29e6fe91d1417921fc"]
     }
   }
 }
