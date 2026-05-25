@@ -1,0 +1,44 @@
+{
+    "template_version": "2.0",
+    "resolved_parameters": {
+        "total_blood_volume_ml": 5000,
+        "posture": "supine",
+        "baseline": {
+            "P_art_mmHg": 95.0,
+            "P_ven_mmHg": 5.0
+        },
+        "pump": {
+            "Q_ml_per_s": 83.0
+        },
+        "compartments": {
+            "arterial": {
+                "C_ml_per_mmHg": 2.0,
+                "V0_ml": 700.0
+            },
+            "venous": {
+                "C_ml_per_mmHg": 30.0,
+                "V0_ml": 2500.0
+            }
+        },
+        "beds": [
+            {
+                "bed_id": "brain",
+                "R_mmHg_s_per_ml": 1.2
+            },
+            {
+                "bed_id": "kidney",
+                "R_mmHg_s_per_ml": 1.5
+            },
+            {
+                "bed_id": "muscle",
+                "R_mmHg_s_per_ml": 2.0
+            }
+        ]
+    },
+    "initial_state": {
+        "V_art_ml": 1500,
+        "V_ven_ml": 3500,
+        "P_art_mmHg": 95.0,
+        "P_ven_mmHg": 5.0
+    }
+}

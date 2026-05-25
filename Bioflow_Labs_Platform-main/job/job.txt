@@ -1,0 +1,83 @@
+This is the plan:
+
+## BioFlow Labs v2 Roadmap
+
+**Goal:**  
+DB-backed, template-driven, multi-bed circulation engine with deterministic runs + rich run logs.  
+No template-designer app yet.
+
+---
+
+## Order of operations
+1. Template contract + validation DB (templates + runs)  
+2. Engine runner (load template → run → log)  
+3. Physiology v2 (multi-bed)  
+4. Runtime UI (optional, engine-only)  
+5. Calibration hooks + import tooling (optional, later)
+
+---
+
+## v2 Blueprint
+
+### 1) Core contract — Scenario Template v2.0 (JSON, canonical units)
+- template_version  
+- metadata, profile (optional)  
+- resolved_parameters (engine-ready)  
+- beds[] (parallel organ beds)  
+- initial_state (explicit, optional but strongly recommended)  
+- clinical_reference (annotation-only)
+
+**Hard rule:** engine runs only resolved params; clinical fields never act as targets.
+
+---
+
+### 2) Multi-bed physiology (engine)
+- Pump feeds arterial compartment.  
+- Beds are parallel branches off arterial pressure: each bed has R, C, unstressed_volume, pooling_bias (if applicable).  
+- Venous return merges to a common venous compartment (or per-bed venous compliance if you want more realism later).
+
+**Emergent outcomes:**  
+- bed flow competition  
+- pressure redistribution  
+- peripheral pooling effects
+
+**Metrics:**  
+- per-bed flow, pressure  
+- perfusion index (0–100) based on flow vs baseline expectation  
+- global perfusion efficiency index
+
+---
+
+### 3) DB-backed templates + run logs
+**DB stores:**  
+- templates (valid + invalid)  
+- runs (immutable run record)  
+- run_samples (time series, optionally downsampled)  
+- run_events (warnings, stability issues)
+
+**Engine creates a run artifact every time:**  
+- template hash  
+- template snapshot  
+- engine version  
+- config: dt, duration, sampling rate  
+- summary metrics + time series
+
+---
+
+### 4) Runtime UI (engine only, optional)
+Can exist, but only for:
+- start/stop/step  
+- inspect plots/metrics  
+- select which template to load  
+
+No “designer” behavior beyond picking a template.
+
+---
+
+### 5) Success criteria for v2
+You can pick a template from DB → run 60s → open a run log and inspect:
+- stable volumes conserved  
+- plausible BP/flow patterns  
+- bed competition is obvious  
+
+**Determinism:** same template + same dt + same duration → identical run hash + identical outputs.

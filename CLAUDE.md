@@ -213,3 +213,71 @@ Three static analysis scripts run pre-commit and can be invoked manually:
 - **`check_data_consistency.py`**: Cross-validates 7 JSON data files (cases→diseases→clues→exams→vitals→ODE paths). `--fix` auto-generates missing `clue_descriptions`
 
 Auto-fixable issues: missing `clue_descriptions` (pattern-based Chinese generation), missing `types.ts` interface fields (backend response field sync).
+
+---
+
+## Scientific Agent Skills（科研论文产出优先）
+
+本项目**优先使用**以下已安装的 agent skill，确保论文产出质量：
+
+### Skill 来源（优先级排序）
+
+| 来源 | 安装位置 | 数量 | 用途 |
+|------|---------|------|------|
+| [academic-research-skills](https://github.com/Imbad0202/academic-research-skills) (v3.9.4) | `~/.claude/skills/academic-research-skills/` | 4 skill + 13 命令 | **全流程**：研究→写作→审稿 |
+| [nature-skills](https://github.com/Yuan1z0825/nature-skills) (11.1k stars) | `~/.claude/skills/nature-skills/` | 9 skill | Nature 风格专用 |
+| [scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) (25.5k stars) | `~/.claude/skills/scientific-agent-skills/` | 139 skill | 补充工具 |
+| [nature-writing](https://github.com/SyntaxSmith/nature-writing-skill) | `~/.claude/skills/nature-writing/` | 44 篇 OA 语料库 | Nature 写作模板 |
+
+### 核心 Skill 命令
+
+| Skill | 触发命令 | 用途 |
+|-------|---------|------|
+| **academic-research** | `/ars-plan` | Socratic 对话规划论文结构 |
+| | `/ars-lit-review "topic"` | 系统性文献调研 |
+| | `/ars-full` | 全流程论文写作 |
+| | `/ars-reviewer` | 多视角同行评审 |
+| **nature-figure** | `/nature-figure` | Nature 风格多面板图 |
+| **nature-polishing** | `/nature-polishing` | 学术 prose 润色 |
+| **nature-citation** | `/nature-citation` | CNS 引用检索 |
+| **nature-reader** | `/nature-reader` | 双语对照论文阅读 |
+| **nature-response** | `/nature-response` | 审稿回复信 |
+| **hypothesis-generation** | `/hypothesis-generation` | 设计实验方案 |
+| **literature-review** | `/literature-review` | 系统性文献调研 |
+| **peer-review** | `/peer-review` | 同行评审 |
+| **matplotlib** | `/matplotlib` | 科学数据可视化 |
+
+### 使用方式
+
+在 Claude Code 对话中直接 slash 触发：
+
+```text
+/ars-plan              → Socratic 对话规划论文章节结构
+/ars-lit-review        → 系统性文献调研
+/ars-full              → 全流程论文写作（从大纲到投稿）
+/ars-reviewer          → 多视角同行评审（EIC + 3审稿人 + 魔鬼代言人）
+/ars-abstract          → 双语摘要 + keywords
+/nature-figure         → 绘制 publication-grade 曲线
+/nature-polishing      → 润色学术 prose
+/nature-citation       → 补齐参考文献
+/nature-reader         → 读论文生成双语对照
+/hypothesis-generation → 设计实验方案
+```
+
+### 论文产出重点
+
+- **结构规划**：`/ars-plan` Socratic 对话 → 明确论文贡献点
+- **Figure 1-4**：`/nature-figure` + `/matplotlib` 生成 MAP/HR/SVR 时序图 + 11 模块架构图
+- **Introduction/Results**：`/ars-full` 或 `/nature-polishing` 把 simulation results 写成学术 prose
+- **参考文献**：`/ars-lit-review` + `/nature-citation` 补齐 baroreflex/Frank-Starling/CVP 相关引用
+- **同行评审**：`/ars-reviewer` 做多视角自我评审，识别论证漏洞
+- **审稿回复**：`/nature-response` 写逐点回复信
+
+### 完整性保证
+
+academic-research-skills 包含 7-mode 阻塞检查清单（Lu et al. 2026, Nature 651:914-919 的 AI Scientist 失败模式），在 Stage 2.5/4.5 integrity gates 自动运行，防止：
+- 实现 bug、幻觉结果、捷径依赖
+- Bug-as-insight 重构、方法论编造
+- Frame-lock、引用幻觉
+
+不需要全部激活，按需触发，按场景使用。

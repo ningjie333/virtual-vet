@@ -1,0 +1,162 @@
+_language:zh_CN
+
+alert.brain_dead=脑死亡
+alert.cardiac_arrest=心脏骤停
+alert.severe_bradycardia=严心动过缓
+alert.severe_tachycardia=严重心动过速
+alert.hypotensive_shock=低血压休克
+alert.severe_hypoxemia=严重低氧血症
+alert.respiratory_depression=呼吸抑制
+alert.hyperkalemia=高钾血症
+alert.severe_hypokalemia=严重低钾血症
+alert.severe_acidosis=严重酸中毒
+alert.severe_alkalosis=严重碱中毒
+alert.severe_hypoglycemia=严重低血糖
+alert.hyperglycemic_crisis=高血糖
+alert.impending_resp_failure=呼吸衰竭前兆
+alert.hypernatremia=高钠血症
+alert.severe_hyponatremia=严重低钠血症
+alert.hypercalcemia_crisis=高钙血症危象
+alert.severe_hypocalcemia=严重低钙血症
+alert.hyperlactatemia=高乳酸血症
+alert.hepatic_failure=肝功能衰竭
+alert.renal_failure=肾功能衰竭
+alert.septic_shock=脓毒症休克
+
+category.emergency.name=急救药物
+category.vasodilators.name=血管扩张剂
+category.hormones.name=激素
+category.nutrition.name=营养物
+category.fluids.name=液体
+category.electrolytes.name=电解质
+category.sedation.name=镇静麻醉
+category.antidotes.name=解毒剂
+category.respiratory.name=呼吸
+category.beta_blockers.name=beta受体阻滞剂
+category.muscle_relaxants.name=肌肉放松剂
+
+drug.epinephrine.name=肾上腺素
+drug.insulin.name=胰岛素
+drug.glucose.name=葡萄糖
+drug.normal_saline.name=生理盐水
+drug.dopamine.name=多巴胺
+drug.hydrocortisone.name=氢化可的松
+drug.potassium_chloride.name=氯化钾
+drug.propofol.name=丙泊酚
+drug.fentanyl.name=芬太尼
+drug.naloxone.name=纳洛酮
+drug.atropine.name=阿托品
+drug.esmolol.name=艾思洛尔
+drug.norepinephrine.name=去甲肾上腺素
+drug.midazolam.name=咪达唑仑
+
+drug.epinephrine.desc=肾上腺素是一线急救药物。它通过激动心脏β1受体增加心率和收缩力，激活血管α1受体升高血压，舒张支气管β2受体缓解气道痉挛。适应症包括心脏骤停、过敏性休克和重症哮喘。过量可致心动过速和高血压危象。
+drug.insulin.desc=胰岛素是一种降糖激素。它促进肌肉和脂肪组织摄取葡萄糖，抑制肝脏葡萄糖生成。用于糖尿病高血糖和危及生命的高钾血症（通过驱动钾离子进入细胞）。过量可致低血糖昏迷，表现为意识模糊、大汗和抽搐。
+drug.glucose.desc=葡萄糖是主要代谢燃料。静脉给药可快速纠正低血糖，并与胰岛素联合用于高钾血症治疗。正常空腹血糖范围为70-110 mg/dL。
+drug.normal_saline.desc=生理盐水是与血浆等渗的0.9%氯化钠溶液。用于低血容量和休克的容量复苏。不影响电解质平衡。过量输注有肺水肿和高氯性酸中毒风险。
+drug.dopamine.desc=多巴胺是一种剂量依赖性的正性肌力血管加压药。低剂量扩张肾和肠系膜血管，中剂量激动β1受体增加心输出量，高剂量激活α1受体引起血管收缩。用于心源性和分布性休克。
+drug.hydrocortisone.desc=氢化可的松是一种兼具盐皮质激素活性的糖皮质激素。可减轻炎症、稳定溶酶体膜、增强血管对儿茶酚胺的敏感性。适应症包括肾上腺功能不全、感染性休克和严重过敏反应。突然停药有肾上腺危象风险。
+drug.potassium_chloride.desc=氯化钾是细胞内主要阳离子，对膜电位和神经肌肉功能至关重要。用于纠正低钾血症，表现为肌无力、肠麻痹和心律失常。快速输注可致致命性高钾心脏骤停。严禁静脉推注。
+drug.propofol.desc=丙泊酚是一种短效静脉麻醉药。通过增强GABA-A受体功能产生快速镇静和催眠作用。用于麻醉诱导和维持，以及ICU镇静。呈剂量依赖性呼吸抑制和低血压。无镇痛作用。起效快（30-40秒），因再分布而苏醒迅速。
+drug.fentanyl.desc=芬太尼是一种强效合成阿片类药物（效价为吗啡的100倍）。作用于中枢μ阿片受体，产生强效镇痛和镇静作用。起效快（1-2分钟），因再分布而作用时间短。呈剂量依赖性呼吸抑制、心动过缓，高剂量可致胸壁僵硬。可用纳洛酮逆转。
+drug.naloxone.desc=纳洛酮是一种竞争性阿片受体拮抗剂。可快速逆转阿片类药物引起的呼吸抑制、镇静和低血压。1-2分钟内起效。持续30-60分钟。在阿片依赖患者中可能诱发急性戒断反应。根据需要可重复给药。
+drug.norepinephrine.desc = 强效 α₁ 受体激动剂，同时有中等 β₁ 效应。\n主要作用：强烈收缩血管，升高血压。\n适应症：感染性休克、严重低血压。\n不良反应：组织缺血、心律失常、肾血管收缩。
+drug.midazolam.desc = 短效苯二氮䓬类药物。\n主要作用：镇静、抗焦虑、顺行性遗忘。\n适应症：术前镇静、ICU 镇静、癫痫持续状态。\n不良反应：呼吸抑制、低血压、依赖性和戒断反应。
+
+# ===== 阿片类 =====
+drug.morphine.name=吗啡
+drug.morphine.desc=吗啡是一种经典阿片类镇痛药。作用于中枢μ阿片受体，产生强效镇痛和镇静作用。起效较芬太尼慢，作用持续时间较长（3-4小时）。呈剂量依赖性呼吸抑制、恶心呕吐和组胺释放。可用纳洛酮逆转。
+
+# ===== 镇静类 =====
+drug.dexmedetomidine.name=右美托咪定
+drug.dexmedetomidine.desc=右美托咪定是一种高选择性α₂-肾上腺素受体激动剂。作用于蓝斑核，产生镇静、抗焦虑和轻度镇痛作用。独特优势是可唤醒镇静（患者易被唤醒且配合），且无呼吸抑制。可引起心动过缓和低血压。
+
+# ===== 血管加压药 =====
+drug.phenylephrine.name=去氧肾上腺素
+drug.phenylephrine.desc=去氧肾上腺素是一种纯α₁受体激动剂。主要作用为收缩血管升高血压，反射性降低心率。适应症包括麻醉相关低血压和血管扩张性休克。无正性肌力作用。
+
+drug.dobutamine.name=多巴酚丁胺
+drug.dobutamine.desc=多巴酚丁胺是一种选择性β₁受体激动剂。主要增加心率和收缩力，同时轻度β₂介导的血管扩张。用于急性失代偿性心力衰竭和心源性休克。
+
+drug.milrinone.name=米力农
+drug.milrinone.desc=米力农是一种磷酸二酯酶3（PDE3）抑制剂。通过抑制cAMP降解产生正性肌力和血管扩张作用。适应症包括急性心力衰竭和肺动脉高压。可引起低血压和心律失常。
+
+drug.ephedrine.name=麻黄碱
+drug.ephedrine.desc=麻黄碱是一种间接拟交感胺。通过促进内源性去甲肾上腺素释放，产生α和β受体激动效应。升高血压同时不显著降低心率。用于麻醉相关低血压。
+
+drug.vasopressin.name=血管加压素
+drug.vasopressin.desc=血管加压素（抗利尿激素）是一种V₁受体激动剂。通过激活血管平滑肌V₁受体引起强烈血管收缩。适应症包括感染性休克和心脏骤停。过量可致冠脉和内脏缺血。
+
+# ===== 血管扩张剂 =====
+drug.nitroglycerin.name=硝酸甘油
+drug.nitroglycerin.desc=硝酸甘油是一种一氧化氮供体。主要舒张静脉，降低前负荷和心室壁张力。用于急性心绞痛、高血压急症和急性心力衰竭。可引起头痛、低血压和反射性心动过速。
+
+drug.nitroprusside.name=硝普钠
+drug.nitroprusside.desc=硝普钠是一种平衡型动静脉扩张剂。释放一氧化氮快速扩张血管。起效极快（数秒），半衰期极短。用于高血压危象。需避光输注，长期使用有氰化物中毒风险。
+
+drug.nicardipine.name=尼卡地平
+drug.nicardipine.desc=尼卡地平是一种二氢吡啶类钙通道阻滞剂。主要舒张动脉血管，降低后负荷。用于高血压急症和术后高血压。可引起头痛、心悸和下肢水肿。
+
+drug.clevidipine.name=氯维地平
+drug.clevidipine.desc=氯维地平是一种超短效二氢吡啶类钙通道阻滞剂。半衰期约1分钟，适合精准滴定血压。用于高血压急症和围术期血压控制。通过血浆酯酶快速代谢，不依赖肝肾。
+
+drug.hydralazine.name=肼屈嗪
+drug.hydralazine.desc=肼屈嗪是一种直接动脉扩张剂。主要舒张小动脉降低后负荷。用于高血压急症（尤其是妊娠期高血压）。可引起反射性心动过速和狼疮样综合征。
+
+# ===== β阻滞剂 =====
+drug.labetalol.name=拉贝洛尔
+drug.labetalol.desc=拉贝洛尔是一种混合α₁/β受体拮抗剂。阻断β受体的同时部分阻断α₁受体，降低血压而不显著影响心率。用于高血压急症和妊娠期高血压。
+
+drug.metoprolol.name=美托洛尔
+drug.metoprolol.desc=美托洛尔是一种选择性β₁受体拮抗剂。降低心率和收缩力，减少心肌氧耗。用于高血压、心绞痛、心力衰竭和心律失常。
+
+drug.atenolol.name=阿替洛尔
+drug.atenolol.desc=阿替洛尔是一种选择性β₁受体拮抗剂。作用与美托洛尔相似，但半衰期更长，主要经肾脏排泄。用于高血压、心绞痛和心律失常。
+
+drug.propranolol.name=普萘洛尔
+drug.propranolol.desc=普萘洛尔是一种非选择性β受体拮抗剂。阻断β₁和β₂受体，降低心率、收缩力，同时可能引起支气管痉挛。用于高血压、心绞痛、偏头痛预防和震颤。
+
+# ===== 支气管扩张剂 =====
+drug.albuterol.name=沙丁胺醇
+drug.albuterol.desc=沙丁胺醇是一种选择性β₂受体激动剂。舒张支气管平滑肌，用于哮喘和COPD急性发作。雾化或吸入给药。可引起心动过速和震颤。
+
+drug.salbutamol.name=沙丁胺醇
+drug.salbutamol.desc=沙丁胺醇是一种选择性β₂受体激动剂。舒张支气管平滑肌，用于哮喘和COPD急性发作。雾化或吸入给药。可引起心动过速和震颤。
+
+# ===== 肌松药 =====
+drug.succinylcholine.name=琥珀胆碱
+drug.succinylcholine.desc=琥珀胆碱是一种去极化肌松药。作用于运动终板产生持续去极化，导致肌肉松弛。起效快（30-60秒），作用时间短（5-10分钟）。用于快速序贯诱导插管。可引起高钾血症和恶性高热。
+
+drug.rocuronium.name=罗库溴铵
+drug.rocuronium.desc=罗库溴铵是一种非去极化肌松药。竞争性拮抗运动终板的烟碱受体。起效较快（60-90秒），作用时间中等（30-60分钟）。用于气管插管和术中肌松维持。可用舒更葡糖逆转。
+
+
+equipment.dialysis.panel_title=透析面板
+equipment.dialysis.power_button=电源
+equipment.dialysis.power_off_warning=电源已关闭。按电源按钮启动。
+equipment.dialysis.tab_status=状态
+equipment.dialysis.tab_settings=设置
+equipment.dialysis.tab_dialysate=透析液
+equipment.dialysis.tab_clearance=清除率
+equipment.dialysis.tab_trends=趋势
+equipment.dialysis.tab_alarms=警报
+
+equipment.cpr.panel_title=心肺复苏面板
+equipment.cpr.power_button=电源
+equipment.cpr.power_off_warning=电源已关闭。按电源按钮启动。
+equipment.cpr.realtime_status=实时状态
+equipment.cpr.effective_co=有效心输出量
+equipment.cpr.compressions=按压次数
+equipment.cpr.cpr_settings=CPR设置
+equipment.cpr.compression_rate=按压频率
+equipment.cpr.compression_rate_target=目标: 100-120 bpm
+equipment.cpr.compression_depth=按压深度
+equipment.cpr.compression_depth_target=目标: 5-6 cm
+equipment.cpr.enable_ventilation=启用通气
+equipment.cpr.ventilation_rate=通气频率
+equipment.cpr.ventilation_rate_target=目标: 10 bpm (30:2 比例)
+equipment.cpr.metronome=节拍器
+equipment.cpr.enable_metronome=启用节拍器
+equipment.cpr.start_cpr=开始 CPR
+equipment.cpr.stop_cpr=停止 CPR
+equipment.cpr.reset_counter=重置计数器

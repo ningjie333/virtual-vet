@@ -1,0 +1,47 @@
+BioFlow_Lab_Platform/
+├─ pyproject.toml
+├─ src/
+│  └─ bioflow/
+│     ├─ __init__.py
+│     ├─ core/
+│     │  ├─ __init__.py
+│     │  ├─ units.py
+│     │  ├─ hashing.py
+│     │  ├─ logging.py
+│     │  ├─ version.py
+│     │  ├─ template_schema.py          # v2 schema incl. Phase 5 knobs
+│     │  └─ validate_template.py        # normalization + default injection
+│     ├─ db/
+│     │  ├─ __init__.py
+│     │  ├─ conn.py
+│     │  ├─ schema.py
+│     │  ├─ templates.py
+│     │  └─ runs.py
+│     ├─ engine/
+│     │  ├─ __init__.py
+│     │  ├─ runner.py                  # orchestration (unchanged since Phase 3)
+│     │  ├─ state.py                   # global simulation state
+│     │  └─ physiology/
+│     │     ├─ __init__.py
+│     │     ├─ algebraic.py             # Phase 4.0: multi-bed flow + perfusion
+│     │     ├─ compliance.py            # Phase 4.1 + Phase 5 dynamics
+│     │     └─ modifiers.py             # Phase 5 parameter transforms
+│     ├─ engine_app/
+│     │  ├─ __init__.py
+│     │  └─ cli.py
+│     └─ tools/
+│        ├─ __init__.py
+│        └─ quick_validate.py
+├─ tests/
+│  ├─ fixtures/
+│  │  ├─ template_valid_baseline.json
+│  │  └─ template_invalid_missing_field.json
+│  ├─ test_template_validation.py       # schema + Phase 5 defaults/bounds
+│  ├─ test_db_template.py
+│  ├─ test_runner_phase3.py
+│  ├─ test_phase41_conservation.py
+│  ├─ test_phase5_hypovolemia_effect.py
+│  ├─ test_phase5_posture_effect.py
+│  ├─ test_phase5_pooling_bias_gate.py
+│  └─ test_phase5_validation_defaults.py
+└─ .venv/

@@ -1,0 +1,15 @@
+{
+    "template_version": "2.0",
+    "resolved_parameters": {
+        "total_blood_volume_ml": 5000,
+        "posture": "supine",
+        "baseline": {
+            "P_art_mmHg": 95.0,
+            "P_ven_mmHg": 5.0
+        }
+    },
+    "initial_state": {
+        "P_art_mmHg": 95.0,
+        "P_ven_mmHg": 5.0
+    }
+}
