@@ -245,7 +245,7 @@ class ImmuneModule:
         if self.cytokine_level > 0.4:
             leak_intensity = (self.cytokine_level - 0.4) / 0.6
             # 血浆容量外渗 → 血钠升高(血液浓缩)
-            sodium_shift = leak_intensity * 8.0  # 最大+8 mEq/L
+            sodium_shift = leak_intensity * 8.0 * dt  # 最大+8 mEq/L/s, dt归一化
             capillary_leak_commands.append(FactorCommand("blood.sodium_mEq_L", "add", sodium_shift))
 
         # ── 5. 血管扩张 (感染性休克) ──────────────────────────────

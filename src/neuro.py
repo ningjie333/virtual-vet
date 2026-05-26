@@ -215,16 +215,18 @@ class NeuroModule:
         cns_SVR_mult = max(0.5, 1.0 - cns_failure_signal * 0.5)  # 最小×0.5
 
         # ── 5. 化学感受器效应 ─────────────────────────────────────
-        chemo_HR_add = self.chemoreceptor_drive * 15.0   # 化学感受器最大+15bpm
+        chemo_HR_add = self.chemoreceptor_drive * 10.0   # 用于参考，不加入 FC
         chemo_RR_add = self.chemoreceptor_drive * 10.0   # 化学感受器驱动RR+10
 
         # ── 6. 自主神经张力计算 ──────────────────────────────────
         # 综合所有效应计算净心率变化
+        # 化学感受器 HR 效应已移至 heart.py 连续路径（_baroreceptor_feedback），
+        # 避免 FC 通道的 O(1) 数值偏差和双重计数。
         net_HR_add = (
             pain_HR_add
             + seizure_HR_add
             + cns_HR_add
-            + chemo_HR_add
+            # chemo_HR_add → 已移至连续路径 heart.py
         )
 
         # 净SVR乘子
@@ -242,16 +244,27 @@ class NeuroModule:
         self.consciousness = max(0.0, min(1.0, self.consciousness + hypoxia_consciousness_effect))
 
         # ── 8. 合成FactorCommands ────────────────────────────────
+        # 注意：所有 FC 的 delta 必须乘以 dt（量纲正确化）。
+        # 原有设计将 net_HR_add / net_RR_add 解释为"每步加固定值"，
+        # 这导致粗 dt 下每步注入量相对时间偏小、细 dt 下偏大的 dt 依赖偏差。
+        # 修正后这些值被解释为 RATE（bpm/s, resp/min/s），经 dt 缩放。
+        # 阈值不变（chemo_drive > 0.01 触发，与之前一致）。
         factor_commands = []
 
         if abs(net_HR_add) > 0.1:
-            factor_commands.append(FactorCommand("heart.heart_rate", "add", net_HR_add))
+            factor_commands.append(FactorCommand("heart.heart_rate", "add", net_HR_add * dt))
 
+        # SVR multiply dt-scaling: net_SVR_mult 是每步乘子（seizure/CNS调制），
+        # 不 dt 归一化会导致细 dt 下乘的频次更高 → SVR 偏差。
+        # 修复：将乘法转换为率形式：SVR_new = SVR × net_SVR_mult^(dt)
+        # 其中 dt ∈ (0,1]，使总乘积 ∏ net_SVR_mult^(dt) = net_SVR_mult^(dt·N) = net_SVR_mult^T
+        # 在 0 < dt ≤ 1 时，net_SVR_mult^(dt) ≈ 1 + (net_SVR_mult-1)·dt（泰勒展开，一阶近似）。
         if abs(net_SVR_mult - 1.0) > 0.01:
-            factor_commands.append(FactorCommand("heart.SVR", "multiply", net_SVR_mult))
+            rate_factor = net_SVR_mult ** dt
+            factor_commands.append(FactorCommand("heart.SVR", "multiply", rate_factor))
 
         if abs(net_RR_add) > 0.1:
-            factor_commands.append(FactorCommand("lung.respiratory_rate", "add", net_RR_add))
+            factor_commands.append(FactorCommand("lung.respiratory_rate", "add", net_RR_add * dt))
 
         # 疼痛 → 肠道动力下降
         if self.pain_level > 0.5:

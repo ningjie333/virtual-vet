@@ -332,12 +332,18 @@ class HeartModule:
         self.stroke_volume = alpha * self.stroke_volume + (1 - alpha) * effective_target
         self.stroke_volume = max(self.base_SV * 0.15, self.stroke_volume)
 
-    def _baroreceptor_feedback(self, MAP: float, dt: float):
+    def _baroreceptor_feedback(self, MAP: float, dt: float,
+                               chemoreceptor_drive: float = 0.0):
         """
         压力感受器反馈（动态版）+ HH 电生理耦合
 
         核心生理：MAP ↓ → 交感 ↑ + 副交感 ↓ → HR ↑（协同代偿）
         正常犬：HR 范围 60-180 bpm，稳态 85 bpm
+
+        Chemoreceptor 直连路径（连续量纲正确版本）：
+        - chemo_drive 经 low-pass 滤波（τ=30s）后以 RATE（bpm/s）形式叠加到 HR
+        - 与离散 FC 通道分离，避免 O(1) 数值偏差
+        - 参考：Tucker et al. 1984, Am J Vet Res (PMID: 6703442)
 
         HH 耦合：
         - 心率由 baroreceptor 反馈决定（传统路径）
@@ -359,7 +365,10 @@ class HeartModule:
         # 与 derivatives() 一致：dHR/dt = (HR_para + HR_symp) * k_factor (单位 1/s)
         HR_para = -self.parasympathetic * 15.0 * max(0.0, -error)
         HR_symp = self.sympathetic * 50.0 * max(0.0, error)
-        HR_delta = (HR_para + HR_symp) * dt
+        # Chemoreceptor 直连：chemo_drive → HR 升速（bpm/s），量纲正确 × dt
+        # 最大约 15 bpm/s，与 Tucker 1984 数据一致（PaO₂=29 时 HR +8 bpm over ~10s）
+        chemo_HR = chemoreceptor_drive * 15.0
+        HR_delta = (HR_para + HR_symp + chemo_HR) * dt
         self.heart_rate = max(60.0, min(self.HR_max, self.heart_rate + HR_delta))
 
         # ── HH 电生理耦合 ──────────────────────────────────────────────
@@ -380,19 +389,21 @@ class HeartModule:
     def _clamp(value: float, lo: float, hi: float) -> float:
         return max(lo, min(hi, value))
 
-    def compute(self, dt: float, svr_factor: float = 1.0):
+    def compute(self, dt: float, svr_factor: float = 1.0,
+                chemoreceptor_drive: float = 0.0):
         """
         主计算：推进心脏循环一个时间步
 
         Args:
             dt: 时间步长（秒）
             svr_factor: 外部 SVR 倍数（ToxicologyModule 输出，1.0 = 无调制）
+            chemoreceptor_drive: 化学感受器驱动（0-1, 来自 neuro 模块上一时间步）
 
         ODE:
         1. Frank-Starling：SV = f(前负荷) × contractility_factor
         2. 心输出量：CO = HR × SV
         3. 平均动脉压：MAP = MAP_base + CO × (SVR × svr_factor) / 60
-        4. 压力感受器：HR = f(MAP_error)
+        4. 压力感受器：HR = f(MAP_error, chemoreceptor_drive)
         """
         # Step 1: Frank-Starling（前负荷调节 SV）
         self._Frank_Starling(dt)
@@ -412,8 +423,9 @@ class HeartModule:
 
         raw_MAP = max(30.0, min(180.0, raw_MAP))
 
-        # Step 4: 压力感受器
-        self._baroreceptor_feedback(raw_MAP, dt)
+        # Step 4: 压力感受器（含化学感受器直连路径）
+        self._baroreceptor_feedback(raw_MAP, dt,
+                                    chemoreceptor_drive=chemoreceptor_drive)
 
         # 低通滤波平滑 MAP
         alpha = 0.1

@@ -661,7 +661,11 @@ class VirtualCreature:
                 svr_factor *= (svr_after_pharma / svr_before_pharma)
 
         # Step 2: 心脏循环（输入：血容量 → 输出：CO、MAP）
-        heart_state = self.heart.compute(dt, svr_factor=svr_factor)
+        # chemoreceptor_drive 来自上一时间步的 neuro 状态（Gauss-Seidel 一阶滞后，
+        # 产生 O(dt) 误差，随 dt 细化收敛，不产生 O(1) 偏差）
+        neuro_chemo = self.neuro.chemoreceptor_drive if hasattr(self, "neuro") else 0.0
+        heart_state = self.heart.compute(dt, svr_factor=svr_factor,
+                                         chemoreceptor_drive=neuro_chemo)
         CVP = heart_state["CVP_mmHg"]
         CO = heart_state["cardiac_output_ml_min"]
 

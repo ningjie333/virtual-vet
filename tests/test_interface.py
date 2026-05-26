@@ -42,11 +42,24 @@ def app():
     import gui_app as gui
     gui.app.config["TESTING"] = True
     gui._game_sessions.clear()
+
+    # Use a separate test database to avoid locking issues
+    from src.db.conn import connect
+    from src.db.schema import init_db
+
+    test_db_path = os.path.join(PROJECT_ROOT, "data", "game_sessions_test.db")
+    if hasattr(gui, '_db_conn') and gui._db_conn is not None:
+        try:
+            gui._db_conn.close()
+        except Exception:
+            pass
+    gui._db_conn = connect(test_db_path)
+    init_db(gui._db_conn)
+
     try:
-        if hasattr(gui, '_db_conn') and gui._db_conn is not None:
-            gui._db_conn.execute("DELETE FROM action_log")
-            gui._db_conn.execute("DELETE FROM sessions")
-            gui._db_conn.commit()
+        gui._db_conn.execute("DELETE FROM action_log")
+        gui._db_conn.execute("DELETE FROM sessions")
+        gui._db_conn.commit()
     except Exception:
         pass
     return gui.app
@@ -64,9 +77,11 @@ def clean_sessions():
     import gui_app as gui
     gui._game_sessions.clear()
     # Also clear the session DB so repeat test runs don't get UNIQUE violations
+    # Use a timeout to avoid database locked errors
     try:
         import gui_app as _gui
         if hasattr(_gui, '_db_conn') and _gui._db_conn is not None:
+            _gui._db_conn.execute("PRAGMA busy_timeout = 5000")
             _gui._db_conn.execute("DELETE FROM action_log")
             _gui._db_conn.execute("DELETE FROM sessions")
             _gui._db_conn.commit()
@@ -76,6 +91,7 @@ def clean_sessions():
     try:
         import gui_app as _gui
         if hasattr(_gui, '_db_conn') and _gui._db_conn is not None:
+            _gui._db_conn.execute("PRAGMA busy_timeout = 5000")
             _gui._db_conn.execute("DELETE FROM action_log")
             _gui._db_conn.execute("DELETE FROM sessions")
             _gui._db_conn.commit()

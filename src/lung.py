@@ -83,13 +83,13 @@ class LungModule:
         # 代偿参数
         self.respiratory_compensation = 0.0         # 呼吸代偿程度
 
-        # Van der Pol 呼吸节律振荡器（替代线性反馈）
-        # 注：静息 RR=15/min（2026-05-22 修正以匹配 PaCO2=40 mmHg）
-        # 不同于 parameters.RESPIRATORY_RATE_REST=18（用于分钟通气量计算）
+        # Van der Pol 呼吸节律振荡器
+        # 静息 RR=18/min 与 parameters.RESPIRATORY_RATE_REST 保持一致，
+        # 使 baseline minute ventilation 与 PaCO2=40 mmHg 匹配。
         dt = DT_SECONDS  # 与仿真步长一致
         self._vdp = VanDerPolRespiratoryRhythm(
             dt=dt,
-            rr_rest=15.0 / 60.0,  # 15/min → 0.25 Hz
+            rr_rest=18.0 / 60.0,  # 18/min → 0.3 Hz
         )
 
     # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
@@ -231,27 +231,24 @@ class LungModule:
         - 高碳酸血症 → VdP ω↑ + μ↑ → RR 加快 + 深度增大
         - 低氧血症  → VdP ω↑ → RR 加快
         - 酸中毒    → VdP ω↑ + μ↑ → Kussmaul 呼吸
-
-        注：VDP 每步迭代次数 = max(1, round(dt/DT_SECONDS))，确保每步恰好模拟 dt 秒的
-        物理时间，避免 dt 减小导致的 VDP 过度推进（3000 次/秒 vs 300 次/秒）。
         """
         # 获取当前 pH
         arterial_pH = self.blood.arterial_pH
 
-        # VDP 迭代次数：每步恰好模拟 dt 秒物理时间
-        # dt=0.1  → 1 次迭代（0.1s VDP 时间）→ 300 次/物理秒
-        # dt=0.01 → 1 次迭代（0.01s VDP 时间）→ 1000 次/物理秒
-        # dt=0.05 → 1 次迭代（0.05s VDP 时间）→ 200 次/物理秒
-        n_vdp_iterations = max(1, round(dt / DT_SECONDS))
-
-        for _ in range(n_vdp_iterations):
+        # VdP 推进：将 dt 拆分为不超过 VdP 设计步长（0.1s）的子步。
+        # dt<=0.1 时单步推进（修复原 10 倍速 bug），dt>0.1 时多步迭代。
+        _VDP_DT = 0.1  # VdP 原始设计步长
+        n = max(1, round(dt / _VDP_DT))
+        sub_dt = dt / n
+        self._vdp.dt = sub_dt
+        for _ in range(n):
             self._vdp.update(pco2=arterial_PCO2, po2=arterial_PO2, ph=arterial_pH)
 
         # 从 VdP 输出获取目标呼吸频率
         target_rr = self._vdp.respiratory_rate
 
-        # 平滑过渡（避免数值振荡）
-        alpha = dt / 0.5  # 500ms 时间常数
+        # 平滑过渡（避免数值振荡，alpha 最大 1.0 防过冲）
+        alpha = min(1.0, dt / 0.5)  # 500ms 时间常数
         self.respiratory_rate += (target_rr - self.respiratory_rate) * alpha
 
         # 限幅
@@ -260,15 +257,12 @@ class LungModule:
             min(self.max_respiratory_rate, self.respiratory_rate)
         )
 
-        # 潮气量随 VdP 幅度调制（深度呼吸时 TV 增大）
+        # 潮气量随 VdP 幅度调制：以正常极限环幅度（~2.0）为中心，
+        # 幅度增大（低氧/高碳酸血症）→ TV 增大，幅度降低 → TV 减小。
         vdp_amplitude = self._vdp.amplitude
-        if vdp_amplitude > 0.8:
-            # 深快呼吸（如酸中毒）→ TV 增大
-            tv_factor = min(1.5, 0.8 + 0.7 * (vdp_amplitude - 0.8) / 1.2)
-            self.tidal_volume = self.base_tidal_volume * tv_factor
-        else:
-            # 恢复正常 TV
-            self.tidal_volume += (self.base_tidal_volume - self.tidal_volume) * alpha
+        tv_factor = 1.0 + 0.4 * (vdp_amplitude - 2.0) / 1.0
+        tv_factor = max(0.8, min(1.5, tv_factor))
+        self.tidal_volume = self.base_tidal_volume * tv_factor
 
     def compute(self, dt: float, cardiac_output: float):
         """
