@@ -14,7 +14,7 @@ Multi-organ physiological simulators commonly couple organ modules through thres
 
 ## 1. Introduction
 
-Physiological simulation platforms such as HumMod, SAPHIR, and CellML-based frameworks now support applications from classroom teaching to drug interaction modeling [Ottesen et al., 2004]. In practice, many of these engines couple 10 or more organ modules with heterogeneous time constants through shared state variables. Sequential explicit Euler integration is frequently chosen because it permits per-module debugging, supports heterogeneous time steps without matrix assembly, and avoids the overhead of implicit solver infrastructure.
+Modular simulation architectures — in which autonomous subsystem modules communicate through shared state variables — are a dominant design pattern across domains from physiological modeling [Ottesen et al., 2004] to multi-physics co-simulation [Causin et al., 2005]. In such architectures, a common inter-module communication mechanism is the threshold-gated discrete event: Module A monitors a state variable, and when a threshold is crossed, emits an event that modifies a state variable in Module B. This pattern appears in physiological engines (e.g., baroreflex-mediated heart rate adjustment), robotic control systems (e.g., sensor-triggered actuator commands), and discrete-event simulation frameworks (e.g., DEVS-based coupling [Zeigler et al., 2000]). When the receiving module integrates its dynamics with explicit Euler, the event's dimensional interpretation — whether it represents a rate (per-second) or a fixed increment (per-step) — becomes critical.
 
 Several groups have documented the numerical challenges of closed-loop cardiovascular simulation. van Osta et al. (2025) demonstrated that closed-loop regulation substantially extends equilibration time in zero-dimensional cardiovascular models compared to open-loop configurations. Tłałka et al. (2024) identified stability concerns with explicit integration in baroreflex-coupled models, motivating the use of implicit or semi-implicit schemes. Ursino (1998), in his foundational work on carotid baroreflex modeling, employed implicit Gear-style solvers as a matter of course.
 
@@ -40,7 +40,7 @@ class FactorCommand:
 
 This design ensures a uniform write interface across all physiological subsystems — baroreflex, diseases, drugs, and treatments all route through the same dispatch. The sequential step order is hard-coded: heart → lung → kidney → gut → liver → endocrine → neuro → immune → coagulation → lymphatic → fluid, executing each module's `compute(dt, ...)` method once per time step.
 
-Default integration parameters: dt = 0.01 s, body weight 20 kg, age 1095 days (adult canine).
+Default integration parameters: dt = 0.01 s, body weight 20 kg, age 1095 days (adult canine). At baseline (DC = 25, no disease), the post-fix simulation produces MAP = 100.9 mmHg and HR = 108.5 bpm — within the normal canine resting range of MAP 85–120 mmHg and HR 60–140 bpm reported by VetFolio and Acierno et al. (2018).
 
 ### 2.2 Dual Baroreflex Architecture
 
@@ -105,7 +105,7 @@ Under the original code, a simple dt-sweep convergence study (DC=10, mild hypoxi
 
 The pattern is striking for two reasons. First, the bias **increases** as dt decreases — the opposite of what is expected from truncation error, which scales as O(dt) for explicit Euler. Second, below dt ≈ 0.02 s, the system plateaus at a precisely constant value. The product bias × dt in the unsaturated regime is nearly constant (1.14 ± 0.04), implying bias ∝ 1/dt.
 
-This behavior superficially resembles the fixed-point destabilization described in sequential coupled analyses [Kim et al., 2011], and we initially pursued this explanation. However, the parameter insensitivity of the bias — identical across baroreflex gains from 0.5× to 8.0×, MAP initializations, and body masses — suggested a mechanism more fundamental than gain-mediated instability.
+This behavior superficially resembles the fixed-point destabilization described in sequential coupled analyses [Kim et al., 2011], and we initially pursued this explanation — noting, however, that Kim's framework addresses operator splitting in coupled PDE systems (poromechanics), not discrete inter-module events in modular ODE engines, so the analogy is heuristic rather than formally applicable. The parameter insensitivity of the bias — identical across baroreflex gains from 0.5× to 8.0×, MAP initializations, and body masses — suggested a mechanism more fundamental than gain-mediated instability.
 
 ### 3.2 Diagnosis: Exclusion of State Pollution
 
@@ -252,24 +252,26 @@ The root cause was a unit mismatch: the neuro module emitted HR increments in bp
 
 Threshold gating compounds the problem. When the chemoreceptor drive is near threshold, small changes in the state trajectory can push the emission on or off, creating a discontinuous mapping between dt and total injected HR. This makes the bias pattern irregular across the dt sweep in the unsaturated regime, further obscuring the underlying monotonic relationship.
 
-### 4.4 Lessons for Modular ODE Simulation
+### 4.4 Lessons for Modular Simulation Design
 
-**Lesson 1: Dimensional consistency must be explicit.** Any discrete event that modifies a continuous state variable must carry consistent rate dimensions. The convention of "per-step" quantities, common in game engines and real-time simulation, is a latent source of dt-dependent error in scientific ODE simulation. We recommend that all inter-module communication quantities be explicitly annotated with their dimensions in code comments. To operationalize this recommendation, we have released a static lint tool (`check_fc_dimensions.py`) that automatically scans FactorCommand emissions for missing dt normalization. The tool successfully detected the original bug in our codebase and identified a similar unresolved issue in the immune module (capillary leak sodium shift). It is available in the project repository.
+Although our case study is drawn from physiological simulation, the underlying design pattern — threshold-gated discrete events coupling heterogeneous modules via shared state variables — is general. The FactorCommand data class (`target`, `op`, `value`) is a domain-neutral dispatch interface that could equally describe actuator commands in a robotic co-simulation, event triggers in a DEVS-based framework [Zeigler et al., 2000], or state modifications in a multi-physics coupling layer. The lessons derived here therefore apply to any modular simulation architecture that mixes continuous integration with discrete inter-module events.
 
-**Lesson 2: Parallel paths mask bugs.** The existence of two independent mechanisms targeting the same variable (heart_rate) allowed the dimensional error to go unnoticed: when one path was removed during testing, the other continued to provide drive. Modular simulation engines should audit for redundant targeting paths and, at minimum, document which path is intended to dominate under which conditions.
+**Lesson 1: Dimensional consistency must be explicit.** Any discrete event that modifies a continuous state variable must carry consistent rate dimensions. The convention of "per-step" quantities, common in game engines and real-time simulation, is a latent source of dt-dependent error in scientific ODE simulation. We recommend that all inter-module communication quantities be explicitly annotated with their dimensions in code comments. To operationalize this recommendation, we have released a static lint tool (`check_fc_dimensions.py`) that automatically scans FactorCommand emissions for missing dt normalization. The tool successfully detected the original bug in our codebase and identified a similar unresolved issue in the immune module (capillary leak sodium shift). It is available in the project repository and is applicable to any codebase using the FactorCommand dispatch pattern.
 
-**Lesson 3: Spurious steady states require specific detection strategies.** Standard diagnostics are insufficient. We recommend:
+**Lesson 2: Parallel paths mask bugs.** The existence of two independent mechanisms targeting the same variable (heart_rate) allowed the dimensional error to go unnoticed: when one path was removed during testing, the other continued to provide drive. In any modular simulation where multiple modules can write to the same state variable, redundant paths create a testing blind spot. Engines should audit for such paths and, at minimum, document which path is intended to dominate under which conditions.
+
+**Lesson 3: Spurious steady states require specific detection strategies.** Standard convergence diagnostics (dt refinement, steady-state detection, parameter sweeps) are necessary but not sufficient. We recommend:
 - Routine dt sweeps with at least one order of magnitude in both directions from the operating dt
-- Explicit monitoring of all state variables approaching physiological saturation limits
-- Where possible, comparison against an independent solver (implicit or unified state-vector) at a single dt value
+- Explicit monitoring of state variables approaching saturation limits (physical, biological, or imposed)
+- Where possible, comparison against an independent solver (implicit or monolithic) at a single dt value
 
-**Lesson 4: Order swap tests are not diagnostic.** The equivalence of heart→neuro and neuro→heart orderings (Δ < 0.034 mmHg in subprocess-isolated tests) shows that sequential coupling is not the source of bias. Before attributing systematic error to algorithmic architecture, exclude dimensional errors in discrete events.
+**Lesson 4: Order swap tests are not diagnostic for dimensional errors.** The equivalence of heart→neuro and neuro→heart orderings (Δ < 0.034 mmHg in subprocess-isolated tests) shows that sequential coupling is not the source of bias. In any modular simulation with sequential module execution, ordering sensitivity and dimensional inconsistency are distinct failure modes — the absence of one does not rule out the other.
 
 ### 4.5 Relationship to Prior Work
 
 Our results complement and extend previous findings on numerical bias in physiological simulation. Tłałka et al. (2024) reported that explicit Euler methods are "numerically unstable" for baroreflex models; we identify a specific, preventable mechanism for this instability — not a fundamental property of explicit Euler, but a dimensional error in discrete inter-module events.
 
-The spurious steady state phenomenon is distinct from the splitting error analyzed by Kim et al. (2011) in poromechanics. In Kim's framework, the splitting error arises from the mathematical structure of the operator split and persists as dt → 0. In our case, the error would vanish if the discrete event were correctly normalized — it is an implementation error, not a mathematical necessity.
+The spurious steady state phenomenon is distinct from the splitting error analyzed by Kim et al. (2011) in poromechanics, though Kim's work provided the initial heuristic framework for our investigation. In Kim's analysis, the splitting error arises from the mathematical structure of the operator split and persists as dt → 0; it is an intrinsic property of the sequential coupling scheme. In our case, the error would vanish if the discrete event were correctly normalized — it is a dimensional inconsistency in the event emission protocol, not a fundamental limitation of sequential integration. The distinction is important: Kim's error requires architectural changes (e.g., monolithic coupling) to eliminate, whereas ours requires only a 7-line code fix.
 
 ### 4.6 Limitations
 
@@ -287,7 +289,7 @@ We documented the discovery, diagnosis, and correction of a dimensional analysis
 
 The correction required 7 lines of code: scaling discrete deltas by dt and eliminating a redundant parallel path. Post-fix, MAP variance across a dt sweep fell from 44.7 mmHg to ≤2.21 mmHg. A three-condition isolation experiment confirmed that the FC dt-scaling (Operation A) accounts for virtually all of the improvement; the parallel redundant-path removal (Operation B) is physiologically motivated but does not materially alter the convergence metric.
 
-This case study is specific to the HR-additive FactorCommand in Virtual Vet. The SVR-multiplicative FactorCommand has an analogous dt-dependency that was corrected in the same code change using exponential rate conversion (SVR_new = SVR × net_SVR_mult^dt). Developers of similar modular ODE engines are advised to explicitly verify the dimensional consistency of all discrete inter-module events — a per-step quantity not normalized by dt carries a hidden dt-dependence that routine convergence checks will not reveal. Whether this failure pattern recurs in other physiological simulation platforms is an open question warranting systematic investigation.
+This case study is specific to the HR-additive FactorCommand in Virtual Vet. The SVR-multiplicative FactorCommand has an analogous dt-dependency that was corrected in the same code change using exponential rate conversion (SVR_new = SVR × net_SVR_mult^dt). The spurious steady state failure mode, however, is general: it can arise in any modular simulation architecture where threshold-gated discrete events modify continuously integrated state variables without dt-normalization. The FactorCommand dispatch pattern (`target`, `op`, `value`) studied here is a domain-neutral interface used across physiological, robotic, and multi-physics co-simulation systems. Developers of such engines are advised to explicitly verify the dimensional consistency of all discrete inter-module events — a per-step quantity not normalized by dt carries a hidden dt-dependence that routine convergence checks will not reveal. Whether this failure pattern recurs in other simulation platforms (HumMod, SAPHIR, CellML-based frameworks) is an open question warranting systematic investigation.
 
 ---
 
@@ -302,6 +304,8 @@ This case study is specific to the HR-additive FactorCommand in Virtual Vet. The
 7. Causin P, Gerbeau JF, Nobile F. Added-mass effect in the design of partitioned algorithms for fluid-structure problems. *Comput Methods Appl Mech Engrg*. 2005;194(42-44):4506–4527.
 8. Ottesen JT, Olufsen MS, Larsen JK. *Applied Mathematical Models in Human Physiology*. SIAM; 2004.
 9. Acierno MJ, Brown S, Coleman AE et al. ACVIM consensus statement: Guidelines for the identification, evaluation, and management of systemic hypertension in dogs and cats. *J Vet Intern Med*. 2018;32(6):1802–1822.
+10. VetFolio. Arterial blood pressure measurement. VetFolio Clinical Resource. Available at: <https://www.vetfolio.com/learn/article/arterial-blood-pressure-measurement>
+11. Zeigler BP, Praehofer H, Kim TG. *Theory of Modeling and Simulation*. 2nd ed. Academic Press; 2000.
 
 ---
 
@@ -323,11 +327,11 @@ This case study is specific to the HR-additive FactorCommand in Virtual Vet. The
 
 ## Highlights
 
-- A dimensional mismatch in discrete inter-module events (bpm/step vs bpm/s) produced a +44.7 mmHg MAP bias invisible to standard convergence diagnostics
-- The system converged to a stable but physiologically wrong operating point — a failure mode termed "spurious steady state"
-- Subprocess-isolated swap experiments ruled out sequential coupling; dimensional analysis of FactorCommand emission identified the root cause
-- A 7-line correction (dt-scaling + path consolidation) reduced MAP variance from 44.7 to ≤2.21 mmHg across a dt sweep
-- A static lint tool is provided to detect similar dimensional inconsistencies in other modular ODE engines
+- A dimensional mismatch in threshold-gated discrete events (per-step vs per-second) produced a stable but wrong steady state invisible to standard convergence diagnostics
+- This "spurious steady state" failure mode is general to modular simulation architectures mixing discrete events with continuous integration
+- Subprocess-isolated experiments ruled out sequential coupling; dimensional analysis of the event emission protocol identified the root cause
+- A 7-line code correction reduced MAP variance from 44.7 to ≤2.21 mmHg; a static lint tool automates detection for similar systems
+- The findings are relevant to any domain using threshold-gated discrete events for inter-module communication (physiological, robotic, multi-physics)
 
 ---
 
