@@ -23,6 +23,7 @@ from immune import ImmuneModule
 from coagulation import CoagulationModule
 from lymphatic import LymphaticModule
 from lifecycle import LifecycleEngine
+from src.organs.coupling import CouplingEngine, OrganContext, PhysiologicalSignal
 from parameters import (
     DT_SECONDS, SIMULATION_STEP_MS, T_MAX_MINUTES,
     PLASMA_VOLUME_FRACTION,
@@ -147,6 +148,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "immune.coagulation_state":      ("immune", "coagulation_state"),
     # Coagulation
     "coag.PT_sec":               ("blood", "PT_sec"),
+    "blood.PT_sec":             ("blood", "PT_sec"),
     "coag.aPTT_sec":             ("blood", "aPTT_sec"),
     "coag.fibrinogen_mg_dL":     ("blood", "fibrinogen_mg_dL"),
     "coag.factor_VII":           ("coagulation", "factor_VII"),
@@ -156,6 +158,12 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.splenic_reserve_mL":  ("blood", "splenic_reserve_mL"),  # disease outputs use blood.*
     "lymph.lymph_flow":          ("lymphatic", "lymph_flow_rate"),
     "lymph.interstitial_fluid":  ("blood", "interstitial_fluid_mL"),
+    # Coupling engine targets (multi-organ signals)
+    "blood.arterial_PO2_mmHg":  ("blood", "arterial_PO2_mmHg"),
+    "blood.BUN":                ("blood", "bun_mg_dL"),
+    "blood.arterial_PCO2_mmHg": ("blood", "arterial_PCO2_mmHg"),
+    "lung.diffusion_coefficient": ("lung", "diffusion_coefficient"),
+    "lung.respiratory_rate":    ("lung", "respiratory_rate"),
 }
 
 
@@ -320,6 +328,13 @@ class VirtualCreature:
         self.immune = ImmuneModule(weight_kg=body_weight_kg, blood=self.blood, endocrine=self.endocrine)
         self.coagulation = CoagulationModule(weight_kg=body_weight_kg, blood=self.blood)
         self.lymphatic = LymphaticModule(weight_kg=body_weight_kg, blood=self.blood)
+
+        # ── 多器官耦合引擎 ─────────────────────────────────────────────
+        # OrganContext: 每个器官模块的信号总线
+        self._organ_contexts: dict[str, OrganContext] = {}
+        for mod_name in ("heart", "lung", "kidney", "blood", "fluid", "liver"):
+            self._organ_contexts[mod_name] = OrganContext(mod_name)
+        self.coupling_engine = CouplingEngine()
 
         # ── 统一 ODE 求解器缓存（半隐式耦合）────────────────────────────
         # _cached_inputs[module_name][input_name] = value
@@ -702,6 +717,50 @@ class VirtualCreature:
         # Step 4.9: 免疫/炎症系统
         immune_state = self.immune.compute(dt, endocrine_state)
         for cmd in immune_state.get("factor_commands", []):
+            self.apply_factor(cmd)
+
+        # ── Step 4.95: 多器官耦合 ─────────────────────────────────────────────
+        # 所有器官 compute() 完成后，发布信号到各自的 OrganContext
+        ctx = self._organ_contexts
+        t = self.current_time_s
+        # Heart signals
+        ctx["heart"].publish(PhysiologicalSignal("cardiac_output", CO, "mL/min", "heart", t))
+        ctx["heart"].publish(PhysiologicalSignal("MAP", heart_state["MAP_mmHg"], "mmHg", "heart", t))
+        ctx["heart"].publish(PhysiologicalSignal("central_venous_pressure", CVP, "mmHg", "heart", t))
+        ctx["heart"].publish(PhysiologicalSignal("heart_rate", self.heart.heart_rate, "bpm", "heart", t))
+        ctx["heart"].publish(PhysiologicalSignal("stroke_volume", self.heart.stroke_volume, "mL", "heart", t))
+        ctx["heart"].publish(PhysiologicalSignal("SVR", self.heart.SVR, "mmHg·s/mL", "heart", t))
+        # Lung signals
+        ctx["lung"].publish(PhysiologicalSignal("arterial_PO2", self.blood.arterial_PO2_mmHg, "mmHg", "lung", t))
+        ctx["lung"].publish(PhysiologicalSignal("arterial_PCO2", self.blood.arterial_PCO2_mmHg, "mmHg", "lung", t))
+        ctx["lung"].publish(PhysiologicalSignal("arterial_saturation", self.blood.arterial_saturation, "", "lung", t))
+        ctx["lung"].publish(PhysiologicalSignal("respiratory_rate", lung_state["respiratory_rate"], "/min", "lung", t))
+        ctx["lung"].publish(PhysiologicalSignal("minute_ventilation", lung_state["minute_ventilation"], "mL/min", "lung", t))
+        ctx["lung"].publish(PhysiologicalSignal("diffusion_coefficient", self.lung.diffusion_coefficient, "", "lung", t))
+        # Kidney signals
+        ctx["kidney"].publish(PhysiologicalSignal("GFR", kidney_state["GFR_ml_min"], "mL/min", "kidney", t))
+        ctx["kidney"].publish(PhysiologicalSignal("renin_activity", kidney_state["renin_activity"], "", "kidney", t))
+        ctx["kidney"].publish(PhysiologicalSignal("angiotensin_II", kidney_state.get("angiotensin_II", self.kidney.angiotensin_II), "", "kidney", t))
+        ctx["kidney"].publish(PhysiologicalSignal("aldosterone", kidney_state["aldosterone"], "", "kidney", t))
+        ctx["kidney"].publish(PhysiologicalSignal("urine_output", kidney_state["urine_output_ml_min"], "mL/min", "kidney", t))
+        # Blood signals
+        ctx["blood"].publish(PhysiologicalSignal("arterial_pH", self.blood.arterial_pH, "", "blood", t))
+        ctx["blood"].publish(PhysiologicalSignal("arterial_PCO2", self.blood.arterial_PCO2_mmHg, "mmHg", "blood", t))
+        ctx["blood"].publish(PhysiologicalSignal("lactate", self.blood.lactate_mmol_L, "mmol/L", "blood", t))
+        ctx["blood"].publish(PhysiologicalSignal("potassium", self.blood.potassium_mEq_L, "mEq/L", "blood", t))
+        ctx["blood"].publish(PhysiologicalSignal("albumin", self.blood.albumin_g_dL, "g/dL", "blood", t))
+        ctx["blood"].publish(PhysiologicalSignal("ALT", self.blood.ALT_U_L, "U/L", "blood", t))
+        ctx["blood"].publish(PhysiologicalSignal("PT_sec", self.blood.PT_sec, "sec", "blood", t))
+        ctx["blood"].publish(PhysiologicalSignal("fibrinogen_mg_dL", self.blood.fibrinogen_mg_dL, "mg/dL", "blood", t))
+        ctx["blood"].publish(PhysiologicalSignal("HCO3", self.fluid.vascular_hco3_meq_l, "mEq/L", "blood", t))
+        # Fluid signals
+        ctx["fluid"].publish(PhysiologicalSignal("vascular_volume_ml", self.fluid.vascular_volume_ml, "mL", "fluid", t))
+        # Liver signals
+        ctx["liver"].publish(PhysiologicalSignal("metabolic_activity", liver_state["metabolic_activity"], "", "liver", t))
+
+        # 解析耦合规则 → 生成 FactorCommands → apply_factor()
+        coupling_cmds = self.coupling_engine.resolve(ctx, dt)
+        for cmd in coupling_cmds:
             self.apply_factor(cmd)
 
         # Step 5: 器官衰竭追踪

@@ -1,0 +1,183 @@
+{
+  "_schema": "coupling_rules v1",
+  "_comment": "Multi-organ closed-loop coupling rules. All coupling writes go through FactorCommand via CouplingEngine.",
+
+  "couplings": [
+
+    {
+      "name": "RAAS → SVR (肾素-血管紧张素-醛固酮系统 → 体循环阻力)",
+      "loop": "kidney_cv",
+      "source": {"module": "kidney", "signal": "renin_activity"},
+      "target": {"module": "heart", "param": "heart.SVR", "op": "multiply", "fn": "1.0 + 0.3 * min(renin_activity / 1.0, 2.0)"},
+      "condition": "renin_activity > 0.1",
+      "time_constant": 5.0,
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "name": "RAAS → 心脏收缩力 (血管紧张素II直接心肌作用)",
+      "loop": "kidney_cv",
+      "source": {"module": "kidney", "signal": "angiotensin_II"},
+      "target": {"module": "heart", "param": "heart.contractility_factor", "op": "multiply", "fn": "1.0 + 0.15 * min(angiotensin_II / 1.0, 1.5)"},
+      "condition": "angiotensin_II > 0.1",
+      "time_constant": 8.0,
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "name": "醛固酮 → 血管容积 (钠水潴留)",
+      "loop": "kidney_cv",
+      "source": {"module": "kidney", "signal": "aldosterone"},
+      "target": {"module": "fluid", "param": "fluid.vascular_volume_ml", "op": "multiply", "fn": "1.0 + 0.08 * max(0, min(aldosterone / 1.0, 3.0))"},
+      "condition": "aldosterone > 0.1",
+      "time_constant": 30.0,
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "name": "GFR → 血尿素氮 (肾排泄功能下降)",
+      "loop": "kidney_cv",
+      "source": {"module": "kidney", "signal": "GFR"},
+      "target": {"module": "blood", "param": "blood.BUN", "op": "set", "fn": "20.0 + 40.0 * max(0, 1.0 - gfr / 100.0)"},
+      "condition": "gfr < 90.0",
+      "time_constant": 0.0,
+      "priority": 15,
+      "enabled": true
+    },
+    {
+      "name": "心输出量 → GFR (心肾综合征前向效应)",
+      "loop": "kidney_cv",
+      "source": {"module": "heart", "signal": "cardiac_output"},
+      "target": {"module": "kidney", "param": "kidney.GFR", "op": "multiply", "fn": "min(1.0 + 0.004 * max(0, cardiac_output - 3.0), 1.5)"},
+      "condition": "cardiac_output < 5.0",
+      "time_constant": 10.0,
+      "priority": 20,
+      "enabled": true
+    },
+
+    {
+      "name": "动脉氧分压 → 心肌收缩力 (心肌氧供)",
+      "loop": "pulmonary_cv",
+      "source": {"module": "lung", "signal": "arterial_PO2"},
+      "target": {"module": "heart", "param": "heart.contractility_factor", "op": "multiply", "fn": "min(1.0 + 0.006 * (arterial_PO2 - 95.0), 1.3)"},
+      "condition": "arterial_PO2 < 95.0",
+      "time_constant": 0.0,
+      "priority": 10,
+      "enabled": false
+    },
+    {
+      "name": "动脉二氧化碳分压 → 呼吸驱动 (化学感受器)",
+      "loop": "pulmonary_cv",
+      "source": {"module": "blood", "signal": "arterial_PCO2"},
+      "target": {"module": "lung", "param": "lung.respiratory_rate", "op": "multiply", "fn": "1.0 + 0.05 * max(0, arterial_PCO2 - 40.0)"},
+      "condition": "arterial_PCO2 > 45.0",
+      "time_constant": 2.0,
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "name": "肺扩散系数 → 动脉氧分压",
+      "loop": "pulmonary_cv",
+      "source": {"module": "lung", "signal": "diffusion_coefficient"},
+      "target": {"module": "blood", "param": "blood.arterial_PO2_mmHg", "op": "multiply", "fn": "diffusion_coefficient"},
+      "condition": null,
+      "time_constant": 0.0,
+      "priority": 10,
+      "enabled": false
+    },
+
+    {
+      "name": "肾GFR → 代谢性酸中毒 (酸性物质蓄积)",
+      "loop": "blood_ph",
+      "source": {"module": "kidney", "signal": "GFR"},
+      "target": {"module": "blood", "param": "blood.pH", "op": "set", "fn": "7.4 - 0.4 * max(0, 1.0 - gfr / 80.0)"},
+      "condition": "gfr < 80.0",
+      "time_constant": 0.0,
+      "priority": 10,
+      "enabled": false
+    },
+    {
+      "name": "动脉PCO2 → 碳酸氢根 (呼吸代偿)",
+      "loop": "blood_ph",
+      "source": {"module": "blood", "signal": "arterial_PCO2"},
+      "target": {"module": "blood", "param": "blood.HCO3", "op": "set", "fn": "24.0 - 0.3 * max(0, arterial_PCO2 - 40.0)"},
+      "condition": null,
+      "time_constant": 0.0,
+      "priority": 15,
+      "enabled": false
+    },
+    {
+      "name": "乳酸 → pH偏移 (乳酸性酸中毒)",
+      "loop": "blood_ph",
+      "source": {"module": "blood", "signal": "lactate"},
+      "target": {"module": "blood", "param": "blood.pH", "op": "add", "fn": "-0.05 * max(0, lactate - 1.0)"},
+      "condition": "lactate > 2.0",
+      "time_constant": 0.0,
+      "priority": 10,
+      "enabled": false
+    },
+    {
+      "name": "代谢性酸中毒 → 血钾转移 (酸碱-电解质交互)",
+      "loop": "blood_ph",
+      "source": {"module": "blood", "signal": "arterial_pH"},
+      "target": {"module": "blood", "param": "blood.potassium", "op": "add", "fn": "-0.3 * max(0, 7.4 - arterial_pH)"},
+      "condition": "arterial_pH < 7.35",
+      "time_constant": 0.0,
+      "priority": 20,
+      "enabled": false
+    },
+
+    {
+      "name": "肝代谢 → 纤维蛋白原合成 (凝血因子)",
+      "loop": "liver_coag",
+      "source": {"module": "liver", "signal": "metabolic_activity"},
+      "target": {"module": "blood", "param": "coag.fibrinogen_mg_dL", "op": "multiply", "fn": "metabolic_activity"},
+      "condition": null,
+      "time_constant": 0.0,
+      "priority": 10,
+      "enabled": false
+    },
+    {
+      "name": "肝代谢 → 白蛋白合成 (血浆蛋白)",
+      "loop": "liver_coag",
+      "source": {"module": "liver", "signal": "metabolic_activity"},
+      "target": {"module": "blood", "param": "blood.albumin", "op": "multiply", "fn": "metabolic_activity"},
+      "condition": null,
+      "time_constant": 0.0,
+      "priority": 10,
+      "enabled": false
+    },
+    {
+      "name": "肝代谢 → PT延长 (凝血酶原时间)",
+      "loop": "liver_coag",
+      "source": {"module": "liver", "signal": "metabolic_activity"},
+      "target": {"module": "blood", "param": "blood.PT_sec", "op": "add", "fn": "5.0 * max(0, 1.0 - metabolic_activity)"},
+      "condition": null,
+      "time_constant": 0.0,
+      "priority": 10,
+      "enabled": false
+    },
+    {
+      "name": "肝代谢 → ALT释放 (细胞损伤)",
+      "loop": "liver_coag",
+      "source": {"module": "liver", "signal": "metabolic_activity"},
+      "target": {"module": "blood", "param": "blood.ALT", "op": "add", "fn": "200.0 * max(0, 1.0 - metabolic_activity)"},
+      "condition": null,
+      "time_constant": 0.0,
+      "priority": 10,
+      "enabled": false
+    },
+
+    {
+      "name": "中心静脉压 → 肾灌注 (静脉充血对GFR的影响)",
+      "loop": "cvp_renal",
+      "source": {"module": "heart", "signal": "central_venous_pressure"},
+      "target": {"module": "kidney", "param": "kidney.GFR", "op": "multiply", "fn": "max(0.3, 1.0 - 0.02 * max(0, central_venous_pressure - 5.0))"},
+      "condition": "central_venous_pressure > 8.0",
+      "time_constant": 10.0,
+      "priority": 20,
+      "enabled": false
+    }
+
+  ]
+}

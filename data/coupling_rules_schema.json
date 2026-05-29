@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "coupling_rules_schema.json",
+  "title": "Virtual Vet Multi-Organ Coupling Rules Schema",
+  "description": "Schema for data/coupling_rules.json — config-driven physiological coupling between organ modules.",
+  "type": "object",
+  "additionalProperties": true,
+
+  "definitions": {
+
+    "signalSource": {
+      "type": "object",
+      "required": ["module", "signal"],
+      "properties": {
+        "module": {
+          "type": "string",
+          "enum": ["heart", "lung", "kidney", "blood", "fluid", "liver", "coagulation", "nervous", "endocrine"],
+          "description": "Source organ module"
+        },
+        "signal": {
+          "type": "string",
+          "description": "Signal name published by the source module"
+        }
+      }
+    },
+
+    "signalTarget": {
+      "type": "object",
+      "required": ["module", "param", "op", "fn"],
+      "properties": {
+        "module": {
+          "type": "string",
+          "enum": ["heart", "lung", "kidney", "blood", "fluid", "liver", "coagulation", "nervous", "endocrine"],
+          "description": "Target organ module"
+        },
+        "param": {
+          "type": "string",
+          "description": "FactorCommand target param path (e.g. 'heart.SVR')"
+        },
+        "op": {
+          "type": "string",
+          "enum": ["multiply", "add", "set"]
+        },
+        "fn": {
+          "type": "string",
+          "description": "Python expression mapping source signal value to target value. Available: signal values, params keys, 'engine' dict."
+        }
+      }
+    },
+
+    "couplingRule": {
+      "type": "object",
+      "required": ["name", "loop", "source", "target"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable coupling name"
+        },
+        "loop": {
+          "type": "string",
+          "enum": ["kidney_cv", "pulmonary_cv", "blood_ph", "liver_coag", "cvp_renal", "metabolic"],
+          "description": "Physiological loop category"
+        },
+        "source": {
+          "$ref": "#/definitions/signalSource"
+        },
+        "target": {
+          "$ref": "#/definitions/signalTarget"
+        },
+        "condition": {
+          "type": ["string", "null"],
+          "description": "Optional Python expression — coupling active only when condition is True"
+        },
+        "time_constant": {
+          "type": "number",
+          "default": 0,
+          "description": "Coupling delay in seconds. If > 0, applies first-order lag toward target value."
+        },
+        "priority": {
+          "type": "integer",
+          "default": 50,
+          "description": "Execution order within a step. Lower = earlier. Range 1-100."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+
+  },
+
+  "required": ["couplings"],
+
+  "properties": {
+    "_schema": {
+      "type": "string",
+      "const": "coupling_rules v1"
+    },
+    "_comment": {
+      "type": "string"
+    },
+    "couplings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/couplingRule"
+      }
+    }
+  }
+}
