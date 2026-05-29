@@ -30,6 +30,7 @@ from parameters import (
     total_blood_volume_ml, stroke_volume_ml, base_cardiac_output_ml_min,
     tidal_volume_ml, base_minute_ventilation,
     renal_blood_flow_ml_min, gfr_ml_min, baseline_urine_output_ml_min,
+    DEFAULT_AGE_DAYS,
 )
 
 logger = logging.getLogger(__name__)
@@ -275,11 +276,13 @@ class VirtualCreature:
         self,
         body_weight_kg: float = 20.0,
         species: str = "canine",
-        age_days: float = 0.0,
+        age_days: float = DEFAULT_AGE_DAYS,
         dt: float = None,
+        solver: str = "euler",
     ):
         self.w = body_weight_kg
         self.species = species
+        self._solver = solver  # "euler" | "radau"
 
         # 根据实际体重计算 A 类参数
         _tbv = total_blood_volume_ml(body_weight_kg)
@@ -355,6 +358,7 @@ class VirtualCreature:
         # 仿真时间
         self.current_time_s = 0.0
         self.dt = DT_SECONDS if dt is None else dt  # dt=None → 0.1s (production); dt=float → override (testing)
+        self._solver = "euler"  # "euler" | "radau" — set via solver= kwarg
 
         # 事件系统
         self.events = []                            # 待处理事件列表
@@ -608,7 +612,20 @@ class VirtualCreature:
 
     def step(self):
         """
-        推进仿真一个时间步
+        推进仿真一个时间步。
+
+        根据 self._solver 分流：
+        - "euler": 顺序调用各模块 compute(dt)，精度 O(dt)
+        - "radau": solve_ivp(method='Radau') 统一积分，精度 O(dt^5)
+        """
+        if self._solver == "radau":
+            self._step_radau()
+        else:
+            self._step_euler()
+
+    def _step_euler(self):
+        """
+        Euler 求解器路径 — 推进仿真一个时间步
 
         执行顺序（保证因果关系正确）：
         0. 处理事件（失血、输液、药物注射等）
@@ -915,6 +932,138 @@ class VirtualCreature:
             "toxicology": tox_state,
             "pharmacology": pharma_effects if (hasattr(self, "pharmacology") and self.pharmacology is not None) else {},
         }
+
+    def _step_radau(self):
+        """
+        Radau 隐式求解器路径 — 单步推进。
+
+        1. 调用 solve_ivp(method='Radau') 在 [t, t+dt] 上积分
+        2. 解包结果到模块属性
+        3. 执行耦合规则（同 Euler 路径）
+        4. 执行疾病模块
+        5. 记录 history
+        """
+        from scipy.integrate import solve_ivp
+
+        t = self.current_time_s
+        dt = self.dt
+
+        # 1. 事件处理
+        self._process_events(t)
+
+        # 2. 打包状态
+        y0 = self._pack_unified_state()
+        if len(y0) == 0:
+            # 无疾病状态，退化为 Euler
+            self._step_euler()
+            return
+
+        # 3. 预热：初始化 _cached_inputs
+        _ = self._unified_rhs(t, y0)
+
+        # 4. solve_ivp 单步
+        sol = solve_ivp(
+            self._unified_rhs,
+            [t, t + dt],
+            y0,
+            method='Radau',
+            rtol=1e-5,
+            atol=1e-8,
+            dense_output=False,
+            vectorized=False,
+        )
+
+        if not sol.success:
+            # 求解失败，退化为 Euler
+            logger.warning("Radau failed at t=%.2fs: %s, falling back to Euler", t, sol.message)
+            self._step_euler()
+            return
+
+        # 5. 解包结果到模块属性
+        self._unpack_unified_state(sol.y[:, -1])
+
+        # 6. 耦合规则（同 Euler 路径）
+        ctx = self._organ_contexts
+        t_now = self.current_time_s + dt
+        # 重新发布信号（用解包后的状态）
+        ctx["heart"].publish(PhysiologicalSignal("cardiac_output", self.heart.cardiac_output, "mL/min", "heart", t_now))
+        ctx["heart"].publish(PhysiologicalSignal("MAP", self.heart.mean_arterial_pressure, "mmHg", "heart", t_now))
+        ctx["heart"].publish(PhysiologicalSignal("central_venous_pressure", self.heart.central_venous_pressure, "mmHg", "heart", t_now))
+        ctx["kidney"].publish(PhysiologicalSignal("GFR", self.kidney.GFR, "mL/min", "kidney", t_now))
+        ctx["kidney"].publish(PhysiologicalSignal("renin_activity", self.kidney.renin_activity, "", "kidney", t_now))
+        ctx["kidney"].publish(PhysiologicalSignal("angiotensin_II", self.kidney.angiotensin_II, "", "kidney", t_now))
+        ctx["kidney"].publish(PhysiologicalSignal("aldosterone", self.kidney.aldosterone, "", "kidney", t_now))
+        ctx["blood"].publish(PhysiologicalSignal("arterial_pH", self.blood.arterial_pH, "", "blood", t_now))
+        ctx["blood"].publish(PhysiologicalSignal("arterial_PCO2", self.blood.arterial_PCO2_mmHg, "mmHg", "blood", t_now))
+        ctx["fluid"].publish(PhysiologicalSignal("vascular_volume_ml", self.fluid.vascular_volume_ml, "mL", "fluid", t_now))
+        ctx["liver"].publish(PhysiologicalSignal("metabolic_activity", self.liver.metabolic_activity, "", "liver", t_now))
+
+        coupling_cmds = self.coupling_engine.resolve(ctx, dt)
+        for cmd in coupling_cmds:
+            self.apply_factor(cmd)
+
+        # 7. 疾病模块
+        if self.disease is not None:
+            engine_state = {
+                "heart": {"HR": self.heart.heart_rate, "MAP": self.heart.mean_arterial_pressure,
+                          "CO": self.heart.cardiac_output, "contractility": self.heart.contractility_factor,
+                          "SVR": self.heart.SVR, "CVP": self.heart.central_venous_pressure},
+                "lung": {"arterial_PO2": self.blood.arterial_PO2_mmHg,
+                         "arterial_PCO2": self.blood.arterial_PCO2_mmHg,
+                         "diffusion_coefficient": self.lung.diffusion_coefficient,
+                         "respiratory_rate": self.lung.respiratory_rate},
+                "kidney": {"GFR": self.kidney.GFR, "urine_output": self.kidney.urine_output,
+                           "renin_activity": self.kidney.renin_activity,
+                           "angiotensin_II": self.kidney.angiotensin_II,
+                           "aldosterone": self.kidney.aldosterone},
+                "blood": {"pH": self.blood.arterial_pH, "lactate": self.blood.lactate_mmol_L,
+                          "BUN": self.blood.bun_mg_dL, "creatinine": self.blood.creatinine_mg_dL,
+                          "glucose": self.blood.glucose_mmol_L, "sodium": self.blood.sodium_mEq_L,
+                          "potassium": self.blood.potassium_mEq_L},
+                "fluid": {"vascular_volume_ml": self.fluid.vascular_volume_ml},
+                "temperature": self.blood.core_temperature_C,
+            }
+            cmds = self.disease.compute(dt, engine_state)
+            for cmd in cmds:
+                self.apply_factor(cmd)
+
+        # 8. 记录历史（同 Euler 路径最后部分）
+        self._record_history(dt)
+
+    def _record_history(self, dt: float):
+        """记录当前状态到 history dict（Euler 和 Radau 共用）。"""
+        self.history["time_s"].append(self.current_time_s)
+        self.history["HR_bpm"].append(self.heart.heart_rate)
+        self.history["CO_ml_min"].append(self.heart.cardiac_output)
+        self.history["MAP_mmHg"].append(self.heart.mean_arterial_pressure)
+        self.history["CVP_mmHg"].append(self.heart.central_venous_pressure)
+        self.history["RR"].append(self.lung.respiratory_rate)
+        self.history["art_PO2"].append(self.blood.arterial_PO2_mmHg)
+        self.history["art_PCO2"].append(self.blood.arterial_PCO2_mmHg)
+        self.history["saturation"].append(self.blood.arterial_saturation)
+        self.history["pH"].append(self.blood.arterial_pH)
+        self.history["GFR"].append(self.kidney.GFR)
+        self.history["urine_ml_min"].append(self.kidney.urine_output)
+        self.history["BUN"].append(self.blood.bun_mg_dL)
+        self.history["creatinine"].append(self.blood.creatinine_mg_dL)
+        self.history["lactate"].append(self.blood.lactate_mmol_L)
+        self.history["glucose"].append(self.blood.glucose_mmol_L)
+        self.history["temperature"].append(self.blood.core_temperature_C)
+        self.history["blood_volume_ml"].append(self.heart.circulating_volume_ml)
+        self.history["sympathetic"].append(self.neuro.sympathetic_tone)
+        self.history["contractility_factor"].append(self.heart.contractility_factor)
+        self.history["SVR"].append(self.heart.SVR)
+        self.history["endocrine"].append(self.endocrine.summary())
+        self.history["immune"].append(self.immune.summary())
+        self.history["toxicology"].append(self.toxicology.summary() if hasattr(self.toxicology, 'summary') else {})
+        self.history["liver"].append(self.liver.summary() if hasattr(self.liver, 'summary') else {})
+        self.history["neuro"].append(self.neuro.summary())
+        self.history["coagulation"].append(self.coagulation.summary())
+        self.history["lymphatic"].append(self.lymphatic.summary())
+        self.history["lymph_splenic_reserve"].append(self.blood.splenic_reserve_mL)
+        self.history["lymph_lymph_flow"].append(self.lymphatic.lymph_flow_rate)
+
+        self.current_time_s += dt
 
     def simulate(self, duration_minutes: float, verbose: bool = False):
         """

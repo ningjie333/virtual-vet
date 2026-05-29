@@ -84,6 +84,23 @@
         "enabled": {
           "type": "boolean",
           "default": true
+        },
+        "references": {
+          "type": "array",
+          "description": "Literature provenance for the coupling coefficients and equation",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id":   { "type": "string" },
+              "text": { "type": "string" },
+              "url":  { "type": "string", "default": "" }
+            },
+            "required": ["id", "text"]
+          }
+        },
+        "notes": {
+          "type": "string",
+          "description": "Derivation notes, coefficient calibration rationale, or caveats"
         }
       }
     }

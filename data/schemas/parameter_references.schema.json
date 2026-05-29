@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://virtual-vet.app/schemas/parameter_references.schema.json",
+  "title": "Parameter Literature References",
+  "description": "Literature provenance for all tunable physiological parameters in VirtualVet. Reference format mirrors ode_diseases.json meta.references style (PMIDs + textbooks).",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "properties": {
+      "references": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id":   { "type": "string" },
+            "text": { "type": "string" },
+            "url":  { "type": "string", "default": "" }
+          },
+          "required": ["id", "text"]
+        },
+        "minItems": 1
+      },
+      "notes": {
+        "type": "string",
+        "description": "Internal derivation notes, caveats, or untested assumptions"
+      }
+    },
+    "required": ["references"]
+  }
+}

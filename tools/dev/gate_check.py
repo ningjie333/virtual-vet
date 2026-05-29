@@ -115,6 +115,63 @@ def run_schema() -> int:
     return max_code
 
 
+def run_verify_refs() -> int:
+    """验证所有 _PARAM_PATHS 和 coupling_rules 有文献溯源。"""
+    import json
+    import sys
+    sys.path.insert(0, str(PROJECT_ROOT))
+    sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+    print("=" * 50)
+    print("Virtual Vet Gate Check — 文献溯源验证")
+    print("=" * 50)
+
+    from src.simulation import _PARAM_PATHS
+    from src.parameter_refs import all_param_refs
+    from src.organs.coupling import CouplingEngine
+
+    refs = all_param_refs()
+    params_missing = []
+    for path in _PARAM_PATHS:
+        if path not in refs:
+            params_missing.append(path)
+
+    # Coupling rules
+    engine = CouplingEngine()
+    couplings_missing = []
+    for rule in engine.rules:
+        if rule.enabled and not rule.references:
+            couplings_missing.append(rule.name)
+
+    unverified = len(params_missing) + len(couplings_missing)
+
+    if params_missing:
+        print(f"\n  [params] {len(params_missing)} 个 _PARAM_PATHS 缺少文献溯源:")
+        for p in params_missing[:10]:
+            print(f"    - {p}")
+        if len(params_missing) > 10:
+            print(f"    ... 及其余 {len(params_missing) - 10} 个")
+
+    if couplings_missing:
+        print(f"\n  [coupling] {len(couplings_missing)} 条 enabled 规则缺少文献溯源:")
+        for n in couplings_missing:
+            print(f"    - {n}")
+
+    total = len(_PARAM_PATHS) + len([r for r in engine.rules if r.enabled])
+    pct = round((total - unverified) / total * 100) if total else 100
+
+    print(f"\n  覆盖率: {total - unverified}/{total} ({pct}%)")
+
+    print("=" * 50)
+    if unverified == 0:
+        print(f"[PASS] 所有参数和耦合规则均有文献溯源 ✓")
+    else:
+        print(f"[WARN] {unverified} 个项目缺少文献溯源")
+    print("=" * 50)
+
+    return 2 if unverified > 0 else 0
+
+
 def run_quick() -> int:
     """全套检查：API + 数据 + 类型。"""
     print("=" * 50)
@@ -158,6 +215,7 @@ def main():
     group.add_argument("--full", action="store_true", help="完整模式")
     group.add_argument("--fix", action="store_true", help="自动修复可修复的问题")
     group.add_argument("--schema", action="store_true", help="JSON Schema 验证")
+    group.add_argument("--verify-refs", action="store_true", help="验证参数文献溯源覆盖率")
     group.add_argument("--install-hook", action="store_true", help="安装 Git pre-commit hook")
     args = parser.parse_args()
 
@@ -174,6 +232,8 @@ def main():
         return run_fix()
     elif args.schema:
         return run_schema()
+    elif args.verify_refs:
+        return run_verify_refs()
     elif args.full:
         return run_quick()
     else:

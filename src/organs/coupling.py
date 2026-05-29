@@ -94,6 +94,10 @@ class _CouplingRule:
     priority: int
     enabled: bool
 
+    # Literature provenance (mirrors ode_diseases.json meta.references format)
+    references: list[dict] = field(default_factory=list)
+    notes: str = ""
+
     # cached lag state: signal_name → current_lagged_value
     _lag_state: dict = field(default_factory=dict)
 
@@ -133,6 +137,7 @@ class CouplingEngine:
 
         self._rules: list[_CouplingRule] = []
         self._signal_map: dict[str, float] = {}
+        self._prev_signal_map: dict[str, float] = {}  # oscillation detection
         self._lag_state: dict[str, float] = {}  # rule_name:signal_name → lagged value
         self._load_rules(Path(rules_path), Path(schema_path))
 
@@ -167,6 +172,8 @@ class CouplingEngine:
                 time_constant=raw.get("time_constant", 0.0),
                 priority=raw.get("priority", 50),
                 enabled=raw.get("enabled", True),
+                references=raw.get("references", []),
+                notes=raw.get("notes", ""),
             )
             self._rules.append(rule)
 
@@ -239,6 +246,21 @@ class CouplingEngine:
                 _source=f"coupling:{rule.name}",
             )
             commands.append(cmd)
+
+        # Oscillation detection: warn if any signal changed >50% between steps
+        if self._prev_signal_map:
+            for key, val in self._signal_map.items():
+                prev = self._prev_signal_map.get(key)
+                if prev is not None and abs(prev) > 1e-6:
+                    change = abs(val - prev) / abs(prev)
+                    if change > 0.5:
+                        logger.warning(
+                            "Coupling oscillation: %s %.3f → %.3f (%.0f%% change)",
+                            key, prev, val, change * 100,
+                        )
+
+        # Save current signal map for next-step oscillation detection
+        self._prev_signal_map = dict(self._signal_map)
 
         return commands
 

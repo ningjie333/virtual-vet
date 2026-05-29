@@ -15,7 +15,12 @@
     "name": "体格检查",
     "test_type": "physical",
     "handler": "physical",
-    "vitals": ["HR", "RR", "Temp", "MAP"],
+    "vitals": [
+      "HR",
+      "RR",
+      "Temp",
+      "MAP"
+    ],
     "extra_params": [],
     "thresholds": {
       "hr_tachy": 140,
@@ -54,10 +59,22 @@
     ],
     "findings_rules": {
       "mental_status": [
-        {"if": "state.MAP < thresholds.map_low_severe or state.SpO2 < thresholds.spo2_low_severe", "text": "昏迷"},
-        {"if": "state.MAP < thresholds.map_low_moderate or state.SpO2 < thresholds.spo2_low_moderate", "text": "嗜睡/沉郁"},
-        {"if": "state.HR > thresholds.hr_tachy", "text": "烦躁不安"},
-        {"else": true, "text": "警觉/正常"}
+        {
+          "if": "state.MAP < thresholds.map_low_severe or state.SpO2 < thresholds.spo2_low_severe",
+          "text": "昏迷"
+        },
+        {
+          "if": "state.MAP < thresholds.map_low_moderate or state.SpO2 < thresholds.spo2_low_moderate",
+          "text": "嗜睡/沉郁"
+        },
+        {
+          "if": "state.HR > thresholds.hr_tachy",
+          "text": "烦躁不安"
+        },
+        {
+          "else": true,
+          "text": "警觉/正常"
+        }
       ]
     }
   },
@@ -110,47 +127,116 @@
     ],
     "findings_rules": {
       "heart_rate_desc": [
-        {"if": "state.HR > thresholds.hr_tachy", "text": "心动过速，心音增强"},
-        {"if": "state.HR < thresholds.hr_brady", "text": "心动过缓，心音减弱"},
-        {"else": true, "text": "心率正常，心音清晰"}
+        {
+          "if": "state.HR > thresholds.hr_tachy",
+          "text": "心动过速，心音增强"
+        },
+        {
+          "if": "state.HR < thresholds.hr_brady",
+          "text": "心动过缓，心音减弱"
+        },
+        {
+          "else": true,
+          "text": "心率正常，心音清晰"
+        }
       ],
       "contractility_desc": [
-        {"if": "state.contractility > thresholds.contractility_high", "text": "心音增强（高动力状态）"},
-        {"if": "state.contractility < thresholds.contractility_low", "text": "心音低沉（收缩力减弱）"}
+        {
+          "if": "state.contractility > thresholds.contractility_high",
+          "text": "心音增强（高动力状态）"
+        },
+        {
+          "if": "state.contractility < thresholds.contractility_low",
+          "text": "心音低沉（收缩力减弱）"
+        }
       ],
       "lung_desc": [
-        {"if": "state.PaO2 < thresholds.pao2_crackles_severe", "text": "双肺湿啰音（肺泡渗出）"},
-        {"if": "state.PaO2 < thresholds.pao2_crackles_mild", "text": "肺底细湿啰音"},
-        {"if": "state.RR > thresholds.rr_high", "text": "呼吸音粗粝（呼吸急促）"},
-        {"else": true, "text": "肺音清晰，呼吸音正常"}
+        {
+          "if": "state.PaO2 < thresholds.pao2_crackles_severe",
+          "text": "双肺湿啰音（肺泡渗出）"
+        },
+        {
+          "if": "state.PaO2 < thresholds.pao2_crackles_mild",
+          "text": "肺底细湿啰音"
+        },
+        {
+          "if": "state.RR > thresholds.rr_high",
+          "text": "呼吸音粗粝（呼吸急促）"
+        },
+        {
+          "else": true,
+          "text": "肺音清晰，呼吸音正常"
+        }
       ],
       "rhythm_note": [
-        {"if": "state.HR > thresholds.hr_very_high", "text": "节律不齐待排（建议心电图）"}
+        {
+          "if": "state.HR > thresholds.hr_very_high",
+          "text": "节律不齐待排（建议心电图）"
+        }
       ],
       "gdv_findings": [
-        {"if": "disease.gastric_distension > thresholds.gdv_distension_severe", "text": "心音遥远（胃扩张压迫膈肌），可闻及振水音"},
-        {"if": "disease.gastric_distension > thresholds.gdv_distension_moderate", "text": "心音轻度遥远"},
-        {"if": "disease.arrhythmia_severity > thresholds.arrhythmia_severe", "text": "室性早搏（胃扩张扭转常见并发症）"}
+        {
+          "if": "disease.gastric_distension > thresholds.gdv_distension_severe",
+          "text": "心音遥远（胃扩张压迫膈肌），可闻及振水音"
+        },
+        {
+          "if": "disease.gastric_distension > thresholds.gdv_distension_moderate",
+          "text": "心音轻度遥远"
+        },
+        {
+          "if": "disease.arrhythmia_severity > thresholds.arrhythmia_severe",
+          "text": "室性早搏（胃扩张扭转常见并发症）"
+        }
       ],
       "dka_kussmaul": [
-        {"if": "disease.kussmaul_respiration > thresholds.kussmaul_moderate", "text": "深大呼吸（Kussmaul呼吸），呼气有酮味"},
-        {"if": "disease.kussmaul_respiration > thresholds.kussmaul_mild", "text": "呼吸深快"}
+        {
+          "if": "disease.kussmaul_respiration > thresholds.kussmaul_moderate",
+          "text": "深大呼吸（Kussmaul呼吸），呼气有酮味"
+        },
+        {
+          "if": "disease.kussmaul_respiration > thresholds.kussmaul_mild",
+          "text": "呼吸深快"
+        }
       ],
       "pericardial_findings": [
-        {"if": "disease.tamponade_severity > thresholds.pericardial_muffled", "text": "心音遥远、低沉（心脏填塞征象）"},
-        {"if": "disease.pulsus_paradoxus > 0.3", "text": "奇脉（吸气时心音明显减弱）"}
+        {
+          "if": "disease.tamponade_severity > thresholds.pericardial_muffled",
+          "text": "心音遥远、低沉（心脏填塞征象）"
+        },
+        {
+          "if": "disease.pulsus_paradoxus > 0.3",
+          "text": "奇脉（吸气时心音明显减弱）"
+        }
       ],
       "dic_hemorrhage": [
-        {"if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_moderate", "text": "黏膜出血点，静脉穿刺部位渗血不止"},
-        {"if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_mild", "text": "散在瘀点瘀斑"}
+        {
+          "if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_moderate",
+          "text": "黏膜出血点，静脉穿刺部位渗血不止"
+        },
+        {
+          "if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_mild",
+          "text": "散在瘀点瘀斑"
+        }
       ],
       "icterus_note": [
-        {"if": "disease.bilirubin_load > thresholds.icterus_moderate", "text": "黏膜黄染（重度黄疸）"},
-        {"if": "disease.bilirubin_load > thresholds.icterus_mild", "text": "黏膜轻度黄染"}
+        {
+          "if": "disease.bilirubin_load > thresholds.icterus_moderate",
+          "text": "黏膜黄染（重度黄疸）"
+        },
+        {
+          "if": "disease.bilirubin_load > thresholds.icterus_mild",
+          "text": "黏膜轻度黄染"
+        }
       ],
       "pericardial_jvd": [
-        {"if": "disease.venous_congestion > thresholds.jvd_moderate", "text": "颈静脉怒张（平卧位仍明显）"},
-        {"if": "disease.venous_congestion > thresholds.jvd_mild", "text": "颈静脉轻度充盈"}
+        {
+          "if": "disease.venous_congestion > thresholds.jvd_moderate",
+          "text": "颈静脉怒张（平卧位仍明显）"
+        },
+        {
+          "if": "disease.venous_congestion > thresholds.jvd_mild",
+          "text": "颈静脉轻度充盈"
+        }
       ]
     }
   },
@@ -209,43 +295,112 @@
     ],
     "findings_rules": {
       "mucosa_color": [
-        {"if": "state.SpO2 < thresholds.spo2_cyanosis_severe", "text": "黏膜发绀（严重低氧）"},
-        {"if": "state.SpO2 < thresholds.spo2_cyanosis_mild", "text": "黏膜轻度发绀"},
-        {"if": "state.MAP < thresholds.map_low", "text": "黏膜苍白（低灌注）"},
-        {"else": true, "text": "黏膜颜色正常，粉红色"}
+        {
+          "if": "state.SpO2 < thresholds.spo2_cyanosis_severe",
+          "text": "黏膜发绀（严重低氧）"
+        },
+        {
+          "if": "state.SpO2 < thresholds.spo2_cyanosis_mild",
+          "text": "黏膜轻度发绀"
+        },
+        {
+          "if": "state.MAP < thresholds.map_low",
+          "text": "黏膜苍白（低灌注）"
+        },
+        {
+          "else": true,
+          "text": "黏膜颜色正常，粉红色"
+        }
       ],
       "hydration": [
-        {"if": "bv_ratio < thresholds.bv_dehydration_severe", "text": "重度脱水（皮肤弹性差，眼球凹陷）"},
-        {"if": "bv_ratio < thresholds.bv_dehydration_moderate", "text": "中度脱水（皮肤弹性下降）"},
-        {"if": "bv_ratio < thresholds.bv_dehydration_mild", "text": "轻度脱水"},
-        {"else": true, "text": "水合状态正常"}
+        {
+          "if": "bv_ratio < thresholds.bv_dehydration_severe",
+          "text": "重度脱水（皮肤弹性差，眼球凹陷）"
+        },
+        {
+          "if": "bv_ratio < thresholds.bv_dehydration_moderate",
+          "text": "中度脱水（皮肤弹性下降）"
+        },
+        {
+          "if": "bv_ratio < thresholds.bv_dehydration_mild",
+          "text": "轻度脱水"
+        },
+        {
+          "else": true,
+          "text": "水合状态正常"
+        }
       ],
       "temperature_note": [
-        {"if": "state.Temp > thresholds.temp_very_high", "text": "高热（体温 {state.Temp:.1f}°C）"},
-        {"if": "state.Temp > thresholds.temp_high", "text": "发热（体温 {state.Temp:.1f}°C）"},
-        {"if": "state.Temp < thresholds.temp_low", "text": "低体温（体温 {state.Temp:.1f}°C）"}
+        {
+          "if": "state.Temp > thresholds.temp_very_high",
+          "text": "高热（体温 {state.Temp:.1f}°C）"
+        },
+        {
+          "if": "state.Temp > thresholds.temp_high",
+          "text": "发热（体温 {state.Temp:.1f}°C）"
+        },
+        {
+          "if": "state.Temp < thresholds.temp_low",
+          "text": "低体温（体温 {state.Temp:.1f}°C）"
+        }
       ],
       "gdv_abdomen": [
-        {"if": "disease.gastric_distension > thresholds.gdv_distension_severe", "text": "腹部极度膨隆如鼓，腹壁紧张"},
-        {"if": "disease.gastric_distension > thresholds.gdv_distension_moderate", "text": "腹部明显膨隆，叩诊呈鼓音"},
-        {"if": "disease.gastric_distension > thresholds.gdv_distension_mild", "text": "上腹部轻度膨隆"}
+        {
+          "if": "disease.gastric_distension > thresholds.gdv_distension_severe",
+          "text": "腹部极度膨隆如鼓，腹壁紧张"
+        },
+        {
+          "if": "disease.gastric_distension > thresholds.gdv_distension_moderate",
+          "text": "腹部明显膨隆，叩诊呈鼓音"
+        },
+        {
+          "if": "disease.gastric_distension > thresholds.gdv_distension_mild",
+          "text": "上腹部轻度膨隆"
+        }
       ],
       "icterus_findings": [
-        {"if": "disease.bilirubin_load > thresholds.icterus_moderate", "text": "黏膜重度黄染（黄疸）"},
-        {"if": "disease.bilirubin_load > thresholds.icterus_mild", "text": "黏膜轻度黄染"},
-        {"else": true, "text": "黏膜颜色正常，无黄疸"}
+        {
+          "if": "disease.bilirubin_load > thresholds.icterus_moderate",
+          "text": "黏膜重度黄染（黄疸）"
+        },
+        {
+          "if": "disease.bilirubin_load > thresholds.icterus_mild",
+          "text": "黏膜轻度黄染"
+        },
+        {
+          "else": true,
+          "text": "黏膜颜色正常，无黄疸"
+        }
       ],
       "dic_hemorrhage_findings": [
-        {"if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_moderate", "text": "全身多处瘀斑，穿刺部位渗血不止，可见血便"},
-        {"if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_mild", "text": "散在瘀点瘀斑"}
+        {
+          "if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_moderate",
+          "text": "全身多处瘀斑，穿刺部位渗血不止，可见血便"
+        },
+        {
+          "if": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_mild",
+          "text": "散在瘀点瘀斑"
+        }
       ],
       "jvd_findings": [
-        {"if": "disease.venous_congestion > thresholds.jvd_moderate", "text": "颈静脉怒张（平卧位仍明显）"},
-        {"if": "disease.venous_congestion > thresholds.jvd_mild", "text": "颈静脉轻度充盈"}
+        {
+          "if": "disease.venous_congestion > thresholds.jvd_moderate",
+          "text": "颈静脉怒张（平卧位仍明显）"
+        },
+        {
+          "if": "disease.venous_congestion > thresholds.jvd_mild",
+          "text": "颈静脉轻度充盈"
+        }
       ],
       "kussmaul_finding": [
-        {"if": "disease.kussmaul_respiration > thresholds.kussmaul_moderate", "text": "深大呼吸（Kussmaul呼吸），呼气有酮味"},
-        {"if": "disease.kussmaul_respiration > thresholds.kussmaul_mild", "text": "呼吸深快"}
+        {
+          "if": "disease.kussmaul_respiration > thresholds.kussmaul_moderate",
+          "text": "深大呼吸（Kussmaul呼吸），呼气有酮味"
+        },
+        {
+          "if": "disease.kussmaul_respiration > thresholds.kussmaul_mild",
+          "text": "呼吸深快"
+        }
       ]
     }
   },
@@ -253,7 +408,9 @@
     "name": "血常规",
     "test_type": "blood_routine",
     "handler": "blood_routine",
-    "vitals": ["HCT"],
+    "vitals": [
+      "HCT"
+    ],
     "extra_params": [
       {
         "param": "WBC",
@@ -386,7 +543,12 @@
     "name": "生化全项",
     "test_type": "blood_biochem",
     "handler": "blood_biochem",
-    "vitals": ["BUN", "Glu", "Na", "K"],
+    "vitals": [
+      "BUN",
+      "Glu",
+      "Na",
+      "K"
+    ],
     "extra_params": [
       {
         "param": "Cr",
@@ -455,7 +617,14 @@
     "name": "血气分析",
     "test_type": "blood_gas",
     "handler": "blood_gas",
-    "vitals": ["PaO2", "PaCO2", "pH", "Lactate", "SpO2", "HCO3"],
+    "vitals": [
+      "PaO2",
+      "PaCO2",
+      "pH",
+      "Lactate",
+      "SpO2",
+      "HCO3"
+    ],
     "extra_params": [],
     "thresholds": {
       "ph_acidosis": 7.35,
@@ -470,7 +639,7 @@
     "tag_rules": [
       {
         "clue_id": "PaO2_low",
-        "condition": "state.PaO2 < 80.0"
+        "condition": "state.PaO2 < 90.0"
       },
       {
         "clue_id": "PaCO2_high",
@@ -499,18 +668,42 @@
     ],
     "findings_rules": {
       "acidosis_type": [
-        {"if": "state.pH < thresholds.ph_acidosis and state.PaCO2 > thresholds.paco2_high", "text": "呼吸性酸中毒"},
-        {"if": "state.pH < thresholds.ph_acidosis and state.Lactate > thresholds.lactate_high", "text": "代谢性酸中毒（乳酸酸中毒）"},
-        {"if": "state.pH < thresholds.ph_acidosis and state.HCO3 < thresholds.hco3_very_low", "text": "代谢性酸中毒（酮症酸中毒可能）"},
-        {"if": "state.pH < thresholds.ph_acidosis and state.HCO3 < thresholds.hco3_low", "text": "代谢性酸中毒"},
-        {"if": "state.pH < thresholds.ph_acidosis", "text": "酸中毒"}
+        {
+          "if": "state.pH < thresholds.ph_acidosis and state.PaCO2 > thresholds.paco2_high",
+          "text": "呼吸性酸中毒"
+        },
+        {
+          "if": "state.pH < thresholds.ph_acidosis and state.Lactate > thresholds.lactate_high",
+          "text": "代谢性酸中毒（乳酸酸中毒）"
+        },
+        {
+          "if": "state.pH < thresholds.ph_acidosis and state.HCO3 < thresholds.hco3_very_low",
+          "text": "代谢性酸中毒（酮症酸中毒可能）"
+        },
+        {
+          "if": "state.pH < thresholds.ph_acidosis and state.HCO3 < thresholds.hco3_low",
+          "text": "代谢性酸中毒"
+        },
+        {
+          "if": "state.pH < thresholds.ph_acidosis",
+          "text": "酸中毒"
+        }
       ],
       "alkalosis_type": [
-        {"if": "state.pH > thresholds.ph_alkalosis and state.PaCO2 < thresholds.paco2_low", "text": "呼吸性碱中毒"},
-        {"if": "state.pH > thresholds.ph_alkalosis", "text": "碱中毒"}
+        {
+          "if": "state.pH > thresholds.ph_alkalosis and state.PaCO2 < thresholds.paco2_low",
+          "text": "呼吸性碱中毒"
+        },
+        {
+          "if": "state.pH > thresholds.ph_alkalosis",
+          "text": "碱中毒"
+        }
       ],
       "kussmaul_compensation": [
-        {"if": "state.pH < thresholds.ph_acidosis and state.PaCO2 < thresholds.paco2_kussmaul_low", "text": "呼吸代偿（Kussmaul呼吸，CO2代偿性降低）"}
+        {
+          "if": "state.pH < thresholds.ph_acidosis and state.PaCO2 < thresholds.paco2_kussmaul_low",
+          "text": "呼吸代偿（Kussmaul呼吸，CO2代偿性降低）"
+        }
       ]
     }
   },
@@ -544,29 +737,79 @@
     ],
     "findings_rules": {
       "pneumonia_findings": [
-        {"if": "disease.alveolar_exudate > thresholds.exudate_severe", "texts": ["双肺大面积实变影，空气支气管征可见", "肺泡渗出严重，呈大叶性肺炎表现"]},
-        {"if": "disease.alveolar_exudate > thresholds.exudate_moderate", "texts": ["肺野斑片状渗出影，以下叶为主", "提示支气管肺炎"]},
-        {"if": "disease.alveolar_exudate > thresholds.exudate_mild", "texts": ["肺纹理增粗，散在少量渗出"]}
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_severe",
+          "texts": [
+            "双肺大面积实变影，空气支气管征可见",
+            "肺泡渗出严重，呈大叶性肺炎表现"
+          ]
+        },
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_moderate",
+          "texts": [
+            "肺野斑片状渗出影，以下叶为主",
+            "提示支气管肺炎"
+          ]
+        },
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_mild",
+          "texts": [
+            "肺纹理增粗，散在少量渗出"
+          ]
+        }
       ],
       "non_pneumonia_findings": [
-        {"if": "state.PaO2 < thresholds.pao2_low", "text": "肺野散在斑片影（非特异性渗出）"},
-        {"else": true, "texts": ["肺野清晰", "未见明显渗出或占位性病变"]}
+        {
+          "if": "state.PaO2 < thresholds.pao2_low",
+          "text": "肺野散在斑片影（非特异性渗出）"
+        },
+        {
+          "else": true,
+          "texts": [
+            "肺野清晰",
+            "未见明显渗出或占位性病变"
+          ]
+        }
       ],
       "dcm_findings": [
-        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "text": "心影普遍增大（心胸比 > 0.7）"},
-        {"if": "disease.fluid_retention > thresholds.dcm_fluid", "text": "肺静脉扩张，肺纹理增粗（肺淤血）"}
+        {
+          "if": "disease.ventricular_dilation > thresholds.dcm_dilation",
+          "text": "心影普遍增大（心胸比 > 0.7）"
+        },
+        {
+          "if": "disease.fluid_retention > thresholds.dcm_fluid",
+          "text": "肺静脉扩张，肺纹理增粗（肺淤血）"
+        }
       ],
       "rr_finding": [
-        {"if": "state.RR > thresholds.rr_high", "text": "膈肌低平（过度通气）"}
+        {
+          "if": "state.RR > thresholds.rr_high",
+          "text": "膈肌低平（过度通气）"
+        }
       ],
       "gdv_xray": [
-        {"if": "disease.gastric_distension > thresholds.gdv_distension_severe", "text": "胃极度扩张，可见\"双气泡\"征（胃扭转典型表现），膈肌前移"},
-        {"if": "disease.gastric_distension > thresholds.gdv_distension_moderate", "text": "胃明显扩张，胃大弯越过体中线"},
-        {"if": "disease.gastric_distension > thresholds.gdv_distension_mild", "text": "胃轻度扩张"}
+        {
+          "if": "disease.gastric_distension > thresholds.gdv_distension_severe",
+          "text": "胃极度扩张，可见\"双气泡\"征（胃扭转典型表现），膈肌前移"
+        },
+        {
+          "if": "disease.gastric_distension > thresholds.gdv_distension_moderate",
+          "text": "胃明显扩张，胃大弯越过体中线"
+        },
+        {
+          "if": "disease.gastric_distension > thresholds.gdv_distension_mild",
+          "text": "胃轻度扩张"
+        }
       ],
       "pericardial_xray": [
-        {"if": "disease.tamponade_severity > thresholds.pericardial_muffled", "text": "心影普遍增大呈\"烧瓶\"状（心包积液）"},
-        {"if": "disease.pericardial_volume > 0.1", "text": "心影轻度增大"}
+        {
+          "if": "disease.tamponade_severity > thresholds.pericardial_muffled",
+          "text": "心影普遍增大呈\"烧瓶\"状（心包积液）"
+        },
+        {
+          "if": "disease.pericardial_volume > 0.1",
+          "text": "心影轻度增大"
+        }
       ]
     }
   },
@@ -574,7 +817,10 @@
     "name": "超声检查",
     "test_type": "ultrasound",
     "handler": "ultrasound",
-    "vitals": ["GFR", "CVP"],
+    "vitals": [
+      "GFR",
+      "CVP"
+    ],
     "extra_params": [
       {
         "param": "Urine",
@@ -635,44 +881,110 @@
     ],
     "findings_rules": {
       "heart_function": [
-        {"if": "state.contractility > thresholds.contractility_high", "text": "左室收缩功能增强（高动力状态）"},
-        {"if": "state.contractility < thresholds.contractility_low", "text": "左室收缩功能减低，室壁运动减弱"},
-        {"else": true, "text": "心脏结构正常，室壁运动良好"}
+        {
+          "if": "state.contractility > thresholds.contractility_high",
+          "text": "左室收缩功能增强（高动力状态）"
+        },
+        {
+          "if": "state.contractility < thresholds.contractility_low",
+          "text": "左室收缩功能减低，室壁运动减弱"
+        },
+        {
+          "else": true,
+          "text": "心脏结构正常，室壁运动良好"
+        }
       ],
       "ivc_status": [
-        {"if": "bv_ratio < thresholds.bv_low", "text": "下腔静脉塌陷（低血容量）"},
-        {"if": "state.CVP > thresholds.cvp_high", "text": "下腔静脉扩张（容量过负荷/右心衰）"}
+        {
+          "if": "bv_ratio < thresholds.bv_low",
+          "text": "下腔静脉塌陷（低血容量）"
+        },
+        {
+          "if": "state.CVP > thresholds.cvp_high",
+          "text": "下腔静脉扩张（容量过负荷/右心衰）"
+        }
       ],
       "kidney_findings": [
-        {"if": "state.GFR < thresholds.gfr_low_severe", "text": "双肾皮质回声增强（肾功能受损）"},
-        {"if": "state.GFR < thresholds.gfr_low_moderate", "text": "肾血流灌注减少"},
-        {"else": true, "text": "双肾大小正常，皮髓质分界清晰"}
+        {
+          "if": "state.GFR < thresholds.gfr_low_severe",
+          "text": "双肾皮质回声增强（肾功能受损）"
+        },
+        {
+          "if": "state.GFR < thresholds.gfr_low_moderate",
+          "text": "肾血流灌注减少"
+        },
+        {
+          "else": true,
+          "text": "双肾大小正常，皮髓质分界清晰"
+        }
       ],
       "dcm_heart": [
-        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "text": "左室扩张，室壁运动弥漫性减弱（DCM 表现）"},
-        {"if": "disease.contractility_loss > thresholds.dcm_contractility_loss", "text": "左室缩短分数减低（收缩功能不全）"}
+        {
+          "if": "disease.ventricular_dilation > thresholds.dcm_dilation",
+          "text": "左室扩张，室壁运动弥漫性减弱（DCM 表现）"
+        },
+        {
+          "if": "disease.contractility_loss > thresholds.dcm_contractility_loss",
+          "text": "左室缩短分数减低（收缩功能不全）"
+        }
       ],
       "lung_findings": [
-        {"if": "disease.alveolar_exudate > thresholds.pneumonia_exudate", "text": "肺实质样变（B线增多，胸膜线不规则）"},
-        {"if": "disease.fluid_retention > thresholds.dcm_fluid", "text": "双肺B线增多（肺淤血/肺水肿）"}
+        {
+          "if": "disease.alveolar_exudate > thresholds.pneumonia_exudate",
+          "text": "肺实质样变（B线增多，胸膜线不规则）"
+        },
+        {
+          "if": "disease.fluid_retention > thresholds.dcm_fluid",
+          "text": "双肺B线增多（肺淤血/肺水肿）"
+        }
       ],
       "urine_findings": [
-        {"if": "state.Urine < thresholds.urine_anuria", "text": "无尿（尿量 {state.Urine:.4f} mL/min）"},
-        {"if": "state.Urine < thresholds.urine_oliguria", "text": "少尿（尿量 {state.Urine:.4f} mL/min）"},
-        {"else": true, "text": "尿量正常"}
+        {
+          "if": "state.Urine < thresholds.urine_anuria",
+          "text": "无尿（尿量 {state.Urine:.4f} mL/min）"
+        },
+        {
+          "if": "state.Urine < thresholds.urine_oliguria",
+          "text": "少尿（尿量 {state.Urine:.4f} mL/min）"
+        },
+        {
+          "else": true,
+          "text": "尿量正常"
+        }
       ],
       "bladder_findings": [
-        {"if": "disease.bladder_distension > thresholds.bladder_severe", "text": "膀胱极度膨大，壁薄（尿道完全梗阻）"},
-        {"if": "disease.bladder_distension > thresholds.bladder_moderate", "text": "膀胱明显膨大，需紧急导尿"},
-        {"if": "disease.bladder_distension > thresholds.bladder_mild", "text": "膀胱中度充盈"}
+        {
+          "if": "disease.bladder_distension > thresholds.bladder_severe",
+          "text": "膀胱极度膨大，壁薄（尿道完全梗阻）"
+        },
+        {
+          "if": "disease.bladder_distension > thresholds.bladder_moderate",
+          "text": "膀胱明显膨大，需紧急导尿"
+        },
+        {
+          "if": "disease.bladder_distension > thresholds.bladder_mild",
+          "text": "膀胱中度充盈"
+        }
       ],
       "pericardial_findings_us": [
-        {"if": "disease.tamponade_severity > thresholds.pericardial_muffled", "text": "心包腔内可见液性暗区，右室舒张期塌陷（心脏填塞）"},
-        {"if": "disease.pericardial_volume > 0.1", "text": "少量心包积液"}
+        {
+          "if": "disease.tamponade_severity > thresholds.pericardial_muffled",
+          "text": "心包腔内可见液性暗区，右室舒张期塌陷（心脏填塞）"
+        },
+        {
+          "if": "disease.pericardial_volume > 0.1",
+          "text": "少量心包积液"
+        }
       ],
       "dic_kidney_findings": [
-        {"if": "disease.organ_ischemia > thresholds.dic_organ_moderate", "text": "双肾回声增强，皮髓质分界不清（肾微血栓缺血）"},
-        {"if": "disease.organ_ischemia > thresholds.dic_organ_mild", "text": "肾血流灌注减少"}
+        {
+          "if": "disease.organ_ischemia > thresholds.dic_organ_moderate",
+          "text": "双肾回声增强，皮髓质分界不清（肾微血栓缺血）"
+        },
+        {
+          "if": "disease.organ_ischemia > thresholds.dic_organ_mild",
+          "text": "肾血流灌注减少"
+        }
       ]
     }
   },
@@ -704,19 +1016,52 @@
     ],
     "findings_rules": {
       "pneumonia_findings": [
-        {"if": "disease.alveolar_exudate > thresholds.exudate_severe", "texts": ["双肺大面积实变，累及多个肺叶", "空气支气管征明显，呈大叶性肺炎典型表现", "少量胸腔积液"]},
-        {"if": "disease.alveolar_exudate > thresholds.exudate_moderate", "texts": ["多发磨玻璃影伴实变，以下叶和背侧为主", "支气管充气征可见"]},
-        {"if": "disease.alveolar_exudate > thresholds.exudate_mild", "texts": ["散在磨玻璃样渗出，范围较小"]}
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_severe",
+          "texts": [
+            "双肺大面积实变，累及多个肺叶",
+            "空气支气管征明显，呈大叶性肺炎典型表现",
+            "少量胸腔积液"
+          ]
+        },
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_moderate",
+          "texts": [
+            "多发磨玻璃影伴实变，以下叶和背侧为主",
+            "支气管充气征可见"
+          ]
+        },
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_mild",
+          "texts": [
+            "散在磨玻璃样渗出，范围较小"
+          ]
+        }
       ],
       "non_pneumonia_findings": [
-        {"else": true, "texts": ["肺野清晰，未见实质性病变", "纵隔结构正常，无肿大淋巴结"]}
+        {
+          "else": true,
+          "texts": [
+            "肺野清晰，未见实质性病变",
+            "纵隔结构正常，无肿大淋巴结"
+          ]
+        }
       ],
       "dcm_findings": [
-        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "text": "心脏各房室普遍扩大，以左室为主"},
-        {"if": "disease.fluid_retention > thresholds.dcm_fluid", "text": "肺血管纹理增粗，少量胸腔积液"}
+        {
+          "if": "disease.ventricular_dilation > thresholds.dcm_dilation",
+          "text": "心脏各房室普遍扩大，以左室为主"
+        },
+        {
+          "if": "disease.fluid_retention > thresholds.dcm_fluid",
+          "text": "肺血管纹理增粗，少量胸腔积液"
+        }
       ],
       "hypoxia_finding": [
-        {"if": "state.PaO2 < thresholds.pao2_low", "text": "低氧血症相关改变"}
+        {
+          "if": "state.PaO2 < thresholds.pao2_low",
+          "text": "低氧血症相关改变"
+        }
       ]
     }
   },
@@ -724,7 +1069,9 @@
     "name": "心电图",
     "test_type": "ecg",
     "handler": "ecg",
-    "vitals": ["HR"],
+    "vitals": [
+      "HR"
+    ],
     "extra_params": [
       {
         "param": "节律",
@@ -797,26 +1144,62 @@
     ],
     "findings_rules": {
       "rhythm_base": [
-        {"if": "state.HR > thresholds.hr_tachy_severe", "text": "窦性心动过速"},
-        {"if": "state.HR > thresholds.hr_tachy_mild", "text": "窦性心动过速（轻度）"},
-        {"if": "state.HR < thresholds.hr_brady_severe", "text": "窦性心动过缓"},
-        {"if": "state.HR < thresholds.hr_brady_mild", "text": "窦性心动过缓（轻度）"},
-        {"else": true, "text": "窦性心律，节律整齐"}
+        {
+          "if": "state.HR > thresholds.hr_tachy_severe",
+          "text": "窦性心动过速"
+        },
+        {
+          "if": "state.HR > thresholds.hr_tachy_mild",
+          "text": "窦性心动过速（轻度）"
+        },
+        {
+          "if": "state.HR < thresholds.hr_brady_severe",
+          "text": "窦性心动过缓"
+        },
+        {
+          "if": "state.HR < thresholds.hr_brady_mild",
+          "text": "窦性心动过缓（轻度）"
+        },
+        {
+          "else": true,
+          "text": "窦性心律，节律整齐"
+        }
       ],
       "fever_note": [
-        {"if": "disease.fever_state > thresholds.fever_state", "text": "；发热相关心率增快"}
+        {
+          "if": "disease.fever_state > thresholds.fever_state",
+          "text": "；发热相关心率增快"
+        }
       ],
       "hh_ecg_findings": [
-        {"if": "state.K > thresholds.k_high and (state.T波 == 'tall' or state.T波 == 'tall_peaked')", "text": "；T波高尖（高钾血症典型ECG表现）"},
-        {"if": "state.K > thresholds.k_high and state.QRS宽度 == 'wide'", "text": "；QRS增宽（高钾血症进展期）"},
-        {"if": "state.K > thresholds.k_high and state.P波 == 'absent'", "text": "；P波消失（严重高钾血症）"},
-        {"if": "state.K < thresholds.k_low", "text": "；低钾血症相关U波"}
+        {
+          "if": "state.K > thresholds.k_high and (state.T波 == 'tall' or state.T波 == 'tall_peaked')",
+          "text": "；T波高尖（高钾血症典型ECG表现）"
+        },
+        {
+          "if": "state.K > thresholds.k_high and state.QRS宽度 == 'wide'",
+          "text": "；QRS增宽（高钾血症进展期）"
+        },
+        {
+          "if": "state.K > thresholds.k_high and state.P波 == 'absent'",
+          "text": "；P波消失（严重高钾血症）"
+        },
+        {
+          "if": "state.K < thresholds.k_low",
+          "text": "；低钾血症相关U波"
+        }
       ],
       "arrhythmia_note": [
-        {"if": "disease.arrhythmia_severity > thresholds.arrhythmia_severe", "text": "；室性早搏二联律（胃扩张扭转相关心律失常）"}
+        {
+          "if": "disease.arrhythmia_severity > thresholds.arrhythmia_severe",
+          "text": "；室性早搏二联律（胃扩张扭转相关心律失常）"
+        }
       ],
       "dic_ecg_note": [
-        {"if": "disease.shock_from_dIC > thresholds.dic_shock_moderate", "text": "；窦性心动过速伴ST段改变（微血栓心肌缺血）"}
+        {
+          "if": "disease.shock_from_dIC > thresholds.dic_shock_moderate",
+          "text": "；窦性心动过速伴ST段改变（微血栓心肌缺血）"
+        }
       ]
     }
   },
@@ -874,7 +1257,9 @@
     "name": "血压测量",
     "test_type": "blood_pressure",
     "handler": "blood_pressure",
-    "vitals": ["MAP"],
+    "vitals": [
+      "MAP"
+    ],
     "extra_params": [
       {
         "param": "SBP",
@@ -931,14 +1316,32 @@
     ],
     "findings_rules": {
       "pneumonia_findings": [
-        {"if": "disease.bacterial_load > thresholds.bacterial_load_significant", "texts": ["大量中性粒细胞，可见细菌吞噬现象", "化脓性炎症表现，符合细菌性肺炎"]},
-        {"else": true, "text": "轻度炎性细胞浸润"}
+        {
+          "if": "disease.bacterial_load > thresholds.bacterial_load_significant",
+          "texts": [
+            "大量中性粒细胞，可见细菌吞噬现象",
+            "化脓性炎症表现，符合细菌性肺炎"
+          ]
+        },
+        {
+          "else": true,
+          "text": "轻度炎性细胞浸润"
+        }
       ],
       "dcm_findings": [
-        {"if": "disease.ventricular_dilation is not None", "texts": ["未见明显异常细胞", "排除肿瘤性病变"]}
+        {
+          "if": "disease.ventricular_dilation is not None",
+          "texts": [
+            "未见明显异常细胞",
+            "排除肿瘤性病变"
+          ]
+        }
       ],
       "default_finding": [
-        {"else": true, "text": "细胞学未见明显异常"}
+        {
+          "else": true,
+          "text": "细胞学未见明显异常"
+        }
       ]
     }
   },
@@ -960,10 +1363,22 @@
     ],
     "findings_rules": {
       "positive": [
-        {"if": "disease.bacterial_load > thresholds.bacterial_load_significant", "texts": ["犬瘟热/副流感快速检测：阳性", "提示病毒性呼吸道感染合并细菌感染"]}
+        {
+          "if": "disease.bacterial_load > thresholds.bacterial_load_significant",
+          "texts": [
+            "犬瘟热/副流感快速检测：阳性",
+            "提示病毒性呼吸道感染合并细菌感染"
+          ]
+        }
       ],
       "negative": [
-        {"else": true, "texts": ["快速检测：阴性", "未检测到常见病原标志物"]}
+        {
+          "else": true,
+          "texts": [
+            "快速检测：阴性",
+            "未检测到常见病原标志物"
+          ]
+        }
       ]
     }
   },
@@ -985,11 +1400,26 @@
     ],
     "findings_rules": {
       "pneumonia_findings": [
-        {"if": "disease.alveolar_exudate > thresholds.exudate_significant", "texts": ["肺组织穿刺：大量炎性细胞", "符合感染性肺炎细胞学表现"]},
-        {"else": true, "text": "少量炎性细胞"}
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_significant",
+          "texts": [
+            "肺组织穿刺：大量炎性细胞",
+            "符合感染性肺炎细胞学表现"
+          ]
+        },
+        {
+          "else": true,
+          "text": "少量炎性细胞"
+        }
       ],
       "default_findings": [
-        {"else": true, "texts": ["细胞学样本未见明显异常", "少量正常间皮细胞"]}
+        {
+          "else": true,
+          "texts": [
+            "细胞学样本未见明显异常",
+            "少量正常间皮细胞"
+          ]
+        }
       ]
     }
   },
@@ -1012,10 +1442,23 @@
     ],
     "findings_rules": {
       "positive": [
-        {"if": "disease.fluid_retention > thresholds.fluid_retention_significant", "texts": ["腹腔穿刺获淡黄色漏出液", "蛋白含量低（<2.5 g/dL），符合漏出液", "提示心源性腹水"]}
+        {
+          "if": "disease.fluid_retention > thresholds.fluid_retention_significant",
+          "texts": [
+            "腹腔穿刺获淡黄色漏出液",
+            "蛋白含量低（<2.5 g/dL），符合漏出液",
+            "提示心源性腹水"
+          ]
+        }
       ],
       "negative": [
-        {"else": true, "texts": ["腹腔未见明显积液", "穿刺阴性"]}
+        {
+          "else": true,
+          "texts": [
+            "腹腔未见明显积液",
+            "穿刺阴性"
+          ]
+        }
       ]
     }
   },
@@ -1039,14 +1482,33 @@
     ],
     "findings_rules": {
       "pneumonia_severe": [
-        {"if": "disease.alveolar_exudate > thresholds.exudate_severe", "texts": ["胸腔穿刺获浑浊液体", "细胞计数升高，蛋白含量高", "符合渗出液，提示感染性胸膜炎"]},
-        {"if": "disease.alveolar_exudate > thresholds.exudate_mild", "text": "少量胸腔积液，淡黄色"}
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_severe",
+          "texts": [
+            "胸腔穿刺获浑浊液体",
+            "细胞计数升高，蛋白含量高",
+            "符合渗出液，提示感染性胸膜炎"
+          ]
+        },
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_mild",
+          "text": "少量胸腔积液，淡黄色"
+        }
       ],
       "dcm_findings": [
-        {"if": "disease.fluid_retention > thresholds.fluid_retention_significant", "text": "双侧少量胸腔积液，漏出液性质"}
+        {
+          "if": "disease.fluid_retention > thresholds.fluid_retention_significant",
+          "text": "双侧少量胸腔积液，漏出液性质"
+        }
       ],
       "negative": [
-        {"else": true, "texts": ["胸腔未见明显积液", "穿刺阴性"]}
+        {
+          "else": true,
+          "texts": [
+            "胸腔未见明显积液",
+            "穿刺阴性"
+          ]
+        }
       ]
     }
   },
@@ -1071,19 +1533,47 @@
     ],
     "findings_rules": {
       "dcm_findings": [
-        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "texts": ["左室舒张末期内径增大（LVIDd ↑）", "缩短分数（FS）显著减低（{fs_value:.0f}%）", "室壁运动弥漫性减弱", "符合扩张型心肌病（DCM）表现"],
-         "fs_formula": "thresholds.fs_base - disease.contractility_loss * thresholds.fs_reduction_factor"
+        {
+          "if": "disease.ventricular_dilation > thresholds.dcm_dilation",
+          "texts": [
+            "左室舒张末期内径增大（LVIDd ↑）",
+            "缩短分数（FS）显著减低（{fs_value:.0f}%）",
+            "室壁运动弥漫性减弱",
+            "符合扩张型心肌病（DCM）表现"
+          ],
+          "fs_formula": "thresholds.fs_base - disease.contractility_loss * thresholds.fs_reduction_factor"
         }
       ],
       "normal_findings": [
-        {"else": true, "texts": ["心脏结构正常，各房室大小在正常范围", "室壁运动良好，缩短分数正常", "瓣膜启闭正常，未见明显反流"]}
+        {
+          "else": true,
+          "texts": [
+            "心脏结构正常，各房室大小在正常范围",
+            "室壁运动良好，缩短分数正常",
+            "瓣膜启闭正常，未见明显反流"
+          ]
+        }
       ],
       "pericardial_echo": [
-        {"if": "disease.tamponade_severity > thresholds.pericardial_muffled", "texts": ["心包腔内可见中-大量液性暗区", "右室游离壁舒张期塌陷（填塞征象）", "下腔静脉扩张，呼吸变异度减低", "确诊：心包积液伴心脏填塞"]},
-        {"if": "disease.pericardial_volume > 0.1", "text": "少量心包积液，未见填塞征象"}
+        {
+          "if": "disease.tamponade_severity > thresholds.pericardial_muffled",
+          "texts": [
+            "心包腔内可见中-大量液性暗区",
+            "右室游离壁舒张期塌陷（填塞征象）",
+            "下腔静脉扩张，呼吸变异度减低",
+            "确诊：心包积液伴心脏填塞"
+          ]
+        },
+        {
+          "if": "disease.pericardial_volume > 0.1",
+          "text": "少量心包积液，未见填塞征象"
+        }
       ],
       "pah_note": [
-        {"if": "state.PaO2 < thresholds.pao2_low", "text": "估测肺动脉收缩压升高（肺动脉高压）"}
+        {
+          "if": "state.PaO2 < thresholds.pao2_low",
+          "text": "估测肺动脉收缩压升高（肺动脉高压）"
+        }
       ]
     }
   },
@@ -1106,12 +1596,31 @@
     ],
     "findings_rules": {
       "pneumonia_findings": [
-        {"if": "disease.alveolar_exudate > thresholds.exudate_significant", "texts": ["气管内可见脓性分泌物", "支气管黏膜充血水肿"]},
-        {"if": "disease.alveolar_exudate > thresholds.exudate_severe", "text": "叶支气管内可见渗出物"},
-        {"if": "disease.alveolar_exudate > thresholds.exudate_significant", "text": "符合感染性气道病变"}
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_significant",
+          "texts": [
+            "气管内可见脓性分泌物",
+            "支气管黏膜充血水肿"
+          ]
+        },
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_severe",
+          "text": "叶支气管内可见渗出物"
+        },
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_significant",
+          "text": "符合感染性气道病变"
+        }
       ],
       "normal_findings": [
-        {"else": true, "texts": ["食道黏膜正常，未见异物或溃疡", "胃黏膜正常，未见肿物", "十二指肠黏膜正常"]}
+        {
+          "else": true,
+          "texts": [
+            "食道黏膜正常，未见异物或溃疡",
+            "胃黏膜正常，未见肿物",
+            "十二指肠黏膜正常"
+          ]
+        }
       ]
     }
   },
@@ -1133,10 +1642,23 @@
     ],
     "findings_rules": {
       "dcm_findings": [
-        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "texts": ["心脏 MRI：左室扩张，心肌变薄", "延迟增强扫描：心肌中层强化（纤维化表现）", "确诊扩张型心肌病"]}
+        {
+          "if": "disease.ventricular_dilation > thresholds.dcm_dilation",
+          "texts": [
+            "心脏 MRI：左室扩张，心肌变薄",
+            "延迟增强扫描：心肌中层强化（纤维化表现）",
+            "确诊扩张型心肌病"
+          ]
+        }
       ],
       "normal_findings": [
-        {"else": true, "texts": ["MRI 扫描未见明显信号", "脑部和脊髓结构正常"]}
+        {
+          "else": true,
+          "texts": [
+            "MRI 扫描未见明显信号",
+            "脑部和脊髓结构正常"
+          ]
+        }
       ]
     }
   },
@@ -1164,14 +1686,35 @@
     ],
     "findings_rules": {
       "pneumonia_findings": [
-        {"if": "disease.alveolar_exudate > thresholds.exudate_significant", "texts": ["肺泡腔内大量中性粒细胞浸润", "肺泡壁充血，纤维素渗出", "细菌菌落可见", "病理诊断：化脓性肺炎"]},
-        {"else": true, "text": "轻度肺泡炎性细胞浸润"}
+        {
+          "if": "disease.alveolar_exudate > thresholds.exudate_significant",
+          "texts": [
+            "肺泡腔内大量中性粒细胞浸润",
+            "肺泡壁充血，纤维素渗出",
+            "细菌菌落可见",
+            "病理诊断：化脓性肺炎"
+          ]
+        },
+        {
+          "else": true,
+          "text": "轻度肺泡炎性细胞浸润"
+        }
       ],
       "dcm_findings": [
-        {"if": "disease.ventricular_dilation > thresholds.dcm_dilation", "texts": ["心肌细胞变性，排列紊乱", "间质纤维化", "病理诊断：扩张型心肌病"]}
+        {
+          "if": "disease.ventricular_dilation > thresholds.dcm_dilation",
+          "texts": [
+            "心肌细胞变性，排列紊乱",
+            "间质纤维化",
+            "病理诊断：扩张型心肌病"
+          ]
+        }
       ],
       "normal_findings": [
-        {"else": true, "text": "组织学未见明显异常"}
+        {
+          "else": true,
+          "text": "组织学未见明显异常"
+        }
       ]
     }
   }

@@ -1,0 +1,1104 @@
+{
+  "_schema": "parameter_references v1",
+  "_comment": "Literature provenance for VirtualVet physiological parameters. Mirror of ode_diseases.json meta.references format (PMIDs + textbooks). Use 'PMID:nnnnnn' for PubMed IDs, 'textbook:name' for textbooks (e.g., textbook:nelson, textbook:guyton). See data/schemas/parameter_references.schema.json for schema.",
+  "heart.heart_rate": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 22 — Canine normal resting HR 60-140 bpm (mean ~85 bpm for healthy adult). Variability by size and breed.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/heart.heart_rate"
+      }
+    ],
+    "notes": "85 bpm used as midpoint of normal range; stress HR 180 bpm = estimated maximum for athletic dog."
+  },
+  "heart.contractility_factor": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 22 — Contractility determined by Ca2+ availability and sympathetic stimulation. ESPVR slope reflects inotropic state.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/heart.contractility_factor"
+      }
+    ],
+    "notes": "No single reference for baseline; derived from cardiac output calibration. Coefficient 0.15 for AngII effect from Patten 1991 PMID:7858848."
+  },
+  "heart.SVR": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Total peripheral resistance ≈ 1.4 mmHg·s/mL in resting adult dog.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/heart.SVR"
+      }
+    ],
+    "notes": "Derived: SVR = (MAP - MAP_rest) / (CO/60), MAP_rest=60, MAP=100, CO=1700 → SVR=1.41. RAAS coupling coefficient 0.3 from Guyton Ch19/26."
+  },
+  "heart.MAP": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 22 — MAP normal range 80-120 mmHg in dogs.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/heart.MAP"
+      }
+    ],
+    "notes": "Baseline 100 mmHg from midpoint of normal range."
+  },
+  "heart.CVP": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Normal central venous pressure 2-8 mmHg in mammals; resting dog ≈ 4 mmHg.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/heart.CVP"
+      }
+    ],
+    "notes": "Baseline 4.0 mmHg."
+  },
+  "heart.stroke_volume": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 22 — Stroke volume ≈ 1.0-1.5 mL/kg in resting dog.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/heart.stroke_volume"
+      }
+    ],
+    "notes": "Baseline 1.0 mL/kg for critical care baseline."
+  },
+  "heart.blood_volume": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Total blood volume ≈ 86 mL/kg in dogs.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/heart.blood_volume"
+      }
+    ],
+    "notes": "Baseline 86 mL/kg."
+  },
+  "kidney.GFR": {
+    "references": [
+      {
+        "id": "PMID:30284231",
+        "text": "Restutto et al. 2018. Reference intervals for serum urea nitrogen and creatinine in client-owned dogs. Vet Clin Pathol.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/kidney.GFR"
+      },
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal canine GFR 2.5-4.0 mL/min/kg.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/kidney.GFR"
+      }
+    ],
+    "notes": "3.0 mL/min/kg used as baseline midpoint. CO→GFR coupling coefficient 0.004 from Ljungman 1990 PMID:18436945."
+  },
+  "kidney.urine_output": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal urine output 1-2 mL/kg/hr in dogs.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/kidney.urine_output"
+      }
+    ],
+    "notes": "Baseline 0.02 mL/min/kg = 1.2 mL/kg/hr (midpoint of normal range)."
+  },
+  "kidney.renal_blood_flow": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Renal blood flow ≈ 20% of cardiac output in resting dog.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/kidney.renal_blood_flow"
+      }
+    ],
+    "notes": "Baseline 0.20 × CO. At rest CO=1700 mL/min, RBF ≈ 340 mL/min for 20kg dog."
+  },
+  "blood.BUN": {
+    "references": [
+      {
+        "id": "PMID:30284231",
+        "text": "Restutto et al. 2018. Reference intervals for BUN and creatinine in client-owned dogs. Vet Clin Pathol.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.BUN"
+      },
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal BUN 10-28 mg/dL in dogs.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.BUN"
+      }
+    ],
+    "notes": "Baseline 20 mg/dL from midpoint of normal range."
+  },
+  "blood.pH": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 30 — Normal arterial pH 7.35-7.45 in mammals.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.pH"
+      },
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Canine arterial pH 7.36-7.44.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.pH"
+      }
+    ],
+    "notes": "Baseline 7.4 from midpoint of normal range."
+  },
+  "blood.sodium_mEq_L": {
+    "references": [
+      {
+        "id": "web:ISU-vet-path",
+        "text": "Iowa State University Veterinary Pathology Reference Intervals — Canine Na 141-151 mEq/L.",
+        "url": "https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.sodium_mEq_L"
+      },
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine Na 143-150 mEq/L.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.sodium_mEq_L"
+      }
+    ],
+    "notes": "Baseline 145 mEq/L from midpoint. IDEXX adult canine 144-160 mmol/L."
+  },
+  "blood.potassium": {
+    "references": [
+      {
+        "id": "web:ISU-vet-path",
+        "text": "Iowa State University Veterinary Pathology Reference Intervals — Canine K 3.9-5.3 mEq/L.",
+        "url": "https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.potassium"
+      },
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine K 4.1-5.4 mEq/L.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.potassium"
+      }
+    ],
+    "notes": "Baseline 4.5 mEq/L from midpoint of 3.9-5.3 range."
+  },
+  "blood.glucose": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine glucose 68-104 mg/dL.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.glucose"
+      }
+    ],
+    "notes": "Baseline 85 mg/dL from midpoint. IDEXX adult 74-143 mg/dL."
+  },
+  "blood.lactate": {
+    "references": [
+      {
+        "id": "web:IDEXX-ref-ranges",
+        "text": "IDEXX Catalyst Reference Ranges — Canine adult lactate 0.50-2.50 mmol/L.",
+        "url": "https://www.idexx.com/files/catalyst-species-reference-ranges.pdf",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.lactate"
+      }
+    ],
+    "notes": "Baseline 1.0 mmol/L from midpoint."
+  },
+  "blood.creatinine_mg_dL": {
+    "references": [
+      {
+        "id": "PMID:30284231",
+        "text": "Restutto et al. 2018. Reference intervals for creatinine in client-owned dogs. Vet Clin Pathol.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.creatinine_mg_dL"
+      },
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal canine creatinine 0.5-1.6 mg/dL.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.creatinine_mg_dL"
+      }
+    ],
+    "notes": "Baseline 1.0 mg/dL from midpoint. Cornell 0.6-1.4 mg/dL."
+  },
+  "blood.ALT": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine ALT 17-95 U/L.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.ALT"
+      },
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — ALT increased in hepatocellular injury.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.ALT"
+      }
+    ],
+    "notes": "Baseline 50 U/L from midpoint of 17-95 range. Iowa State 24-90 U/L."
+  },
+  "blood.AST": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine AST 18-56 U/L.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.AST"
+      }
+    ],
+    "notes": "Baseline 35 U/L from midpoint of 18-56 range."
+  },
+  "blood.ALP": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine ALP 7-115 U/L.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.ALP"
+      }
+    ],
+    "notes": "Baseline 50 U/L from midpoint. Iowa State 20-150 U/L."
+  },
+  "blood.GGT": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine GGT 0-8 U/L.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.GGT"
+      }
+    ],
+    "notes": "Baseline 4 U/L."
+  },
+  "blood.HCO3": {
+    "references": [
+      {
+        "id": "web:ISU-vet-path",
+        "text": "Iowa State University Veterinary Pathology Reference Intervals — Canine HCO3 17-24 mEq/L.",
+        "url": "https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.HCO3"
+      }
+    ],
+    "notes": "Baseline 20 mEq/L from midpoint."
+  },
+  "blood.bilirubin_mg_dL": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine total bilirubin 0-0.2 mg/dL.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.bilirubin_mg_dL"
+      }
+    ],
+    "notes": "Baseline 0.1 mg/dL. Iowa State same range 0-0.2 mg/dL."
+  },
+  "blood.arterial_PO2_mmHg": {
+    "references": [
+      {
+        "id": "web:ISU-vet-path",
+        "text": "Iowa State University Veterinary Pathology Reference Intervals — Canine arterial pO2 85-95 mmHg.",
+        "url": "https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.arterial_PO2_mmHg"
+      },
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 40 — Normal PaO2 95 mmHg at sea level.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.arterial_PO2_mmHg"
+      }
+    ],
+    "notes": "Baseline 90 mmHg from midpoint. IDEXX PaO2 not reported (blood gas)."
+  },
+  "blood.arterial_PCO2_mmHg": {
+    "references": [
+      {
+        "id": "web:ISU-vet-path",
+        "text": "Iowa State University Veterinary Pathology Reference Intervals — Canine arterial pCO2 29-42 mmHg.",
+        "url": "https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.arterial_PCO2_mmHg"
+      },
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 30 — Normal PaCO2 40 mmHg.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.arterial_PCO2_mmHg"
+      }
+    ],
+    "notes": "Baseline 38 mmHg from midpoint. IDEXX 29-42 mmHg."
+  },
+  "lung.respiratory_rate": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Normal canine respiratory rate 10-30 breaths/min (resting).",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/lung.respiratory_rate"
+      }
+    ],
+    "notes": "18 breaths/min used as baseline midpoint. PaCO2 coupling coefficient 0.05 from Guyton Ch42."
+  },
+  "lung.PaO2": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 40 — Normal alveolar PO2 ≈ 100 mmHg, arterial PO2 95 mmHg.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/lung.PaO2"
+      }
+    ],
+    "notes": "Baseline alveolar PO2 100 mmHg. Coupled to blood.arterial_PO2_mmHg."
+  },
+  "lung.PaCO2": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 30 — Normal alveolar PCO2 ≈ 40 mmHg.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/lung.PaCO2"
+      }
+    ],
+    "notes": "Baseline 40 mmHg."
+  },
+  "lung.diffusion_coefficient": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 40 — Lung diffusion coefficient (DL) for O2 ≈ 20-30 mL/min/mmHg in healthy adult.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/lung.diffusion_coefficient"
+      }
+    ],
+    "notes": "Baseline 25 mL O2/min/mmHg."
+  },
+  "fluid.vascular_volume_ml": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Total blood volume ≈ 86 mL/kg in dogs.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/fluid.vascular_volume_ml"
+      }
+    ],
+    "notes": "Vascular volume fraction ~60% of total blood. Aldosterone coupling coefficient 0.08 from Guyton Ch26."
+  },
+  "coag.PT_sec": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Normal PT 10-15 sec in dogs.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/coag.PT_sec"
+      }
+    ],
+    "notes": "Baseline 12 sec from midpoint of normal range."
+  },
+  "coag.aPTT_sec": {
+    "references": [
+      {
+        "id": "web:IDEXX-ref-ranges",
+        "text": "IDEXX Catalyst Reference Ranges — Canine adult aPTT 14-24 sec.",
+        "url": "https://www.idexx.com/files/catalyst-species-reference-ranges.pdf",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/coag.aPTT_sec"
+      }
+    ],
+    "notes": "Baseline 19 sec from midpoint. Nelson & Couto Ch37 aPTT normal range."
+  },
+  "blood.albumin": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Normal canine serum albumin 2.6-4.0 g/dL.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.albumin"
+      }
+    ],
+    "notes": "Baseline 3.3 g/dL from midpoint. Half-life ~8 days in dogs — too slow for acute simulation."
+  },
+  "coag.fibrinogen_mg_dL": {
+    "references": [
+      {
+        "id": "PMID:12479367",
+        "text": "Stokol et al. 2000. Evaluation of coagulation in dogs with liver disease. J Vet Intern Med.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/coag.fibrinogen_mg_dL"
+      },
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Normal canine fibrinogen 200-400 mg/dL.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/coag.fibrinogen_mg_dL"
+      }
+    ],
+    "notes": "Baseline 300 mg/dL from midpoint. liver_metabolic_activity coupling: at MA=1.0, fibrinogen=300; at MA=0.5, fibrinogen=150."
+  },
+  "endocrine.T3_ng_dL": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine total T3 normal range 30-80 ng/dL (mean ~50-60 in adult).",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.T3_ng_dL"
+      }
+    ],
+    "notes": "Baseline 100 ng/dL = upper end of normal (healthy adult dog)."
+  },
+  "endocrine.T4_ug_dL": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine total T4 normal range 1-4 ug/dL.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.T4_ug_dL"
+      }
+    ],
+    "notes": "Baseline 1.5 ug/dL from lower normal range."
+  },
+  "endocrine.cortisol_ug_dL": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine baseline cortisol 2-10 ug/dL (resting).",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.cortisol_ug_dL"
+      }
+    ],
+    "notes": "Baseline 5 ug/dL from midpoint of normal range. Stress max 25 ug/dL."
+  },
+  "endocrine.insulin_uU_mL": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine baseline insulin 5-20 uU/mL (fasting).",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.insulin_uU_mL"
+      }
+    ],
+    "notes": "Baseline 12 uU/mL from midpoint."
+  },
+  "endocrine.glucagon_pg_mL": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Basal glucagon ~50-150 pg/mL in mammals.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.glucagon_pg_mL"
+      }
+    ],
+    "notes": "Baseline 80 pg/mL from midpoint."
+  },
+  "endocrine.PTH_pg_mL": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine PTH 10-40 pg/mL (resting).",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.PTH_pg_mL"
+      }
+    ],
+    "notes": "Baseline 30 pg/mL from midpoint."
+  },
+  "endocrine.calcium_mg_dL": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine total Ca 9.4-11.1 mg/dL.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.calcium_mg_dL"
+      }
+    ],
+    "notes": "Baseline 10.0 mg/dL from midpoint. Iowa State 9.7-11.3 mg/dL."
+  },
+  "endocrine.phosphate_mg_dL": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine phosphate 2.7-5.4 mg/dL.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.phosphate_mg_dL"
+      }
+    ],
+    "notes": "Baseline 4.0 mg/dL from midpoint. Iowa State 2.7-5.4 mg/dL."
+  },
+  "_internal.cocaine_params": {
+    "references": [
+      {
+        "id": "PMID:8491156",
+        "text": "Liu et al. 1993. Cardiovascular effects of cocaine in dogs: a modeling study. J Am Coll Cardiol 21:260-268.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/_internal.cocaine_params"
+      }
+    ],
+    "notes": "Dose 3 mg/kg IV produces transient cardiac depression (5-10 min τ) and sustained peripheral vasoconstriction (30 min τ). SVR peaks at 2x baseline. ESPVR max drop 19%. LD50 ≈ 60 mg/kg."
+  },
+  "blood.PLT": {
+    "references": [
+      {
+        "id": "textbook:merckvet",
+        "text": "Merck Veterinary Manual — Canine platelet count 200,000-600,000/µL (200-600 ×10^9/L).",
+        "url": "https://www.merckvetmanual.com/multimedia/table/hematology-complete-blood-count-reference-ranges",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.PLT"
+      }
+    ],
+    "notes": "Baseline 400,000/µL."
+  },
+  "blood.ammonia": {
+    "references": [
+      {
+        "id": "PMID:12197803",
+        "text": "Inferred blood ammonia reference range for dogs using POC analyzer. Animals 2025;12(6):596. PMID:12197803.",
+        "url": "https://www.mdpi.com/2306-7381/12/6/596",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.ammonia"
+      }
+    ],
+    "notes": "Baseline < 30 µmol/L. Dogs with BA > 30 µg/dL suggestive of liver disease."
+  },
+  "blood.ketone_mmol_L": {
+    "references": [
+      {
+        "id": "PMID:24675829",
+        "text": "Bresciani et al. 2014. Accuracy of capillary blood 3-beta-hydroxybutyrate for canine diabetic ketoacidosis. J Vet Sci 15(2):309-316. PMID:24675829.",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4087234/",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.ketone_mmol_L"
+      }
+    ],
+    "notes": "Baseline 0.2 mmol/L (well below DKA threshold of 3.8 mmol/L)."
+  },
+  "blood.temperature": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Normal canine body temperature 38.0-39.2°C.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.temperature"
+      }
+    ],
+    "notes": "Baseline 38.5°C."
+  },
+  "blood.amino_acids": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 44 — Plasma amino acid concentrations regulated by liver and kidney.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.amino_acids"
+      }
+    ],
+    "notes": "Baseline modeled as fraction of normal hepatic metabolic activity."
+  },
+  "blood.fatty_acids": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine NEFA 0.13-1.25 mEq/L.",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.fatty_acids"
+      }
+    ],
+    "notes": "Baseline 0.5 mEq/L."
+  },
+  "blood.red_cell_volume_ml": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Hematocrit ≈ 45% in dogs (PCV 37-55%).",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.red_cell_volume_ml"
+      }
+    ],
+    "notes": "Baseline ≈ 45% × blood volume. PCV 37-55% normal range."
+  },
+  "blood.bile_acids": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Fasting bile acids < 25 µmol/L in dogs.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.bile_acids"
+      }
+    ],
+    "notes": "Baseline 10 µmol/L."
+  },
+  "coag.factor_VII": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 36 — Factor VII shortest half-life (~6h) of coagulation factors, synthesized by liver.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/coag.factor_VII"
+      }
+    ],
+    "notes": "Baseline 1.0 (100% activity). Used in liver_coag coupling PT formula."
+  },
+  "coag.coagulation_state": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Balanced coagulation depends on pro- and anti-coagulant factors.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/coag.coagulation_state"
+      }
+    ],
+    "notes": "Baseline 1.0 (balanced). Elevated in DIC, low in liver failure."
+  },
+  "immune.wbc_count": {
+    "references": [
+      {
+        "id": "textbook:merckvet",
+        "text": "Merck Veterinary Manual — Canine WBC 6.0-17.0 ×10^9/L.",
+        "url": "https://www.merckvetmanual.com/multimedia/table/hematology-complete-blood-count-reference-ranges",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/immune.wbc_count"
+      }
+    ],
+    "notes": "Baseline 11.0 ×10^9/L."
+  },
+  "immune.crp_level": {
+    "references": [
+      {
+        "id": "web:Cornell-vet-path",
+        "text": "Cornell University College of Veterinary Medicine Clinical Pathology — Canine CRP 0-12 mg/L (normal).",
+        "url": "https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/immune.crp_level"
+      }
+    ],
+    "notes": "Baseline 5 mg/L."
+  },
+  "immune.acute_phase_response": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Acute phase response includes CRP, fibrinogen, SAA elevation.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/immune.acute_phase_response"
+      }
+    ],
+    "notes": "Baseline 0 (no acute inflammation)."
+  },
+  "immune.immune_suppression": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Immunosuppression reduces WBC and cytokine response.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/immune.immune_suppression"
+      }
+    ],
+    "notes": "Baseline 0 (no immunosuppression)."
+  },
+  "immune.coagulation_state": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Inflammation activates coagulation cascade.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/immune.coagulation_state"
+      }
+    ],
+    "notes": "Baseline 0 (normal). Activated by cytokine storm."
+  },
+  "endocrine.GH_ng_mL": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Basal GH ~1-5 ng/mL in mammals.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.GH_ng_mL"
+      }
+    ],
+    "notes": "Baseline 2 ng/mL."
+  },
+  "endocrine.IGF1_nmol_L": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — IGF-1 ~10-40 nmol/L in adult dogs.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.IGF1_nmol_L"
+      }
+    ],
+    "notes": "Baseline 10 nmol/L."
+  },
+  "endocrine.HPA_axis": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — HPA axis regulates cortisol secretion.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.HPA_axis"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal activity). Activated by stress."
+  },
+  "endocrine.metabolic_rate": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 16 — Basal metabolic rate determined by thyroid hormone levels.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.metabolic_rate"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal). MODIFIED by T3/T4_factor."
+  },
+  "endocrine.epinephrine_pg_mL": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Basal plasma epinephrine ~30 pg/mL.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.epinephrine_pg_mL"
+      }
+    ],
+    "notes": "Baseline 30 pg/mL."
+  },
+  "endocrine.norepinephrine_pg_mL": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Basal plasma norepinephrine ~100 pg/mL.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.norepinephrine_pg_mL"
+      }
+    ],
+    "notes": "Baseline 100 pg/mL."
+  },
+  "endocrine.calcium_factor": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — PTH regulates Ca2+ within narrow range via bone, gut, kidney.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.calcium_factor"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal Ca2+ homeostasis)."
+  },
+  "endocrine.growth_factor": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — GH/IGF-1 axis drives tissue growth and repair.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.growth_factor"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal)."
+  },
+  "endocrine.insulin_factor": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Insulin regulates glucose uptake into cells.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.insulin_factor"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal insulin sensitivity)."
+  },
+  "endocrine.glucagon_factor": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Glucagon opposes insulin in glucose regulation.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.glucagon_factor"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal glucagon activity)."
+  },
+  "endocrine.T3_factor": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — T3/T4 regulate metabolic rate.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.T3_factor"
+      }
+    ],
+    "notes": "Baseline 1.0. MODIFIED by thyroid axis."
+  },
+  "endocrine.T4_factor": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — T4 converted to active T3 in tissues.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.T4_factor"
+      }
+    ],
+    "notes": "Baseline 1.0. MODIFIED by thyroid axis."
+  },
+  "neuro.sympathetic_tone": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 20 — Sympathetic tone maintains vasomotor constriction at baseline.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/neuro.sympathetic_tone"
+      }
+    ],
+    "notes": "Baseline 0.3 (normal). Elevated in stress/hemorrhage."
+  },
+  "neuro.parasympathetic_tone": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 20 — Parasympathetic (vagal) tone dominates at rest.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/neuro.parasympathetic_tone"
+      }
+    ],
+    "notes": "Baseline 0.7 (normal). Elevated in sedation/heart block."
+  },
+  "neuro.consciousness": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 59 — Consciousness depends on cerebral cortex and brainstem arousal centers.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/neuro.consciousness"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal). Decreased in hypoxia, sedatives, hepatic encephalopathy."
+  },
+  "neuro.seizure": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Seizure threshold reduced by electrolyte abnormalities, toxins, hypoxia.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/neuro.seizure"
+      }
+    ],
+    "notes": "Baseline 0 (no seizure activity)."
+  },
+  "neuro.pain_level": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Pain activates sympathetic nervous system and stress response.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/neuro.pain_level"
+      }
+    ],
+    "notes": "Baseline 0 (no pain)."
+  },
+  "neuro.chemoreceptor_drive": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 42 — Peripheral and central chemoreceptors respond to PaO2, PaCO2, and pH.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/neuro.chemoreceptor_drive"
+      }
+    ],
+    "notes": "Baseline 0.3 (normal). Elevated in hypoxemia/hypercapnia."
+  },
+  "gut.motility": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 36 — Normal GI motility regulated by autonomic nervous system and enteric nervous system.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/gut.motility"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal motility)."
+  },
+  "gut.barrier_integrity": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 36 — Gut mucosal barrier prevents bacterial translocation.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/gut.barrier_integrity"
+      }
+    ],
+    "notes": "Baseline 1.0 (intact barrier)."
+  },
+  "gut.microbiome_activity": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 66 — Gut microbiome produces short-chain fatty acids and influences systemic immunity.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/gut.microbiome_activity"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal microbiome). Reduced by antibiotics, dysbiosis."
+  },
+  "liver.metabolic_activity": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Liver synthetic function measured by albumin, coagulation factors, urea.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/liver.metabolic_activity"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal). Reduced in hepatocellular disease."
+  },
+  "liver.detox_capacity": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 71 — Liver detoxifies drugs, ammonia, bilirubin.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/liver.detox_capacity"
+      }
+    ],
+    "notes": "Baseline 1.0. MODIFIED by liver.metabolic_activity."
+  },
+  "liver.cyp450_activity": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 71 — Cytochrome P450 system metabolizes drugs and toxins.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/liver.cyp450_activity"
+      }
+    ],
+    "notes": "Baseline 1.0. Inducible by drugs (carbamazepine ↑, cimetidine ↓)."
+  },
+  "liver.glycogen_fraction": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 71 — Liver glycogen stores ~300g in dogs, mobilized during fasting.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/liver.glycogen_fraction"
+      }
+    ],
+    "notes": "Baseline 1.0 (full glycogen stores). Depleted in fasting/hypoglycemia."
+  },
+  "liver.bilirubin_conjugation": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 33 — Bilirubin conjugated by hepatocytes and excreted in bile.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/liver.bilirubin_conjugation"
+      }
+    ],
+    "notes": "Baseline 1.0 (normal conjugation capacity)."
+  },
+  "lymph.splenic_reserve_mL": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Spleen acts as blood reservoir, releasing RBCs and plasma in stress.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/lymph.splenic_reserve_mL"
+      }
+    ],
+    "notes": "Baseline ~10% of blood volume reserve. Alias: blood.splenic_reserve_ml."
+  },
+  "lymph.lymph_flow": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 16 — Lymph flow returns interstitial fluid to circulation.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/lymph.lymph_flow"
+      }
+    ],
+    "notes": "Baseline proportional to interstitial fluid volume."
+  },
+  "lymph.interstitial_fluid": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 16 — Starling forces govern fluid exchange across capillary beds.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/lymph.interstitial_fluid"
+      }
+    ],
+    "notes": "Baseline ~3L in dogs."
+  },
+  "kidney._disease_gfr_multiplier": {
+    "references": [
+      {
+        "id": "internal",
+        "text": "Internal disease module parameter — represents GFR reduction beyond baseline due to disease process.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/kidney._disease_gfr_multiplier"
+      }
+    ],
+    "notes": "Set by disease ODE models. 1.0 = no additional reduction beyond baseline GFR."
+  },
+  "lung.VQ_ratio": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 40 — V/Q ratio normal ≈ 0.8-1.0 in healthy lung regions.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/lung.VQ_ratio"
+      }
+    ],
+    "notes": "Baseline 1.0 (ideal). Reduced in shunt, elevated in dead space."
+  },
+  "endocrine.cortisol_factor": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Cortisol released from adrenal cortex in response to ACTH and stress.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/endocrine.cortisol_factor"
+      }
+    ],
+    "notes": "Baseline 1.0. Elevated in stress (HPA axis activation)."
+  },
+  "immune.cytokine_level": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Cytokines (IL-1, IL-6, TNF-α) mediate systemic inflammatory response.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/immune.cytokine_level"
+      }
+    ],
+    "notes": "Baseline 0 (no inflammation). Elevated in sepsis/SIRS."
+  },
+  "blood.PT_sec": {
+    "references": [
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Prothrombin time (PT) reflects extrinsic and common pathway factors (I, II, V, VII, X). Normal 10-15 sec.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.PT_sec"
+      }
+    ],
+    "notes": "Baseline 12 sec. Same value as coag.PT_sec."
+  },
+  "blood.creatinine": {
+    "references": [
+      {
+        "id": "PMID:30284231",
+        "text": "Restutto et al. 2018. Reference intervals for creatinine in client-owned dogs. Vet Clin Pathol.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.creatinine"
+      },
+      {
+        "id": "textbook:nelson",
+        "text": "Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal canine creatinine 0.5-1.6 mg/dL.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.creatinine"
+      }
+    ],
+    "notes": "Alias for blood.creatinine_mg_dL. Baseline 1.0 mg/dL."
+  },
+  "blood.splenic_reserve_mL": {
+    "references": [
+      {
+        "id": "textbook:guyton",
+        "text": "Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Spleen acts as blood reservoir, releasing RBCs and plasma in stress.",
+        "url": "",
+        "zotero_group": "https://www.zotero.org/groups/6570133/virtualvet-physiology-params/items/q/blood.splenic_reserve_mL"
+      }
+    ],
+    "notes": "Alias for lymph.splenic_reserve_ml."
+  }
+}

@@ -339,6 +339,53 @@ def validate_diseases(
     return errors
 
 
+def validate_coupling_rules(config: dict) -> list[ValidationError]:
+    """
+    Validate data/coupling_rules.json structure.
+
+    Schema checks:
+      - _schema matches
+      - couplings is array of rules
+      - each rule has name, loop, source, target
+
+    Programmatic checks:
+      - references[].id and references[].text are non-empty strings
+      - notes is string (can be empty)
+    """
+    errors: list[ValidationError] = []
+    # coupling_rules_schema.json lives in data/, not data/schemas/
+    schema_path = _get_data_dir() / "coupling_rules_schema.json"
+    with open(schema_path, encoding="utf-8") as f:
+        schema = json.load(f)
+    validator = Draft202012Validator(schema)
+
+    for err in validator.iter_errors(config):
+        path = ".".join(str(p) for p in err.path) if err.path else "root"
+        errors.append(ValidationError("coupling_rules.json", path, err.message))
+
+    # Programmatic: each coupling rule with references must have non-empty id/text
+    for i, rule in enumerate(config.get("couplings", [])):
+        if not isinstance(rule, dict):
+            continue
+        for j, ref in enumerate(rule.get("references", [])):
+            if not isinstance(ref, dict):
+                continue
+            if not ref.get("id"):
+                errors.append(ValidationError(
+                    "coupling_rules.json",
+                    f"couplings[{i}].references[{j}].id",
+                    "Reference id cannot be empty"
+                ))
+            if not ref.get("text"):
+                errors.append(ValidationError(
+                    "coupling_rules.json",
+                    f"couplings[{i}].references[{j}].text",
+                    "Reference text cannot be empty"
+                ))
+
+    return errors
+
+
 # ── validate_all ─────────────────────────────────────────────────────────────
 
 def validate_all() -> dict[str, list[ValidationError]]:
@@ -353,6 +400,7 @@ def validate_all() -> dict[str, list[ValidationError]]:
         "examinations.json": [],
         "exam_templates.json": [],
         "diseases.json": [],
+        "coupling_rules.json": [],
     }
 
     data_dir = _get_data_dir()
@@ -360,6 +408,7 @@ def validate_all() -> dict[str, list[ValidationError]]:
     _exam_file = data_dir / "examinations.json"
     _tmpl_file = data_dir / "exam_templates.json"
     _dz_file = data_dir / "diseases.json"
+    _cr_file = data_dir / "coupling_rules.json"
 
     try:
         ode_diseases_config = _load_json(_ode_file)
@@ -385,6 +434,12 @@ def validate_all() -> dict[str, list[ValidationError]]:
         results["diseases.json"].append(ValidationError("diseases.json", "root", str(e)))
         diseases_config = {}
 
+    try:
+        coupling_rules_config = _load_json(_cr_file)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        results["coupling_rules.json"].append(ValidationError("coupling_rules.json", "root", str(e)))
+        coupling_rules_config = {}
+
     results["ode_diseases.json"].extend(validate_ode_diseases(ode_diseases_config))
     results["examinations.json"].extend(validate_examinations(examinations_config))
     results["exam_templates.json"].extend(
@@ -393,6 +448,7 @@ def validate_all() -> dict[str, list[ValidationError]]:
     results["diseases.json"].extend(
         validate_diseases(diseases_config, examinations_config, exam_templates_config)
     )
+    results["coupling_rules.json"].extend(validate_coupling_rules(coupling_rules_config))
 
     return results
 
@@ -419,6 +475,7 @@ def main() -> int:
             "examinations.json": ("examinations.json", _load_json(data_dir / "examinations.json")),
             "exam_templates.json": ("exam_templates.json", _load_json(data_dir / "exam_templates.json")),
             "diseases.json": ("diseases.json", _load_json(data_dir / "diseases.json")),
+            "coupling_rules.json": ("coupling_rules.json", _load_json(data_dir / "coupling_rules.json")),
         }
         if args.file not in file_map:
             print(f"Unknown file: {args.file}")
@@ -457,6 +514,8 @@ def _run_validators_for_file(filename: str, config: dict) -> list[ValidationErro
         return validate_exam_templates(config, None)
     elif filename == "diseases.json":
         return validate_diseases(config, None, None)
+    elif filename == "coupling_rules.json":
+        return validate_coupling_rules(config)
     return []
 
 
