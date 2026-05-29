@@ -225,7 +225,7 @@
     "abdominal_pain": "腹部疼痛",
     "weak_thready_pulse": "脉搏细弱",
     "pale_mucous_membranes": "黏膜苍白",
-    "distended_abdomen": "Distended Abdomen"
+    "distended_abdomen": "腹部膨隆"
   },
   "clue_to_test": {
     "PaO2_low": "blood_gas",
