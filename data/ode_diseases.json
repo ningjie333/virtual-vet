@@ -1,1 +1,2447 @@
-{"_schema":"ode_diseases v1","_comment":"所有 'fn' 字段为 Python 表达式字符串。可用变量：状态变量名、params 键名、engine 字典（引擎状态快照）。clamp 格式 [lo, hi]，null 表示无界。ode_type: logistic | algebraic | first_order_lag | custom。","pneumonia":{"display_name":"肺炎（肺部感染）","severity_presets":{"mild":{"bacterial_seed":0.1,"growth_rate":0.02,"exudate_K":0.4,"immune_clearance":0.015},"moderate":{"bacterial_seed":0.3,"growth_rate":0.035,"exudate_K":0.7,"immune_clearance":0.01},"severe":{"bacterial_seed":0.6,"growth_rate":0.05,"exudate_K":0.95,"immune_clearance":0.005}},"state_variables":{"alveolar_exudate":{"initial":0.0,"clamp":[0,1],"ode_type":"logistic","params":{"rate":0.005,"K_key":"exudate_K","seed_threshold":0.01,"seed_boost_fn":"0.001 * min(bacterial_load / (bacterial_load + 1.0), 1.0)"}},"bacterial_load":{"initial_key":"bacterial_seed","clamp":[0,null],"ode_type":"custom","derivative_fn":"(growth_rate - immune_clearance * (1 + 0.5 * fever_state)) * bacterial_load"},"fever_state":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":1800.0,"target_fn":"min(bacterial_load / (bacterial_load + 2.0), 1.0)"}},"tissue_hypoxia":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"min(alveolar_exudate ** 2.0 + min(bacterial_load / (bacterial_load + 5.0), 0.3), 1.0)"}}},"outputs":[{"target":"lung.diffusion_coefficient","op":"multiply","fn":"max(0.1, 1.0 - alveolar_exudate * 0.9)"},{"target":"heart.heart_rate","op":"add","fn":"fever_state * 20.0"},{"target":"heart.SVR","op":"multiply","fn":"max(0.5, 1.0 - 0.5 * min(max(tissue_hypoxia - 0.6, 0.0) / 0.4, 1.0))","condition":"tissue_hypoxia > 0.6"}]},"acute_renal_failure":{"display_name":"急性肾衰竭","severity_presets":{"mild":{"damage_rate":0.005,"damage_K":0.4},"moderate":{"damage_rate":0.008,"damage_K":1.0},"severe":{"damage_rate":0.02,"damage_K":0.95}},"state_variables":{"nephron_damage":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"damage_rate","K_key":"damage_K","seed_threshold":0.01,"seed_boost":0.0005}},"gfr_decline":{"initial":0.0,"clamp":[0,1],"ode_type":"algebraic","fn":"min(nephron_damage ** 1.5, 1.0)"},"potassium_shift":{"initial":0.0,"clamp":[0,3.5],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"gfr_decline * 3.0"}},"metabolic_acidosis":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":900.0,"target_fn":"gfr_decline * 0.8"}}},"outputs":[{"target":"kidney._disease_gfr_multiplier","op":"set","fn":"max(0.05, 1.0 - gfr_decline)"},{"target":"blood.potassium","op":"set","fn":"4.2 + potassium_shift"},{"target":"blood.pH","op":"set","fn":"7.40 - metabolic_acidosis * 0.3"},{"target":"heart.heart_rate","op":"add","fn":"-15.0 * (potassium_shift / 3.0) if potassium_shift > 1.5 else (5.0 if gfr_decline > 0.5 else 0.0)"}]},"dilated_cardiomyopathy":{"display_name":"扩张型心肌病（DCM）","severity_presets":{"mild":{"fibrosis_rate":0.003,"fibrosis_K":0.4},"moderate":{"fibrosis_rate":0.006,"fibrosis_K":0.75},"severe":{"fibrosis_rate":0.012,"fibrosis_K":0.95}},"state_variables":{"myocardial_fibrosis":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"fibrosis_rate","K_key":"fibrosis_K","seed_threshold":0.01,"seed_boost":0.0003}},"contractility_loss":{"initial":0.0,"clamp":[0,1],"ode_type":"algebraic","fn":"min(myocardial_fibrosis ** 1.2, 1.0)"},"ventricular_dilation":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":900.0,"target_fn":"contractility_loss * 0.8"}},"fluid_retention":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":1200.0,"target_source":"engine","target_engine_key":"heart.cardiac_output_ml_min","target_fn":"clamp(1.0 - engine['heart']['cardiac_output_ml_min'] / 1700.0, 0.0, 0.8) if engine['heart']['cardiac_output_ml_min'] / 1700.0 < 0.7 else 0.0"}}},"outputs":[{"target":"heart.contractility_factor","op":"multiply","fn":"max(0.2, 1.0 - contractility_loss * 0.8)"},{"target":"heart.heart_rate","op":"add","fn":"max(-20.0, min(15.0, 15.0 * contractility_loss if contractility_loss < 0.5 else 7.5 - 30.0 * (contractility_loss - 0.5)))"},{"target":"heart.CVP","op":"add","fn":"fluid_retention * 10.0"},{"target":"heart.blood_volume","op":"multiply","fn":"1.0 + fluid_retention * 0.15"},{"target":"kidney.GFR","op":"multiply","fn":"max(0.3, min(1.0, engine['heart']['cardiac_output_ml_min'] / 1700.0 + 0.2))"}]},"phosphorus_poisoning":{"display_name":"磷化锌/磷化铝灭鼠药中毒","severity_presets":{"mild":{"toxicity_rate":0.004,"toxicity_K":0.4},"moderate":{"toxicity_rate":0.008,"toxicity_K":0.7},"severe":{"toxicity_rate":0.015,"toxicity_K":0.9}},"state_variables":{"cellular_toxicity":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"toxicity_rate","K_key":"toxicity_K","seed_threshold":0.01,"seed_boost":0.0003}},"myocardial_depression":{"initial":0.0,"clamp":[0,1],"ode_type":"algebraic","fn":"min(cellular_toxicity ** 1.3, 1.0)"},"metabolic_acidosis":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":1200.0,"target_fn":"cellular_toxicity * 0.85"}},"renal_injury":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":1800.0,"target_fn":"cellular_toxicity * 0.7"}}},"outputs":[{"target":"heart.contractility_factor","op":"multiply","fn":"max(0.25, 1.0 - myocardial_depression * 0.75)"},{"target":"heart.heart_rate","op":"add","fn":"max(-15.0, min(10.0, 10.0 * cellular_toxicity if cellular_toxicity < 0.4 else 4.0 - 20.0 * (cellular_toxicity - 0.4)))"},{"target":"kidney._disease_gfr_multiplier","op":"set","fn":"max(0.2, 1.0 - renal_injury)"},{"target":"blood.HCO3","op":"set","fn":"max(6.0, 24.0 - metabolic_acidosis * 16.0)"},{"target":"blood.temperature","op":"set","fn":"(38.5 + cellular_toxicity * 1.5) if cellular_toxicity < 0.5 else (38.5 + 0.75 - 2.0 * (cellular_toxicity - 0.5))"}]},"gastric_dilatation_volvulus":{"display_name":"胃扩张扭转（GDV）","severity_presets":{"mild":{"distension_rate":0.003,"distension_K":0.4,"ischemia_rate":0.002},"moderate":{"distension_rate":0.006,"distension_K":0.75,"ischemia_rate":0.005},"severe":{"distension_rate":0.012,"distension_K":0.95,"ischemia_rate":0.01}},"state_variables":{"gastric_distension":{"initial":0.1,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"distension_rate","K_key":"distension_K","seed_threshold":0.05,"seed_boost":0.001}},"gastric_ischemia":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":300.0,"target_fn":"min(gastric_distension * 1.2, 1.0)"}},"systemic_shock":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"gastric_ischemia * 0.9"}},"arrhythmia_severity":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":400.0,"target_fn":"gastric_ischemia * 0.7"}},"lactate_accumulation":{"initial":0.0,"clamp":[0,15],"ode_type":"first_order_lag","params":{"tau":500.0,"target_fn":"gastric_ischemia * 12.0"}}},"outputs":[{"target":"heart.heart_rate","op":"add","fn":"max(-10.0, min(50.0, systemic_shock * 50.0 + arrhythmia_severity * 20.0))"},{"target":"heart.SVR","op":"multiply","fn":"max(0.3, 1.0 - systemic_shock * 0.7)"},{"target":"heart.CVP","op":"add","fn":"-gastric_distension * 5.0"},{"target":"blood.pH","op":"set","fn":"max(7.0, 7.40 - lactate_accumulation * 0.025)"},{"target":"blood.lactate","op":"set","fn":"max(0.5, lactate_accumulation)"},{"target":"blood.temperature","op":"set","fn":"38.5 - systemic_shock * 1.5"}]},"immune_mediated_hemolytic_anemia":{"display_name":"免疫介导性溶血性贫血（IMHA）","severity_presets":{"mild":{"destruction_rate":0.004,"destruction_K":0.3},"moderate":{"destruction_rate":0.008,"destruction_K":0.6},"severe":{"destruction_rate":0.015,"destruction_K":0.9}},"state_variables":{"antibody_activity":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"destruction_rate","K_key":"destruction_K","seed_threshold":0.01,"seed_boost":0.0005}},"rbc_destruction":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"min(antibody_activity * 1.1, 1.0)"}},"bilirubin_load":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":900.0,"target_fn":"rbc_destruction * 0.9"}},"compensatory_tachycardia":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":300.0,"target_fn":"rbc_destruction * 0.8"}},"hypoxia_from_anemia":{"initial":0.0,"clamp":[0,1],"ode_type":"algebraic","fn":"max(0.0, min(1.0, (rbc_destruction - 0.2) / 0.6))"}},"outputs":[{"target":"blood.red_cell_volume_ml","op":"set","fn":"max(300.0, 2000.0 * (1.0 - rbc_destruction * 0.85))"},{"target":"heart.heart_rate","op":"add","fn":"compensatory_tachycardia * 40.0"},{"target":"blood.bilirubin_mg_dL","op":"set","fn":"max(0.1, bilirubin_load * 8.0)"},{"target":"lung.diffusion_coefficient","op":"multiply","fn":"max(0.5, 1.0 - hypoxia_from_anemia * 0.3)"}]},"urinary_obstruction":{"display_name":"尿道梗阻","severity_presets":{"mild":{"obstruction_rate":0.003,"obstruction_K":0.4},"moderate":{"obstruction_rate":0.007,"obstruction_K":0.75},"severe":{"obstruction_rate":0.012,"obstruction_K":0.95}},"state_variables":{"urethral_blockage":{"initial":0.1,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"obstruction_rate","K_key":"obstruction_K","seed_threshold":0.05,"seed_boost":0.001}},"bladder_distension":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":300.0,"target_fn":"min(urethral_blockage * 1.1, 1.0)"}},"post_renal_azotemia":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":900.0,"target_fn":"urethral_blockage * 0.9"}},"hyperkalemia":{"initial":0.0,"clamp":[0,4.0],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"urethral_blockage * 3.5"}},"metabolic_acidosis":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":1200.0,"target_fn":"urethral_blockage * 0.7"}}},"outputs":[{"target":"kidney.urine_output","op":"set","fn":"max(0.0, 0.02 * (1.0 - urethral_blockage))"},{"target":"kidney._disease_gfr_multiplier","op":"set","fn":"max(0.05, 1.0 - post_renal_azotemia)"},{"target":"blood.potassium","op":"set","fn":"4.2 + hyperkalemia"},{"target":"blood.pH","op":"set","fn":"max(7.0, 7.40 - metabolic_acidosis * 0.35)"},{"target":"heart.heart_rate","op":"add","fn":"-20.0 * (hyperkalemia / 4.0) if hyperkalemia > 1.5 else (10.0 if post_renal_azotemia > 0.3 else 0.0)"},{"target":"blood.BUN","op":"set","fn":"max(7.0, 7.0 + post_renal_azotemia * 60.0)"}]},"diabetic_ketoacidosis":{"display_name":"糖尿病酮症酸中毒（DKA）","severity_presets":{"mild":{"hyperglycemia_rate":0.003,"ketone_rate":0.004,"dehydration_rate":0.002},"moderate":{"hyperglycemia_rate":0.006,"ketone_rate":0.007,"dehydration_rate":0.004},"severe":{"hyperglycemia_rate":0.012,"ketone_rate":0.012,"dehydration_rate":0.008}},"state_variables":{"hyperglycemia":{"initial":0.1,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"hyperglycemia_rate","K_key":"1.0","seed_threshold":0.05,"seed_boost":0.001}},"ketone_accumulation":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"ketone_rate","K_key":"0.95","seed_threshold":0.01,"seed_boost":0.0005}},"kussmaul_respiration":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":400.0,"target_fn":"min(ketone_accumulation * 0.9, 1.0)"}},"dehydration":{"initial":0.0,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"dehydration_rate","K_key":"0.9","seed_threshold":0.05,"seed_boost":0.0003}},"anion_gap_acidosis":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":800.0,"target_fn":"ketone_accumulation * 0.85"}}},"outputs":[{"target":"blood.glucose","op":"set","fn":"max(5.0, 5.0 + hyperglycemia * 30.0)"},{"target":"blood.pH","op":"set","fn":"max(6.95, 7.40 - anion_gap_acidosis * 0.4)"},{"target":"blood.HCO3","op":"set","fn":"max(5.0, 24.0 - anion_gap_acidosis * 18.0)"},{"target":"lung.respiratory_rate","op":"add","fn":"kussmaul_respiration * 15.0"},{"target":"heart.heart_rate","op":"add","fn":"dehydration * 15.0 - kussmaul_respiration * 5.0"},{"target":"blood.ketone_mmol_L","op":"set","fn":"max(0.0, ketone_accumulation * 6.0)"}]},"pericardial_effusion":{"display_name":"心包积液/心脏填塞","severity_presets":{"mild":{"effusion_rate":0.003,"effusion_K":0.35},"moderate":{"effusion_rate":0.007,"effusion_K":0.65},"severe":{"effusion_rate":0.015,"effusion_K":0.9}},"state_variables":{"pericardial_volume":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"effusion_rate","K_key":"effusion_K","seed_threshold":0.01,"seed_boost":0.0005}},"tamponade_severity":{"initial":0.0,"clamp":[0,1],"ode_type":"algebraic","fn":"max(0.0, min(1.0, (pericardial_volume - 0.2) / 0.5))"},"venous_congestion":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":300.0,"target_fn":"tamponade_severity * 0.9"}},"pulsus_paradoxus":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":400.0,"target_fn":"tamponade_severity * 0.8"}}},"outputs":[{"target":"heart.contractility_factor","op":"multiply","fn":"max(0.3, 1.0 - tamponade_severity * 0.6)"},{"target":"heart.SVR","op":"multiply","fn":"1.0 + tamponade_severity * 0.8"},{"target":"heart.CVP","op":"add","fn":"venous_congestion * 12.0"},{"target":"heart.heart_rate","op":"add","fn":"tamponade_severity * 35.0"},{"target":"lung.diffusion_coefficient","op":"multiply","fn":"max(0.6, 1.0 - tamponade_severity * 0.25)"}]},"disseminated_intravascular_coagulation":{"display_name":"弥散性血管内凝血（DIC）","severity_presets":{"mild":{"coagulation_rate":0.004,"coagulation_K":0.35,"consumption_rate":0.003},"moderate":{"coagulation_rate":0.008,"coagulation_K":0.65,"consumption_rate":0.006},"severe":{"coagulation_rate":0.015,"coagulation_K":0.9,"consumption_rate":0.012}},"state_variables":{"microthrombus_formation":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"coagulation_rate","K_key":"coagulation_K","seed_threshold":0.01,"seed_boost":0.0005}},"coagulation_consumption":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":500.0,"target_fn":"min(microthrombus_formation * 1.1, 1.0)"}},"hemorrhage_risk":{"initial":0.0,"clamp":[0,1],"ode_type":"algebraic","fn":"max(0.0, min(1.0, coagulation_consumption * 0.8 - microthrombus_formation * 0.2))"},"organ_ischemia":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":800.0,"target_fn":"microthrombus_formation * 0.7"}},"shock_from_dIC":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"max(hemorrhage_risk, organ_ischemia) * 0.8"}}},"outputs":[{"target":"blood.PLT","op":"set","fn":"max(10.0, 300.0 * (1.0 - coagulation_consumption * 0.9))"},{"target":"heart.heart_rate","op":"add","fn":"shock_from_dIC * 30.0 + hemorrhage_risk * 15.0"},{"target":"heart.SVR","op":"multiply","fn":"max(0.3, 1.0 - shock_from_dIC * 0.6)"},{"target":"kidney._disease_gfr_multiplier","op":"set","fn":"max(0.1, 1.0 - organ_ischemia * 0.8)"},{"target":"blood.pH","op":"set","fn":"max(7.05, 7.40 - shock_from_dIC * 0.3)"},{"target":"lung.diffusion_coefficient","op":"multiply","fn":"max(0.4, 1.0 - organ_ischemia * 0.4)"}]},"hyperthyroidism":{"display_name":"甲状腺功能亢进","severity_presets":{"mild":{"nodule_rate":0.003,"T3_K":0.5},"moderate":{"nodule_rate":0.006,"T3_K":0.75},"severe":{"nodule_rate":0.012,"T3_K":0.95}},"state_variables":{"thyroid_nodule":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"nodule_rate","K_key":"T3_K","seed_threshold":0.01,"seed_boost":0.0002}},"T3_excess":{"initial":0.0,"clamp":[0,2.0],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"min(thyroid_nodule * 2.5, 2.0)"}},"tachycardia":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":300.0,"target_fn":"min(T3_excess * 0.6, 1.0)"}}},"outputs":[{"target":"endocrine.T3_ng_dL","op":"set","fn":"100.0 + T3_excess * 200.0"},{"target":"endocrine.T3_factor","op":"set","fn":"1.0 + T3_excess * 0.9"},{"target":"heart.heart_rate","op":"add","fn":"tachycardia * 55.0"},{"target":"blood.temperature","op":"add","fn":"T3_excess * 1.0"},{"target":"gut.motility","op":"multiply","fn":"1.0 + T3_excess * 0.4"}]},"hypoadrenocorticism":{"display_name":"肾上腺皮质功能减退（艾迪森氏病）","severity_presets":{"mild":{"atrophy_rate":0.003,"atrophy_K":0.3},"moderate":{"atrophy_rate":0.007,"atrophy_K":0.6},"severe":{"atrophy_rate":0.015,"atrophy_K":0.9}},"state_variables":{"adrenal_atrophy":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"atrophy_rate","K_key":"atrophy_K","seed_threshold":0.01,"seed_boost":0.0005}},"cortisol_deficiency":{"initial":0.0,"clamp":[0,1],"ode_type":"algebraic","fn":"min(adrenal_atrophy ** 1.2, 1.0)"},"hyperkalemia":{"initial":0.0,"clamp":[0,4.5],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"min(cortisol_deficiency * 4.0, 4.5)"}}},"outputs":[{"target":"endocrine.cortisol_ug_dL","op":"set","fn":"max(0.5, 5.0 * (1.0 - cortisol_deficiency))"},{"target":"endocrine.cortisol_factor","op":"set","fn":"max(0.02, 1.0 - cortisol_deficiency)"},{"target":"gut.barrier_integrity","op":"set","fn":"max(0.2, 0.8 - cortisol_deficiency * 0.6)"},{"target":"blood.potassium","op":"add","fn":"hyperkalemia"},{"target":"blood.sodium_mEq_L","op":"add","fn":"-cortisol_deficiency * 12.0"},{"target":"heart.heart_rate","op":"add","fn":"-15.0 * cortisol_deficiency"}]},"sepsis":{"display_name":"脓毒症（细菌感染）","severity_presets":{"moderate":{"bacteremia_rate":0.003,"bacteremia_K":0.7,"toxin_factor":0.5},"severe":{"bacteremia_rate":0.007,"bacteremia_K":0.9,"toxin_factor":1.0}},"state_variables":{"bacteremia":{"initial":0.01,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"bacteremia_rate","K_key":"bacteremia_K","seed_threshold":0.01,"seed_boost":0.001}},"cytokine_storm":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"min(bacteremia * toxin_factor * 1.5, 1.0)"}},"capillary_leak":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":900.0,"target_fn":"cytokine_storm * 0.8"}}},"outputs":[{"target":"immune.cytokine_level","op":"set","fn":"cytokine_storm"},{"target":"heart.SVR","op":"multiply","fn":"max(0.2, 1.0 - cytokine_storm * 0.8)"},{"target":"blood.temperature","op":"set","fn":"38.5 + cytokine_storm * 3.0"},{"target":"blood.sodium_mEq_L","op":"add","fn":"capillary_leak * 8.0"},{"target":"immune.wbc_count","op":"set","fn":"10.0 + cytokine_storm * 25.0"}]},"ivdd":{"display_name":"椎间盘疾病（疼痛）","severity_presets":{"mild":{"disc_herniation_rate":0.002,"disc_herniation_K":0.4},"moderate":{"disc_herniation_rate":0.004,"disc_herniation_K":0.75},"severe":{"disc_herniation_rate":0.007,"disc_herniation_K":0.9}},"state_variables":{"disc_herniation":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"disc_herniation_rate","K_key":"disc_herniation_K","seed_threshold":0.05,"seed_boost":0.001}},"pain_level":{"initial":0.0,"clamp":[0,10],"ode_type":"first_order_lag","params":{"tau":180.0,"target_fn":"disc_herniation * 10.0"}}},"outputs":[{"target":"neuro.pain_level","op":"set","fn":"pain_level"},{"target":"heart.heart_rate","op":"add","fn":"pain_level * 2.5"}]},"meningitis":{"display_name":"脑膜炎/脑炎","severity_presets":{"moderate":{"inflammation_rate":0.004,"inflammation_K":0.7},"severe":{"inflammation_rate":0.008,"inflammation_K":0.9}},"state_variables":{"cns_inflammation":{"initial":0.01,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"inflammation_rate","K_key":"inflammation_K","seed_threshold":0.01,"seed_boost":0.0005}},"consciousness_loss":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"min(cns_inflammation * 1.2, 1.0)"}},"seizure_activity":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":300.0,"target_fn":"cns_inflammation * 0.8"}}},"outputs":[{"target":"neuro.consciousness","op":"set","fn":"max(0.1, 1.0 - consciousness_loss)"},{"target":"neuro.seizure","op":"set","fn":"seizure_activity"},{"target":"heart.heart_rate","op":"add","fn":"seizure_activity * 30.0 - consciousness_loss * 15.0"}]},"hepatic_failure_coagulopathy":{"display_name":"肝功能衰竭伴凝血障碍","severity_presets":{"mild":{"necrosis_rate":0.003,"necrosis_K":0.4},"moderate":{"necrosis_rate":0.006,"necrosis_K":0.7},"severe":{"necrosis_rate":0.012,"necrosis_K":0.95}},"state_variables":{"hepatic_necrosis":{"initial":0.05,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"necrosis_rate","K_key":"necrosis_K","seed_threshold":0.01,"seed_boost":0.0005}},"factor_VII_decline":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":600.0,"target_fn":"hepatic_necrosis * 0.95"}},"encephalopathy":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":900.0,"target_fn":"hepatic_necrosis * 0.7"}}},"outputs":[{"target":"coag.factor_VII","op":"set","fn":"max(0.05, 1.0 - factor_VII_decline)"},{"target":"coag.PT_sec","op":"set","fn":"min(45.0, 12.0 + factor_VII_decline * 30.0)"},{"target":"coag.aPTT_sec","op":"set","fn":"min(80.0, 30.0 + factor_VII_decline * 45.0)"},{"target":"coag.fibrinogen_mg_dL","op":"set","fn":"max(80.0, 300.0 - hepatic_necrosis * 200.0)"},{"target":"blood.albumin","op":"set","fn":"max(1.0, 3.0 - hepatic_necrosis * 1.8)"},{"target":"blood.ammonia","op":"set","fn":"min(200.0, 30.0 + encephalopathy * 170.0)"},{"target":"blood.ALT","op":"set","fn":"min(2000.0, 25.0 + hepatic_necrosis * 1975.0)"}]},"splenic_rupture":{"display_name":"脾脏破裂/急性失血","severity_presets":{"mild":{"rupture_rate":0.01,"rupture_K":0.3},"moderate":{"rupture_rate":0.02,"rupture_K":0.6},"severe":{"rupture_rate":0.04,"rupture_K":0.9}},"state_variables":{"splenic_hemorrhage":{"initial":0.1,"clamp":[0,1],"ode_type":"logistic","params":{"rate_key":"rupture_rate","K_key":"rupture_K","seed_threshold":0.05,"seed_boost":0.002}},"hypovolemic_shock":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":180.0,"target_fn":"splenic_hemorrhage * 0.9"}},"compensatory_tachycardia":{"initial":0.0,"clamp":[0,1],"ode_type":"first_order_lag","params":{"tau":120.0,"target_fn":"hypovolemic_shock * 0.8"}}},"outputs":[{"target":"heart.blood_volume","op":"multiply","fn":"max(0.4, 1.0 - splenic_hemorrhage * 0.55)"},{"target":"heart.heart_rate","op":"add","fn":"compensatory_tachycardia * 50.0"},{"target":"heart.SVR","op":"multiply","fn":"min(1.5, 1.0 + hypovolemic_shock * 0.5)"},{"target":"heart.CVP","op":"set","fn":"max(-5.0, 5.0 - hypovolemic_shock * 10.0)"},{"target":"blood.lactate","op":"set","fn":"min(10.0, 1.0 + hypovolemic_shock * 9.0)"},{"target":"blood.splenic_reserve_mL","op":"set","fn":"max(0.0, 75.0 - splenic_hemorrhage * 75.0)"}]}}
+{
+  "_schema": "ode_diseases v1",
+  "_comment": "所有 'fn' 字段为 Python 表达式字符串。可用变量：状态变量名、params 键名、engine 字典（引擎状态快照）。clamp 格式 [lo, hi]，null 表示无界。ode_type: logistic | algebraic | first_order_lag | custom。",
+  "pneumonia": {
+    "display_name": "肺炎（肺部感染）",
+    "severity_presets": {
+      "mild": {
+        "bacterial_seed": 0.1,
+        "growth_rate": 0.02,
+        "exudate_K": 0.4,
+        "immune_clearance": 0.015
+      },
+      "moderate": {
+        "bacterial_seed": 0.3,
+        "growth_rate": 0.035,
+        "exudate_K": 0.7,
+        "immune_clearance": 0.01
+      },
+      "severe": {
+        "bacterial_seed": 0.6,
+        "growth_rate": 0.05,
+        "exudate_K": 0.95,
+        "immune_clearance": 0.005
+      }
+    },
+    "state_variables": {
+      "alveolar_exudate": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate": 0.005,
+          "K_key": "exudate_K",
+          "seed_threshold": 0.01,
+          "seed_boost_fn": "0.001 * min(bacterial_load / (bacterial_load + 1.0), 1.0)"
+        }
+      },
+      "bacterial_load": {
+        "initial_key": "bacterial_seed",
+        "clamp": [
+          0,
+          null
+        ],
+        "ode_type": "custom",
+        "derivative_fn": "(growth_rate - immune_clearance * (1 + 0.5 * fever_state)) * bacterial_load"
+      },
+      "fever_state": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 1800.0,
+          "target_fn": "min(bacterial_load / (bacterial_load + 2.0), 1.0)"
+        }
+      },
+      "tissue_hypoxia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "min(alveolar_exudate ** 2.0 + min(bacterial_load / (bacterial_load + 5.0), 0.3), 1.0)"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "lung.diffusion_coefficient",
+        "op": "multiply",
+        "fn": "max(0.1, 1.0 - alveolar_exudate * 0.9)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "fever_state * 20.0"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "max(0.5, 1.0 - 0.5 * min(max(tissue_hypoxia - 0.6, 0.0) / 0.4, 1.0))",
+        "condition": "tissue_hypoxia > 0.6"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:30284231",
+          "text": "Restuito et al. 2018. Ventilation-Perfusion Mismatch in Canine Pneumonia.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 12.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "respiratory",
+          "infectious"
+        ],
+        "organ_systems": [
+          "lung",
+          "cardiovascular"
+        ],
+        "symptoms": [
+          "cough",
+          "dyspnea",
+          "hypoxemia",
+          "fever"
+        ]
+      },
+      "equations": {
+        "alveolar_exudate": {
+          "type": "logistic",
+          "formula": "dalveolar_exudate/dt = r·alveolar_exudate·(1 - alveolar_exudate/exudate_K) + seed_boost",
+          "description": "肺泡渗出物累积量（相对值，0-1）（logistic增长）"
+        },
+        "bacterial_load": {
+          "type": "custom",
+          "formula": "dbacterial_load/dt = ...",
+          "description": "细菌负荷增长（logistic增长）（自定义ODE）"
+        },
+        "fever_state": {
+          "type": "first_order_lag",
+          "formula": "dfever_state/dt = (target - fever_state) / τ (τ=1800.0s)",
+          "description": "发热状态（first-order lag响应）（一阶滞后）"
+        },
+        "tissue_hypoxia": {
+          "type": "first_order_lag",
+          "formula": "dtissue_hypoxia/dt = (target - tissue_hypoxia) / τ (τ=600.0s)",
+          "description": "组织缺氧程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "acute_renal_failure": {
+    "display_name": "急性肾衰竭",
+    "severity_presets": {
+      "mild": {
+        "damage_rate": 0.005,
+        "damage_K": 0.4
+      },
+      "moderate": {
+        "damage_rate": 0.008,
+        "damage_K": 1.0
+      },
+      "severe": {
+        "damage_rate": 0.02,
+        "damage_K": 0.95
+      }
+    },
+    "state_variables": {
+      "nephron_damage": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "damage_rate",
+          "K_key": "damage_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0005
+        }
+      },
+      "gfr_decline": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "algebraic",
+        "fn": "min(nephron_damage ** 1.5, 1.0)"
+      },
+      "potassium_shift": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          3.5
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "gfr_decline * 3.0"
+        }
+      },
+      "metabolic_acidosis": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 900.0,
+          "target_fn": "gfr_decline * 0.8"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "kidney._disease_gfr_multiplier",
+        "op": "set",
+        "fn": "max(0.05, 1.0 - gfr_decline)"
+      },
+      {
+        "target": "blood.potassium",
+        "op": "set",
+        "fn": "4.2 + potassium_shift"
+      },
+      {
+        "target": "blood.pH",
+        "op": "set",
+        "fn": "7.40 - metabolic_acidosis * 0.3"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "-15.0 * (potassium_shift / 3.0) if potassium_shift > 1.5 else (5.0 if gfr_decline > 0.5 else 0.0)"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:22477244",
+          "text": "Cowgill LD. Acute Kidney Injury. J Vet Intern Med 2012.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 13.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "renal",
+          "toxic"
+        ],
+        "organ_systems": [
+          "kidney",
+          "cardiovascular"
+        ],
+        "symptoms": [
+          "oliguria",
+          "vomiting",
+          "lethargy"
+        ]
+      },
+      "equations": {
+        "nephron_damage": {
+          "type": "logistic",
+          "formula": "dnephron_damage/dt = r·nephron_damage·(1 - nephron_damage/damage_K) + seed_boost",
+          "description": "肾单位损伤比例（logistic增长）"
+        },
+        "gfr_decline": {
+          "type": "algebraic",
+          "formula": "gfr_decline = ...",
+          "description": "GFR下降程度（相对值）（代数关系）"
+        },
+        "potassium_shift": {
+          "type": "first_order_lag",
+          "formula": "dpotassium_shift/dt = (target - potassium_shift) / τ (τ=600.0s)",
+          "description": "血钾偏移量（一阶滞后）"
+        },
+        "metabolic_acidosis": {
+          "type": "first_order_lag",
+          "formula": "dmetabolic_acidosis/dt = (target - metabolic_acidosis) / τ (τ=900.0s)",
+          "description": "代谢性酸中毒程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "dilated_cardiomyopathy": {
+    "display_name": "扩张型心肌病（DCM）",
+    "severity_presets": {
+      "mild": {
+        "fibrosis_rate": 0.003,
+        "fibrosis_K": 0.4
+      },
+      "moderate": {
+        "fibrosis_rate": 0.006,
+        "fibrosis_K": 0.75
+      },
+      "severe": {
+        "fibrosis_rate": 0.012,
+        "fibrosis_K": 0.95
+      }
+    },
+    "state_variables": {
+      "myocardial_fibrosis": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "fibrosis_rate",
+          "K_key": "fibrosis_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0003
+        }
+      },
+      "contractility_loss": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "algebraic",
+        "fn": "min(myocardial_fibrosis ** 1.2, 1.0)"
+      },
+      "ventricular_dilation": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 900.0,
+          "target_fn": "contractility_loss * 0.8"
+        }
+      },
+      "fluid_retention": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 1200.0,
+          "target_source": "engine",
+          "target_engine_key": "heart.cardiac_output_ml_min",
+          "target_fn": "clamp(1.0 - engine['heart']['cardiac_output_ml_min'] / 1700.0, 0.0, 0.8) if engine['heart']['cardiac_output_ml_min'] / 1700.0 < 0.7 else 0.0"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "heart.contractility_factor",
+        "op": "multiply",
+        "fn": "max(0.2, 1.0 - contractility_loss * 0.8)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "max(-20.0, min(15.0, 15.0 * contractility_loss if contractility_loss < 0.5 else 7.5 - 30.0 * (contractility_loss - 0.5)))"
+      },
+      {
+        "target": "heart.CVP",
+        "op": "add",
+        "fn": "fluid_retention * 10.0"
+      },
+      {
+        "target": "heart.blood_volume",
+        "op": "multiply",
+        "fn": "1.0 + fluid_retention * 0.15"
+      },
+      {
+        "target": "kidney.GFR",
+        "op": "multiply",
+        "fn": "max(0.3, min(1.0, engine['heart']['cardiac_output_ml_min'] / 1700.0 + 0.2))"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:16946085",
+          "text": "Tidholm A et al. Canine Dilated Cardiomyopathy. J Vet Intern Med 2006.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 11.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "cardiovascular"
+        ],
+        "organ_systems": [
+          "heart",
+          "kidney"
+        ],
+        "symptoms": [
+          "exercise_intolerance",
+          "cough",
+          "ascites"
+        ]
+      },
+      "equations": {
+        "myocardial_fibrosis": {
+          "type": "logistic",
+          "formula": "dmyocardial_fibrosis/dt = r·myocardial_fibrosis·(1 - myocardial_fibrosis/fibrosis_K) + seed_boost",
+          "description": "心肌纤维化程度（logistic增长）"
+        },
+        "contractility_loss": {
+          "type": "algebraic",
+          "formula": "contractility_loss = ...",
+          "description": "收缩力丧失程度（代数关系）"
+        },
+        "ventricular_dilation": {
+          "type": "first_order_lag",
+          "formula": "dventricular_dilation/dt = (target - ventricular_dilation) / τ (τ=900.0s)",
+          "description": "心室扩张程度（一阶滞后）"
+        },
+        "fluid_retention": {
+          "type": "first_order_lag",
+          "formula": "dfluid_retention/dt = (target - fluid_retention) / τ (τ=1200.0s)",
+          "description": "液体潴留程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "phosphorus_poisoning": {
+    "display_name": "磷化锌/磷化铝灭鼠药中毒",
+    "severity_presets": {
+      "mild": {
+        "toxicity_rate": 0.004,
+        "toxicity_K": 0.4
+      },
+      "moderate": {
+        "toxicity_rate": 0.008,
+        "toxicity_K": 0.7
+      },
+      "severe": {
+        "toxicity_rate": 0.015,
+        "toxicity_K": 0.9
+      }
+    },
+    "state_variables": {
+      "cellular_toxicity": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "toxicity_rate",
+          "K_key": "toxicity_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0003
+        }
+      },
+      "myocardial_depression": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "algebraic",
+        "fn": "min(cellular_toxicity ** 1.3, 1.0)"
+      },
+      "metabolic_acidosis": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 1200.0,
+          "target_fn": "cellular_toxicity * 0.85"
+        }
+      },
+      "renal_injury": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 1800.0,
+          "target_fn": "cellular_toxicity * 0.7"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "heart.contractility_factor",
+        "op": "multiply",
+        "fn": "max(0.25, 1.0 - myocardial_depression * 0.75)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "max(-15.0, min(10.0, 10.0 * cellular_toxicity if cellular_toxicity < 0.4 else 4.0 - 20.0 * (cellular_toxicity - 0.4)))"
+      },
+      {
+        "target": "kidney._disease_gfr_multiplier",
+        "op": "set",
+        "fn": "max(0.2, 1.0 - renal_injury)"
+      },
+      {
+        "target": "blood.HCO3",
+        "op": "set",
+        "fn": "max(6.0, 24.0 - metabolic_acidosis * 16.0)"
+      },
+      {
+        "target": "blood.temperature",
+        "op": "set",
+        "fn": "(38.5 + cellular_toxicity * 1.5) if cellular_toxicity < 0.5 else (38.5 + 0.75 - 2.0 * (cellular_toxicity - 0.5))"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:10499796",
+          "text": "Gale GR et al. Zinc Phosphide Rodenticide Poisoning. Vet Hum Toxicol 1999.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Peterson ME & Talcott PA. Small Animal Toxicology, 3rd ed. Saunders, Ch 45.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "toxicology",
+          "gastrointestinal"
+        ],
+        "organ_systems": [
+          "liver",
+          "kidney",
+          "heart"
+        ],
+        "symptoms": [
+          "vomiting",
+          "dyspnea",
+          "seizure"
+        ]
+      },
+      "equations": {
+        "cellular_toxicity": {
+          "type": "logistic",
+          "formula": "dcellular_toxicity/dt = r·cellular_toxicity·(1 - cellular_toxicity/toxicity_K) + seed_boost",
+          "description": "细胞毒性程度（logistic增长）"
+        },
+        "myocardial_depression": {
+          "type": "algebraic",
+          "formula": "myocardial_depression = ...",
+          "description": "心肌抑制程度（代数关系）"
+        },
+        "metabolic_acidosis": {
+          "type": "first_order_lag",
+          "formula": "dmetabolic_acidosis/dt = (target - metabolic_acidosis) / τ (τ=1200.0s)",
+          "description": "代谢性酸中毒程度（一阶滞后）"
+        },
+        "renal_injury": {
+          "type": "first_order_lag",
+          "formula": "drenal_injury/dt = (target - renal_injury) / τ (τ=1800.0s)",
+          "description": "肾损伤程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "gastric_dilatation_volvulus": {
+    "display_name": "胃扩张扭转（GDV）",
+    "severity_presets": {
+      "mild": {
+        "distension_rate": 0.003,
+        "distension_K": 0.4,
+        "ischemia_rate": 0.002
+      },
+      "moderate": {
+        "distension_rate": 0.006,
+        "distension_K": 0.75,
+        "ischemia_rate": 0.005
+      },
+      "severe": {
+        "distension_rate": 0.012,
+        "distension_K": 0.95,
+        "ischemia_rate": 0.01
+      }
+    },
+    "state_variables": {
+      "gastric_distension": {
+        "initial": 0.1,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "distension_rate",
+          "K_key": "distension_K",
+          "seed_threshold": 0.05,
+          "seed_boost": 0.001
+        }
+      },
+      "gastric_ischemia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 300.0,
+          "target_fn": "min(gastric_distension * 1.2, 1.0)"
+        }
+      },
+      "systemic_shock": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "gastric_ischemia * 0.9"
+        }
+      },
+      "arrhythmia_severity": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 400.0,
+          "target_fn": "gastric_ischemia * 0.7"
+        }
+      },
+      "lactate_accumulation": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          15
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 500.0,
+          "target_fn": "gastric_ischemia * 12.0"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "max(-10.0, min(50.0, systemic_shock * 50.0 + arrhythmia_severity * 20.0))"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "max(0.3, 1.0 - systemic_shock * 0.7)"
+      },
+      {
+        "target": "heart.CVP",
+        "op": "add",
+        "fn": "-gastric_distension * 5.0"
+      },
+      {
+        "target": "blood.pH",
+        "op": "set",
+        "fn": "max(7.0, 7.40 - lactate_accumulation * 0.025)"
+      },
+      {
+        "target": "blood.lactate",
+        "op": "set",
+        "fn": "max(0.5, lactate_accumulation)"
+      },
+      {
+        "target": "blood.temperature",
+        "op": "set",
+        "fn": "38.5 - systemic_shock * 1.5"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:29262317",
+          "text": "Orson HE et al. GDV in Dogs. JAVMA 2017.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 11.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "gastrointestinal",
+          "surgical"
+        ],
+        "organ_systems": [
+          "stomach",
+          "cardiovascular"
+        ],
+        "symptoms": [
+          "abdominal_distension",
+          "non_productive_retching",
+          "weak_pulse",
+          "collapse"
+        ]
+      },
+      "equations": {
+        "gastric_distension": {
+          "type": "logistic",
+          "formula": "dgastric_distension/dt = r·gastric_distension·(1 - gastric_distension/distension_K) + seed_boost",
+          "description": "胃扩张程度（GDV）（logistic增长）"
+        },
+        "gastric_ischemia": {
+          "type": "first_order_lag",
+          "formula": "dgastric_ischemia/dt = (target - gastric_ischemia) / τ (τ=300.0s)",
+          "description": "胃缺血程度（一阶滞后）"
+        },
+        "systemic_shock": {
+          "type": "first_order_lag",
+          "formula": "dsystemic_shock/dt = (target - systemic_shock) / τ (τ=600.0s)",
+          "description": "全身性休克程度（一阶滞后）"
+        },
+        "arrhythmia_severity": {
+          "type": "first_order_lag",
+          "formula": "darrhythmia_severity/dt = (target - arrhythmia_severity) / τ (τ=400.0s)",
+          "description": "心律失常严重程度（一阶滞后）"
+        },
+        "lactate_accumulation": {
+          "type": "first_order_lag",
+          "formula": "dlactate_accumulation/dt = (target - lactate_accumulation) / τ (τ=500.0s)",
+          "description": "乳酸蓄积量（一阶滞后）"
+        }
+      }
+    }
+  },
+  "immune_mediated_hemolytic_anemia": {
+    "display_name": "免疫介导性溶血性贫血（IMHA）",
+    "severity_presets": {
+      "mild": {
+        "destruction_rate": 0.004,
+        "destruction_K": 0.3
+      },
+      "moderate": {
+        "destruction_rate": 0.008,
+        "destruction_K": 0.6
+      },
+      "severe": {
+        "destruction_rate": 0.015,
+        "destruction_K": 0.9
+      }
+    },
+    "state_variables": {
+      "antibody_activity": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "destruction_rate",
+          "K_key": "destruction_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0005
+        }
+      },
+      "rbc_destruction": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "min(antibody_activity * 1.1, 1.0)"
+        }
+      },
+      "bilirubin_load": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 900.0,
+          "target_fn": "rbc_destruction * 0.9"
+        }
+      },
+      "compensatory_tachycardia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 300.0,
+          "target_fn": "rbc_destruction * 0.8"
+        }
+      },
+      "hypoxia_from_anemia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "algebraic",
+        "fn": "max(0.0, min(1.0, (rbc_destruction - 0.2) / 0.6))"
+      }
+    },
+    "outputs": [
+      {
+        "target": "blood.red_cell_volume_ml",
+        "op": "set",
+        "fn": "max(300.0, 2000.0 * (1.0 - rbc_destruction * 0.85))"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "compensatory_tachycardia * 40.0"
+      },
+      {
+        "target": "blood.bilirubin_mg_dL",
+        "op": "set",
+        "fn": "max(0.1, bilirubin_load * 8.0)"
+      },
+      {
+        "target": "lung.diffusion_coefficient",
+        "op": "multiply",
+        "fn": "max(0.5, 1.0 - hypoxia_from_anemia * 0.3)"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:19449167",
+          "text": "Garden OA et al. Immune-mediated haemolytic anaemia in dogs. J Small Anim Pract 2009.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 15.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "hematology",
+          "immune"
+        ],
+        "organ_systems": [
+          "blood",
+          "liver"
+        ],
+        "symptoms": [
+          "pale_mucous_membranes",
+          "jaundice",
+          "weakness"
+        ]
+      },
+      "equations": {
+        "antibody_activity": {
+          "type": "logistic",
+          "formula": "dantibody_activity/dt = r·antibody_activity·(1 - antibody_activity/destruction_K) + seed_boost",
+          "description": "自身抗体活性（logistic增长）"
+        },
+        "rbc_destruction": {
+          "type": "first_order_lag",
+          "formula": "drbc_destruction/dt = (target - rbc_destruction) / τ (τ=600.0s)",
+          "description": "红细胞破坏程度（一阶滞后）"
+        },
+        "bilirubin_load": {
+          "type": "first_order_lag",
+          "formula": "dbilirubin_load/dt = (target - bilirubin_load) / τ (τ=900.0s)",
+          "description": "胆红素负荷（一阶滞后）"
+        },
+        "compensatory_tachycardia": {
+          "type": "first_order_lag",
+          "formula": "dcompensatory_tachycardia/dt = (target - compensatory_tachycardia) / τ (τ=300.0s)",
+          "description": "代偿性心动过速（一阶滞后）"
+        },
+        "hypoxia_from_anemia": {
+          "type": "algebraic",
+          "formula": "hypoxia_from_anemia = ...",
+          "description": "贫血性缺氧（代数关系）"
+        }
+      }
+    }
+  },
+  "urinary_obstruction": {
+    "display_name": "尿道梗阻",
+    "severity_presets": {
+      "mild": {
+        "obstruction_rate": 0.003,
+        "obstruction_K": 0.4
+      },
+      "moderate": {
+        "obstruction_rate": 0.007,
+        "obstruction_K": 0.75
+      },
+      "severe": {
+        "obstruction_rate": 0.012,
+        "obstruction_K": 0.95
+      }
+    },
+    "state_variables": {
+      "urethral_blockage": {
+        "initial": 0.1,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "obstruction_rate",
+          "K_key": "obstruction_K",
+          "seed_threshold": 0.05,
+          "seed_boost": 0.001
+        }
+      },
+      "bladder_distension": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 300.0,
+          "target_fn": "min(urethral_blockage * 1.1, 1.0)"
+        }
+      },
+      "post_renal_azotemia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 900.0,
+          "target_fn": "urethral_blockage * 0.9"
+        }
+      },
+      "hyperkalemia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          4.0
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "urethral_blockage * 3.5"
+        }
+      },
+      "metabolic_acidosis": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 1200.0,
+          "target_fn": "urethral_blockage * 0.7"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "kidney.urine_output",
+        "op": "set",
+        "fn": "max(0.0, 0.02 * (1.0 - urethral_blockage))"
+      },
+      {
+        "target": "kidney._disease_gfr_multiplier",
+        "op": "set",
+        "fn": "max(0.05, 1.0 - post_renal_azotemia)"
+      },
+      {
+        "target": "blood.potassium",
+        "op": "set",
+        "fn": "4.2 + hyperkalemia"
+      },
+      {
+        "target": "blood.pH",
+        "op": "set",
+        "fn": "max(7.0, 7.40 - metabolic_acidosis * 0.35)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "-20.0 * (hyperkalemia / 4.0) if hyperkalemia > 1.5 else (10.0 if post_renal_azotemia > 0.3 else 0.0)"
+      },
+      {
+        "target": "blood.BUN",
+        "op": "set",
+        "fn": "max(7.0, 7.0 + post_renal_azotemia * 60.0)"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:15614978",
+          "text": "Hostutler RA et al. Urethral Obstruction in Cats. J Vet Intern Med 2005.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 13.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "urology",
+          "emergency"
+        ],
+        "organ_systems": [
+          "kidney",
+          "bladder"
+        ],
+        "symptoms": [
+          "stranguria",
+          "dysuria",
+          "vomiting"
+        ]
+      },
+      "equations": {
+        "urethral_blockage": {
+          "type": "logistic",
+          "formula": "durethral_blockage/dt = r·urethral_blockage·(1 - urethral_blockage/obstruction_K) + seed_boost",
+          "description": "尿道梗阻程度（logistic增长）"
+        },
+        "bladder_distension": {
+          "type": "first_order_lag",
+          "formula": "dbladder_distension/dt = (target - bladder_distension) / τ (τ=300.0s)",
+          "description": "膀胱扩张程度（一阶滞后）"
+        },
+        "post_renal_azotemia": {
+          "type": "first_order_lag",
+          "formula": "dpost_renal_azotemia/dt = (target - post_renal_azotemia) / τ (τ=900.0s)",
+          "description": "肾后性氮质血症（一阶滞后）"
+        },
+        "hyperkalemia": {
+          "type": "first_order_lag",
+          "formula": "dhyperkalemia/dt = (target - hyperkalemia) / τ (τ=600.0s)",
+          "description": "高钾血症程度（一阶滞后）"
+        },
+        "metabolic_acidosis": {
+          "type": "first_order_lag",
+          "formula": "dmetabolic_acidosis/dt = (target - metabolic_acidosis) / τ (τ=1200.0s)",
+          "description": "代谢性酸中毒程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "diabetic_ketoacidosis": {
+    "display_name": "糖尿病酮症酸中毒（DKA）",
+    "severity_presets": {
+      "mild": {
+        "hyperglycemia_rate": 0.003,
+        "ketone_rate": 0.004,
+        "dehydration_rate": 0.002
+      },
+      "moderate": {
+        "hyperglycemia_rate": 0.006,
+        "ketone_rate": 0.007,
+        "dehydration_rate": 0.004
+      },
+      "severe": {
+        "hyperglycemia_rate": 0.012,
+        "ketone_rate": 0.012,
+        "dehydration_rate": 0.008
+      }
+    },
+    "state_variables": {
+      "hyperglycemia": {
+        "initial": 0.1,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "hyperglycemia_rate",
+          "K_key": "1.0",
+          "seed_threshold": 0.05,
+          "seed_boost": 0.001
+        }
+      },
+      "ketone_accumulation": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "ketone_rate",
+          "K_key": "0.95",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0005
+        }
+      },
+      "kussmaul_respiration": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 400.0,
+          "target_fn": "min(ketone_accumulation * 0.9, 1.0)"
+        }
+      },
+      "dehydration": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "dehydration_rate",
+          "K_key": "0.9",
+          "seed_threshold": 0.05,
+          "seed_boost": 0.0003
+        }
+      },
+      "anion_gap_acidosis": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 800.0,
+          "target_fn": "ketone_accumulation * 0.85"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "blood.glucose",
+        "op": "set",
+        "fn": "max(5.0, 5.0 + hyperglycemia * 30.0)"
+      },
+      {
+        "target": "blood.pH",
+        "op": "set",
+        "fn": "max(6.95, 7.40 - anion_gap_acidosis * 0.4)"
+      },
+      {
+        "target": "blood.HCO3",
+        "op": "set",
+        "fn": "max(5.0, 24.0 - anion_gap_acidosis * 18.0)"
+      },
+      {
+        "target": "lung.respiratory_rate",
+        "op": "add",
+        "fn": "kussmaul_respiration * 15.0"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "dehydration * 15.0 - kussmaul_respiration * 5.0"
+      },
+      {
+        "target": "blood.ketone_mmol_L",
+        "op": "set",
+        "fn": "max(0.0, ketone_accumulation * 6.0)"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:20416053",
+          "text": "Diabetic Ketoacidosis in Dogs and Cats. J Vet Intern Med 2010.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 14.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "endocrine",
+          "metabolic"
+        ],
+        "organ_systems": [
+          "pancreas",
+          "blood"
+        ],
+        "symptoms": [
+          "polyuria",
+          "polydipsia",
+          "vomiting",
+          "ketotic_breath"
+        ]
+      },
+      "equations": {
+        "hyperglycemia": {
+          "type": "logistic",
+          "formula": "dhyperglycemia/dt = r·hyperglycemia·(1 - hyperglycemia/1.0) + seed_boost",
+          "description": "高血糖程度（logistic增长）"
+        },
+        "ketone_accumulation": {
+          "type": "logistic",
+          "formula": "dketone_accumulation/dt = r·ketone_accumulation·(1 - ketone_accumulation/0.95) + seed_boost",
+          "description": "酮体积聚程度（logistic增长）"
+        },
+        "kussmaul_respiration": {
+          "type": "first_order_lag",
+          "formula": "dkussmaul_respiration/dt = (target - kussmaul_respiration) / τ (τ=400.0s)",
+          "description": "Kussmaul呼吸深度（一阶滞后）"
+        },
+        "dehydration": {
+          "type": "logistic",
+          "formula": "ddehydration/dt = r·dehydration·(1 - dehydration/0.9) + seed_boost",
+          "description": "脱水程度（logistic增长）"
+        },
+        "anion_gap_acidosis": {
+          "type": "first_order_lag",
+          "formula": "danion_gap_acidosis/dt = (target - anion_gap_acidosis) / τ (τ=800.0s)",
+          "description": "阴离子间隙性酸中毒（一阶滞后）"
+        }
+      }
+    }
+  },
+  "pericardial_effusion": {
+    "display_name": "心包积液/心脏填塞",
+    "severity_presets": {
+      "mild": {
+        "effusion_rate": 0.003,
+        "effusion_K": 0.35
+      },
+      "moderate": {
+        "effusion_rate": 0.007,
+        "effusion_K": 0.65
+      },
+      "severe": {
+        "effusion_rate": 0.015,
+        "effusion_K": 0.9
+      }
+    },
+    "state_variables": {
+      "pericardial_volume": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "effusion_rate",
+          "K_key": "effusion_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0005
+        }
+      },
+      "tamponade_severity": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "algebraic",
+        "fn": "max(0.0, min(1.0, (pericardial_volume - 0.2) / 0.5))"
+      },
+      "venous_congestion": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 300.0,
+          "target_fn": "tamponade_severity * 0.9"
+        }
+      },
+      "pulsus_paradoxus": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 400.0,
+          "target_fn": "tamponade_severity * 0.8"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "heart.contractility_factor",
+        "op": "multiply",
+        "fn": "max(0.3, 1.0 - tamponade_severity * 0.6)"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "1.0 + tamponade_severity * 0.8"
+      },
+      {
+        "target": "heart.CVP",
+        "op": "add",
+        "fn": "venous_congestion * 12.0"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "tamponade_severity * 35.0"
+      },
+      {
+        "target": "lung.diffusion_coefficient",
+        "op": "multiply",
+        "fn": "max(0.6, 1.0 - tamponade_severity * 0.25)"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:29262317",
+          "text": "Pericardial Disease in Dogs. J Vet Cardiol 2017.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 11.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "cardiology",
+          "emergency"
+        ],
+        "organ_systems": [
+          "heart",
+          "pericardium"
+        ],
+        "symptoms": [
+          "weak_pulse",
+          "muffled_heart_sounds",
+          "jugular_distension"
+        ]
+      },
+      "equations": {
+        "pericardial_volume": {
+          "type": "logistic",
+          "formula": "dpericardial_volume/dt = r·pericardial_volume·(1 - pericardial_volume/effusion_K) + seed_boost",
+          "description": "心包积液量（相对值）（logistic增长）"
+        },
+        "tamponade_severity": {
+          "type": "algebraic",
+          "formula": "tamponade_severity = ...",
+          "description": "心脏填塞严重程度（代数关系）"
+        },
+        "venous_congestion": {
+          "type": "first_order_lag",
+          "formula": "dvenous_congestion/dt = (target - venous_congestion) / τ (τ=300.0s)",
+          "description": "静脉淤血程度（一阶滞后）"
+        },
+        "pulsus_paradoxus": {
+          "type": "first_order_lag",
+          "formula": "dpulsus_paradoxus/dt = (target - pulsus_paradoxus) / τ (τ=400.0s)",
+          "description": "奇脉程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "disseminated_intravascular_coagulation": {
+    "display_name": "弥散性血管内凝血（DIC）",
+    "severity_presets": {
+      "mild": {
+        "coagulation_rate": 0.004,
+        "coagulation_K": 0.35,
+        "consumption_rate": 0.003
+      },
+      "moderate": {
+        "coagulation_rate": 0.008,
+        "coagulation_K": 0.65,
+        "consumption_rate": 0.006
+      },
+      "severe": {
+        "coagulation_rate": 0.015,
+        "coagulation_K": 0.9,
+        "consumption_rate": 0.012
+      }
+    },
+    "state_variables": {
+      "microthrombus_formation": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "coagulation_rate",
+          "K_key": "coagulation_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0005
+        }
+      },
+      "coagulation_consumption": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 500.0,
+          "target_fn": "min(microthrombus_formation * 1.1, 1.0)"
+        }
+      },
+      "hemorrhage_risk": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "algebraic",
+        "fn": "max(0.0, min(1.0, coagulation_consumption * 0.8 - microthrombus_formation * 0.2))"
+      },
+      "organ_ischemia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 800.0,
+          "target_fn": "microthrombus_formation * 0.7"
+        }
+      },
+      "shock_from_dIC": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "max(hemorrhage_risk, organ_ischemia) * 0.8"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "blood.PLT",
+        "op": "set",
+        "fn": "max(10.0, 300.0 * (1.0 - coagulation_consumption * 0.9))"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "shock_from_dIC * 30.0 + hemorrhage_risk * 15.0"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "max(0.3, 1.0 - shock_from_dIC * 0.6)"
+      },
+      {
+        "target": "kidney._disease_gfr_multiplier",
+        "op": "set",
+        "fn": "max(0.1, 1.0 - organ_ischemia * 0.8)"
+      },
+      {
+        "target": "blood.pH",
+        "op": "set",
+        "fn": "max(7.05, 7.40 - shock_from_dIC * 0.3)"
+      },
+      {
+        "target": "lung.diffusion_coefficient",
+        "op": "multiply",
+        "fn": "max(0.4, 1.0 - organ_ischemia * 0.4)"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:25870526",
+          "text": "DIC in Dogs and Cats. J Vet Emerg Crit Care 2014.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 15.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "hematology",
+          "critical"
+        ],
+        "organ_systems": [
+          "blood",
+          "liver",
+          "kidney"
+        ],
+        "symptoms": [
+          "petechiae",
+          "bleeding",
+          "weakness"
+        ]
+      },
+      "equations": {
+        "microthrombus_formation": {
+          "type": "logistic",
+          "formula": "dmicrothrombus_formation/dt = r·microthrombus_formation·(1 - microthrombus_formation/coagulation_K) + seed_boost",
+          "description": "微血栓形成程度（logistic增长）"
+        },
+        "coagulation_consumption": {
+          "type": "first_order_lag",
+          "formula": "dcoagulation_consumption/dt = (target - coagulation_consumption) / τ (τ=500.0s)",
+          "description": "凝血因子消耗程度（一阶滞后）"
+        },
+        "hemorrhage_risk": {
+          "type": "algebraic",
+          "formula": "hemorrhage_risk = ...",
+          "description": "出血风险（代数关系）"
+        },
+        "organ_ischemia": {
+          "type": "first_order_lag",
+          "formula": "dorgan_ischemia/dt = (target - organ_ischemia) / τ (τ=800.0s)",
+          "description": "器官缺血程度（一阶滞后）"
+        },
+        "shock_from_dIC": {
+          "type": "first_order_lag",
+          "formula": "dshock_from_dIC/dt = (target - shock_from_dIC) / τ (τ=600.0s)",
+          "description": "DIC性休克程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "hyperthyroidism": {
+    "display_name": "甲状腺功能亢进",
+    "severity_presets": {
+      "mild": {
+        "nodule_rate": 0.003,
+        "T3_K": 0.5
+      },
+      "moderate": {
+        "nodule_rate": 0.006,
+        "T3_K": 0.75
+      },
+      "severe": {
+        "nodule_rate": 0.012,
+        "T3_K": 0.95
+      }
+    },
+    "state_variables": {
+      "thyroid_nodule": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "nodule_rate",
+          "K_key": "T3_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0002
+        }
+      },
+      "T3_excess": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          2.0
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "min(thyroid_nodule * 2.5, 2.0)"
+        }
+      },
+      "tachycardia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 300.0,
+          "target_fn": "min(T3_excess * 0.6, 1.0)"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "endocrine.T3_ng_dL",
+        "op": "set",
+        "fn": "100.0 + T3_excess * 200.0"
+      },
+      {
+        "target": "endocrine.T3_factor",
+        "op": "set",
+        "fn": "1.0 + T3_excess * 0.9"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "tachycardia * 55.0"
+      },
+      {
+        "target": "blood.temperature",
+        "op": "add",
+        "fn": "T3_excess * 1.0"
+      },
+      {
+        "target": "gut.motility",
+        "op": "multiply",
+        "fn": "1.0 + T3_excess * 0.4"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:15614978",
+          "text": "Peterson ME. Hyperthyroidism in Cats. J Vet Intern Med 2005.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 14.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "endocrine"
+        ],
+        "organ_systems": [
+          "thyroid",
+          "heart"
+        ],
+        "symptoms": [
+          "weight_loss",
+          "polyphagia",
+          "tachycardia",
+          "polyuria"
+        ]
+      },
+      "equations": {
+        "thyroid_nodule": {
+          "type": "logistic",
+          "formula": "dthyroid_nodule/dt = r·thyroid_nodule·(1 - thyroid_nodule/T3_K) + seed_boost",
+          "description": "甲状腺结节活性（logistic增长）"
+        },
+        "T3_excess": {
+          "type": "first_order_lag",
+          "formula": "dT3_excess/dt = (target - T3_excess) / τ (τ=600.0s)",
+          "description": "T3过量程度（一阶滞后）"
+        },
+        "tachycardia": {
+          "type": "first_order_lag",
+          "formula": "dtachycardia/dt = (target - tachycardia) / τ (τ=300.0s)",
+          "description": "心动过速程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "hypoadrenocorticism": {
+    "display_name": "肾上腺皮质功能减退（艾迪森氏病）",
+    "severity_presets": {
+      "mild": {
+        "atrophy_rate": 0.003,
+        "atrophy_K": 0.3
+      },
+      "moderate": {
+        "atrophy_rate": 0.007,
+        "atrophy_K": 0.6
+      },
+      "severe": {
+        "atrophy_rate": 0.015,
+        "atrophy_K": 0.9
+      }
+    },
+    "state_variables": {
+      "adrenal_atrophy": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "atrophy_rate",
+          "K_key": "atrophy_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0005
+        }
+      },
+      "cortisol_deficiency": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "algebraic",
+        "fn": "min(adrenal_atrophy ** 1.2, 1.0)"
+      },
+      "hyperkalemia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          4.5
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "min(cortisol_deficiency * 4.0, 4.5)"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "endocrine.cortisol_ug_dL",
+        "op": "set",
+        "fn": "max(0.5, 5.0 * (1.0 - cortisol_deficiency))"
+      },
+      {
+        "target": "endocrine.cortisol_factor",
+        "op": "set",
+        "fn": "max(0.02, 1.0 - cortisol_deficiency)"
+      },
+      {
+        "target": "gut.barrier_integrity",
+        "op": "set",
+        "fn": "max(0.2, 0.8 - cortisol_deficiency * 0.6)"
+      },
+      {
+        "target": "blood.potassium",
+        "op": "add",
+        "fn": "hyperkalemia"
+      },
+      {
+        "target": "blood.sodium_mEq_L",
+        "op": "add",
+        "fn": "-cortisol_deficiency * 12.0"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "-15.0 * cortisol_deficiency"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:20416053",
+          "text": "Adrenal Insufficiency in Dogs. J Vet Intern Med 2010.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 14.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "endocrine",
+          "adrenal"
+        ],
+        "organ_systems": [
+          "adrenal",
+          "kidney",
+          "heart"
+        ],
+        "symptoms": [
+          "lethargy",
+          "vomiting",
+          "weakness"
+        ]
+      },
+      "equations": {
+        "adrenal_atrophy": {
+          "type": "logistic",
+          "formula": "dadrenal_atrophy/dt = r·adrenal_atrophy·(1 - adrenal_atrophy/atrophy_K) + seed_boost",
+          "description": "肾上腺萎缩程度（logistic增长）"
+        },
+        "cortisol_deficiency": {
+          "type": "algebraic",
+          "formula": "cortisol_deficiency = ...",
+          "description": "皮质醇缺乏程度（代数关系）"
+        },
+        "hyperkalemia": {
+          "type": "first_order_lag",
+          "formula": "dhyperkalemia/dt = (target - hyperkalemia) / τ (τ=600.0s)",
+          "description": "高钾血症程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "sepsis": {
+    "display_name": "脓毒症（细菌感染）",
+    "severity_presets": {
+      "moderate": {
+        "bacteremia_rate": 0.003,
+        "bacteremia_K": 0.7,
+        "toxin_factor": 0.5
+      },
+      "severe": {
+        "bacteremia_rate": 0.007,
+        "bacteremia_K": 0.9,
+        "toxin_factor": 1.0
+      }
+    },
+    "state_variables": {
+      "bacteremia": {
+        "initial": 0.01,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "bacteremia_rate",
+          "K_key": "bacteremia_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.001
+        }
+      },
+      "cytokine_storm": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "min(bacteremia * toxin_factor * 1.5, 1.0)"
+        }
+      },
+      "capillary_leak": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 900.0,
+          "target_fn": "cytokine_storm * 0.8"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "immune.cytokine_level",
+        "op": "set",
+        "fn": "cytokine_storm"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "max(0.2, 1.0 - cytokine_storm * 0.8)"
+      },
+      {
+        "target": "blood.temperature",
+        "op": "set",
+        "fn": "38.5 + cytokine_storm * 3.0"
+      },
+      {
+        "target": "blood.sodium_mEq_L",
+        "op": "add",
+        "fn": "capillary_leak * 8.0"
+      },
+      {
+        "target": "immune.wbc_count",
+        "op": "set",
+        "fn": "10.0 + cytokine_storm * 25.0"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:29262317",
+          "text": "Sepsis and Septic Shock in Small Animals. J Vet Emerg Crit Care 2017.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 12.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "infectious",
+          "critical"
+        ],
+        "organ_systems": [
+          "systemic",
+          "cardiovascular"
+        ],
+        "symptoms": [
+          "fever",
+          "tachycardia",
+          "hypotension"
+        ]
+      },
+      "equations": {
+        "bacteremia": {
+          "type": "logistic",
+          "formula": "dbacteremia/dt = r·bacteremia·(1 - bacteremia/bacteremia_K) + seed_boost",
+          "description": "菌血症程度（logistic增长）"
+        },
+        "cytokine_storm": {
+          "type": "first_order_lag",
+          "formula": "dcytokine_storm/dt = (target - cytokine_storm) / τ (τ=600.0s)",
+          "description": "细胞因子风暴程度（一阶滞后）"
+        },
+        "capillary_leak": {
+          "type": "first_order_lag",
+          "formula": "dcapillary_leak/dt = (target - capillary_leak) / τ (τ=900.0s)",
+          "description": "毛细血管渗漏程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "ivdd": {
+    "display_name": "椎间盘疾病（疼痛）",
+    "severity_presets": {
+      "mild": {
+        "disc_herniation_rate": 0.002,
+        "disc_herniation_K": 0.4
+      },
+      "moderate": {
+        "disc_herniation_rate": 0.004,
+        "disc_herniation_K": 0.75
+      },
+      "severe": {
+        "disc_herniation_rate": 0.007,
+        "disc_herniation_K": 0.9
+      }
+    },
+    "state_variables": {
+      "disc_herniation": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "disc_herniation_rate",
+          "K_key": "disc_herniation_K",
+          "seed_threshold": 0.05,
+          "seed_boost": 0.001
+        }
+      },
+      "pain_level": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          10
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 180.0,
+          "target_fn": "disc_herniation * 10.0"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "neuro.pain_level",
+        "op": "set",
+        "fn": "pain_level"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "pain_level * 2.5"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:25870526",
+          "text": "Intervertebral Disc Disease in Dogs. Vet Surg 2014.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 16.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "neurology",
+          "orthopedic"
+        ],
+        "organ_systems": [
+          "spine",
+          "nervous"
+        ],
+        "symptoms": [
+          "spinal_pain",
+          "paresis",
+          "ataxia"
+        ]
+      },
+      "equations": {
+        "disc_herniation": {
+          "type": "logistic",
+          "formula": "ddisc_herniation/dt = r·disc_herniation·(1 - disc_herniation/disc_herniation_K) + seed_boost",
+          "description": "椎间盘突出程度（logistic增长）"
+        },
+        "pain_level": {
+          "type": "first_order_lag",
+          "formula": "dpain_level/dt = (target - pain_level) / τ (τ=180.0s)",
+          "description": "疼痛程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "meningitis": {
+    "display_name": "脑膜炎/脑炎",
+    "severity_presets": {
+      "moderate": {
+        "inflammation_rate": 0.004,
+        "inflammation_K": 0.7
+      },
+      "severe": {
+        "inflammation_rate": 0.008,
+        "inflammation_K": 0.9
+      }
+    },
+    "state_variables": {
+      "cns_inflammation": {
+        "initial": 0.01,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "inflammation_rate",
+          "K_key": "inflammation_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0005
+        }
+      },
+      "consciousness_loss": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "min(cns_inflammation * 1.2, 1.0)"
+        }
+      },
+      "seizure_activity": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 300.0,
+          "target_fn": "cns_inflammation * 0.8"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "neuro.consciousness",
+        "op": "set",
+        "fn": "max(0.1, 1.0 - consciousness_loss)"
+      },
+      {
+        "target": "neuro.seizure",
+        "op": "set",
+        "fn": "seizure_activity"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "seizure_activity * 30.0 - consciousness_loss * 15.0"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:20416053",
+          "text": "Meningitis and Meningoencephalitis in Dogs and Cats. J Vet Intern Med 2010.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 16.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "neurology",
+          "infectious"
+        ],
+        "organ_systems": [
+          "brain",
+          "meninges"
+        ],
+        "symptoms": [
+          "neck_pain",
+          "fever",
+          "seizure",
+          "consciousness"
+        ]
+      },
+      "equations": {
+        "cns_inflammation": {
+          "type": "logistic",
+          "formula": "dcns_inflammation/dt = r·cns_inflammation·(1 - cns_inflammation/inflammation_K) + seed_boost",
+          "description": "中枢神经系统炎症（logistic增长）"
+        },
+        "consciousness_loss": {
+          "type": "first_order_lag",
+          "formula": "dconsciousness_loss/dt = (target - consciousness_loss) / τ (τ=600.0s)",
+          "description": "意识丧失程度（一阶滞后）"
+        },
+        "seizure_activity": {
+          "type": "first_order_lag",
+          "formula": "dseizure_activity/dt = (target - seizure_activity) / τ (τ=300.0s)",
+          "description": "癫痫活动程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "hepatic_failure_coagulopathy": {
+    "display_name": "肝功能衰竭伴凝血障碍",
+    "severity_presets": {
+      "mild": {
+        "necrosis_rate": 0.003,
+        "necrosis_K": 0.4
+      },
+      "moderate": {
+        "necrosis_rate": 0.006,
+        "necrosis_K": 0.7
+      },
+      "severe": {
+        "necrosis_rate": 0.012,
+        "necrosis_K": 0.95
+      }
+    },
+    "state_variables": {
+      "hepatic_necrosis": {
+        "initial": 0.05,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "necrosis_rate",
+          "K_key": "necrosis_K",
+          "seed_threshold": 0.01,
+          "seed_boost": 0.0005
+        }
+      },
+      "factor_VII_decline": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "hepatic_necrosis * 0.95"
+        }
+      },
+      "encephalopathy": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 900.0,
+          "target_fn": "hepatic_necrosis * 0.7"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "coag.factor_VII",
+        "op": "set",
+        "fn": "max(0.05, 1.0 - factor_VII_decline)"
+      },
+      {
+        "target": "coag.PT_sec",
+        "op": "set",
+        "fn": "min(45.0, 12.0 + factor_VII_decline * 30.0)"
+      },
+      {
+        "target": "coag.aPTT_sec",
+        "op": "set",
+        "fn": "min(80.0, 30.0 + factor_VII_decline * 45.0)"
+      },
+      {
+        "target": "coag.fibrinogen_mg_dL",
+        "op": "set",
+        "fn": "max(80.0, 300.0 - hepatic_necrosis * 200.0)"
+      },
+      {
+        "target": "blood.albumin",
+        "op": "set",
+        "fn": "max(1.0, 3.0 - hepatic_necrosis * 1.8)"
+      },
+      {
+        "target": "blood.ammonia",
+        "op": "set",
+        "fn": "min(200.0, 30.0 + encephalopathy * 170.0)"
+      },
+      {
+        "target": "blood.ALT",
+        "op": "set",
+        "fn": "min(2000.0, 25.0 + hepatic_necrosis * 1975.0)"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:25870526",
+          "text": "Canine Liver Disease and Coagulopathy. J Vet Intern Med 2014.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 10.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "hepatology",
+          "hematology"
+        ],
+        "organ_systems": [
+          "liver",
+          "coagulation"
+        ],
+        "symptoms": [
+          "icterus",
+          "bleeding",
+          "encephalopathy"
+        ]
+      },
+      "equations": {
+        "hepatic_necrosis": {
+          "type": "logistic",
+          "formula": "dhepatic_necrosis/dt = r·hepatic_necrosis·(1 - hepatic_necrosis/necrosis_K) + seed_boost",
+          "description": "肝坏死程度（logistic增长）"
+        },
+        "factor_VII_decline": {
+          "type": "first_order_lag",
+          "formula": "dfactor_VII_decline/dt = (target - factor_VII_decline) / τ (τ=600.0s)",
+          "description": "凝血因子VII下降（一阶滞后）"
+        },
+        "encephalopathy": {
+          "type": "first_order_lag",
+          "formula": "dencephalopathy/dt = (target - encephalopathy) / τ (τ=900.0s)",
+          "description": "肝性脑病程度（一阶滞后）"
+        }
+      }
+    }
+  },
+  "splenic_rupture": {
+    "display_name": "脾脏破裂/急性失血",
+    "severity_presets": {
+      "mild": {
+        "rupture_rate": 0.01,
+        "rupture_K": 0.3
+      },
+      "moderate": {
+        "rupture_rate": 0.02,
+        "rupture_K": 0.6
+      },
+      "severe": {
+        "rupture_rate": 0.04,
+        "rupture_K": 0.9
+      }
+    },
+    "state_variables": {
+      "splenic_hemorrhage": {
+        "initial": 0.1,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "rupture_rate",
+          "K_key": "rupture_K",
+          "seed_threshold": 0.05,
+          "seed_boost": 0.002
+        }
+      },
+      "hypovolemic_shock": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 180.0,
+          "target_fn": "splenic_hemorrhage * 0.9"
+        }
+      },
+      "compensatory_tachycardia": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 120.0,
+          "target_fn": "hypovolemic_shock * 0.8"
+        }
+      }
+    },
+    "outputs": [
+      {
+        "target": "heart.blood_volume",
+        "op": "multiply",
+        "fn": "max(0.4, 1.0 - splenic_hemorrhage * 0.55)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "compensatory_tachycardia * 50.0"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "min(1.5, 1.0 + hypovolemic_shock * 0.5)"
+      },
+      {
+        "target": "heart.CVP",
+        "op": "set",
+        "fn": "max(-5.0, 5.0 - hypovolemic_shock * 10.0)"
+      },
+      {
+        "target": "blood.lactate",
+        "op": "set",
+        "fn": "min(10.0, 1.0 + hypovolemic_shock * 9.0)"
+      },
+      {
+        "target": "blood.splenic_reserve_mL",
+        "op": "set",
+        "fn": "max(0.0, 75.0 - splenic_hemorrhage * 75.0)"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:29262317",
+          "text": "Splenic Masses and Hemorrhage in Dogs. JAVMA 2017.",
+          "url": ""
+        },
+        {
+          "id": "Textbook",
+          "text": "Nelson RW & Couto CG. Small Animal Internal Medicine, 6th ed. Mosby, Ch 11.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": [
+          "surgery",
+          "emergency",
+          "hematology"
+        ],
+        "organ_systems": [
+          "spleen",
+          "cardiovascular"
+        ],
+        "symptoms": [
+          "abdominal_pain",
+          "pale_mucous_membranes",
+          "weak_rapid_pulse",
+          "collapse"
+        ]
+      },
+      "equations": {
+        "splenic_hemorrhage": {
+          "type": "logistic",
+          "formula": "dsplenic_hemorrhage/dt = r·splenic_hemorrhage·(1 - splenic_hemorrhage/rupture_K) + seed_boost",
+          "description": "脾破裂出血程度（logistic增长）"
+        },
+        "hypovolemic_shock": {
+          "type": "first_order_lag",
+          "formula": "dhypovolemic_shock/dt = (target - hypovolemic_shock) / τ (τ=180.0s)",
+          "description": "低血容量性休克（一阶滞后）"
+        },
+        "compensatory_tachycardia": {
+          "type": "first_order_lag",
+          "formula": "dcompensatory_tachycardia/dt = (target - compensatory_tachycardia) / τ (τ=120.0s)",
+          "description": "代偿性心动过速（一阶滞后）"
+        }
+      }
+    }
+  }
+}

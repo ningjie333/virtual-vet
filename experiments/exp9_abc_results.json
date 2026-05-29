@@ -1,9 +1,10 @@
 {
-  "description": "3-group isolation: A=FC dt-scaling, B=chemo redundant path removal",
+  "description": "4-group isolation: A=FC dt-scaling, B=path consolidation, C=gain 10\u219215",
   "conditions": {
     "X": "buggy: FC no dt-scale, chemo in net_HR_add, no continuous chemo",
     "Y": "A-only: FC dt-scale, chemo in net_HR_add, no continuous chemo",
-    "Z": "A+B:   FC dt-scale, chemo excluded, has continuous chemo"
+    "W": "A+path: FC dt-scale, chemo excluded, has continuous chemo (gain=10)",
+    "Z": "A+B:   FC dt-scale, chemo excluded, has continuous chemo (gain=15)"
   },
   "dt_sweep": [
     0.1,
@@ -26,33 +27,41 @@
       "dc": 25,
       "X_range": 0.09799999999999898,
       "Y_range": 0.09799999999999898,
+      "W_range": 0.26500000000000057,
       "Z_range": 0.3469999999999942,
       "A_contrib": 0.0,
-      "B_contrib": -0.24899999999999523
+      "B_contrib": -0.1670000000000016,
+      "C_contrib": -0.08199999999999363
     },
     {
       "dc": 15,
       "X_range": 2.5160000000000053,
       "Y_range": 2.5160000000000053,
+      "W_range": 2.7020000000000124,
       "Z_range": 2.7950000000000017,
       "A_contrib": 0.0,
-      "B_contrib": -0.27899999999999636
+      "B_contrib": -0.18600000000000705,
+      "C_contrib": -0.09299999999998931
     },
     {
       "dc": 10,
       "X_range": 31.98599999999999,
       "Y_range": 0.4060000000000059,
+      "W_range": 0.3719999999999999,
       "Z_range": 0.5079999999999956,
       "A_contrib": 31.579999999999984,
-      "B_contrib": -0.10199999999998965
+      "B_contrib": 0.034000000000006025,
+      "C_contrib": -0.13599999999999568
     },
     {
       "dc": 5,
       "X_range": 20.84400000000001,
       "Y_range": 2.2020000000000124,
+      "W_range": 2.203000000000003,
       "Z_range": 2.2109999999999985,
       "A_contrib": 18.641999999999996,
-      "B_contrib": -0.00899999999998613
+      "B_contrib": -0.000999999999990564,
+      "C_contrib": -0.007999999999995566
     }
   ],
   "raw": {
@@ -614,6 +623,288 @@
         "dc": 5.0,
         "dt": 0.001,
         "MAP": 103.888,
+        "HR": 93.3,
+        "PaO2": 74.33,
+        "PaCO2": 32.67,
+        "chemo_drive": 0.040332
+      }
+    },
+    "W": {
+      "25_0.1": {
+        "condition": "W",
+        "dc": 25.0,
+        "dt": 0.1,
+        "MAP": 101.292,
+        "HR": 87.79,
+        "PaO2": 95.85,
+        "PaCO2": 34.47,
+        "chemo_drive": 0.003291
+      },
+      "25_0.05": {
+        "condition": "W",
+        "dc": 25.0,
+        "dt": 0.05,
+        "MAP": 101.102,
+        "HR": 87.37,
+        "PaO2": 94.55,
+        "PaCO2": 35.51,
+        "chemo_drive": 0.001833
+      },
+      "25_0.02": {
+        "condition": "W",
+        "dc": 25.0,
+        "dt": 0.02,
+        "MAP": 101.054,
+        "HR": 87.27,
+        "PaO2": 93.42,
+        "PaCO2": 36.41,
+        "chemo_drive": 0.0015
+      },
+      "25_0.01": {
+        "condition": "W",
+        "dc": 25.0,
+        "dt": 0.01,
+        "MAP": 101.04,
+        "HR": 87.24,
+        "PaO2": 93.16,
+        "PaCO2": 36.61,
+        "chemo_drive": 0.001405
+      },
+      "25_0.005": {
+        "condition": "W",
+        "dc": 25.0,
+        "dt": 0.005,
+        "MAP": 101.033,
+        "HR": 87.23,
+        "PaO2": 93.01,
+        "PaCO2": 36.73,
+        "chemo_drive": 0.001356
+      },
+      "25_0.002": {
+        "condition": "W",
+        "dc": 25.0,
+        "dt": 0.002,
+        "MAP": 101.029,
+        "HR": 87.22,
+        "PaO2": 92.94,
+        "PaCO2": 36.79,
+        "chemo_drive": 0.001329
+      },
+      "25_0.001": {
+        "condition": "W",
+        "dc": 25.0,
+        "dt": 0.001,
+        "MAP": 101.027,
+        "HR": 87.22,
+        "PaO2": 92.91,
+        "PaCO2": 36.81,
+        "chemo_drive": 0.00132
+      },
+      "15_0.1": {
+        "condition": "W",
+        "dc": 15.0,
+        "dt": 0.1,
+        "MAP": 101.156,
+        "HR": 87.5,
+        "PaO2": 84.51,
+        "PaCO2": 34.03,
+        "chemo_drive": 0.002581
+      },
+      "15_0.05": {
+        "condition": "W",
+        "dc": 15.0,
+        "dt": 0.05,
+        "MAP": 101.007,
+        "HR": 87.17,
+        "PaO2": 89.75,
+        "PaCO2": 29.84,
+        "chemo_drive": 0.001229
+      },
+      "15_0.02": {
+        "condition": "W",
+        "dc": 15.0,
+        "dt": 0.02,
+        "MAP": 99.133,
+        "HR": 86.91,
+        "PaO2": 72.57,
+        "PaCO2": 43.59,
+        "chemo_drive": 0.00061
+      },
+      "15_0.01": {
+        "condition": "W",
+        "dc": 15.0,
+        "dt": 0.01,
+        "MAP": 98.722,
+        "HR": 86.9,
+        "PaO2": 71.85,
+        "PaCO2": 44.16,
+        "chemo_drive": 0.000541
+      },
+      "15_0.005": {
+        "condition": "W",
+        "dc": 15.0,
+        "dt": 0.005,
+        "MAP": 98.573,
+        "HR": 86.9,
+        "PaO2": 71.61,
+        "PaCO2": 44.35,
+        "chemo_drive": 0.00051
+      },
+      "15_0.002": {
+        "condition": "W",
+        "dc": 15.0,
+        "dt": 0.002,
+        "MAP": 98.483,
+        "HR": 86.89,
+        "PaO2": 71.45,
+        "PaCO2": 44.48,
+        "chemo_drive": 0.000491
+      },
+      "15_0.001": {
+        "condition": "W",
+        "dc": 15.0,
+        "dt": 0.001,
+        "MAP": 98.454,
+        "HR": 86.89,
+        "PaO2": 71.4,
+        "PaCO2": 44.52,
+        "chemo_drive": 0.000485
+      },
+      "10_0.1": {
+        "condition": "W",
+        "dc": 10.0,
+        "dt": 0.1,
+        "MAP": 102.102,
+        "HR": 89.49,
+        "PaO2": 75.05,
+        "PaCO2": 36.85,
+        "chemo_drive": 0.015349
+      },
+      "10_0.05": {
+        "condition": "W",
+        "dc": 10.0,
+        "dt": 0.05,
+        "MAP": 101.889,
+        "HR": 89.05,
+        "PaO2": 75.08,
+        "PaCO2": 36.82,
+        "chemo_drive": 0.013491
+      },
+      "10_0.02": {
+        "condition": "W",
+        "dc": 10.0,
+        "dt": 0.02,
+        "MAP": 101.759,
+        "HR": 88.77,
+        "PaO2": 83.25,
+        "PaCO2": 30.29,
+        "chemo_drive": 0.012544
+      },
+      "10_0.01": {
+        "condition": "W",
+        "dc": 10.0,
+        "dt": 0.01,
+        "MAP": 101.743,
+        "HR": 88.74,
+        "PaO2": 82.33,
+        "PaCO2": 31.03,
+        "chemo_drive": 0.012416
+      },
+      "10_0.005": {
+        "condition": "W",
+        "dc": 10.0,
+        "dt": 0.005,
+        "MAP": 101.736,
+        "HR": 88.72,
+        "PaO2": 81.74,
+        "PaCO2": 31.5,
+        "chemo_drive": 0.012357
+      },
+      "10_0.002": {
+        "condition": "W",
+        "dc": 10.0,
+        "dt": 0.002,
+        "MAP": 101.732,
+        "HR": 88.71,
+        "PaO2": 81.39,
+        "PaCO2": 31.78,
+        "chemo_drive": 0.012323
+      },
+      "10_0.001": {
+        "condition": "W",
+        "dc": 10.0,
+        "dt": 0.001,
+        "MAP": 101.73,
+        "HR": 88.71,
+        "PaO2": 81.26,
+        "PaCO2": 31.88,
+        "chemo_drive": 0.012311
+      },
+      "5_0.1": {
+        "condition": "W",
+        "dc": 5.0,
+        "dt": 0.1,
+        "MAP": 102.119,
+        "HR": 94.36,
+        "PaO2": 66.39,
+        "PaCO2": 39.02,
+        "chemo_drive": 0.044763
+      },
+      "5_0.05": {
+        "condition": "W",
+        "dc": 5.0,
+        "dt": 0.05,
+        "MAP": 101.699,
+        "HR": 93.87,
+        "PaO2": 61.61,
+        "PaCO2": 42.84,
+        "chemo_drive": 0.042678
+      },
+      "5_0.02": {
+        "condition": "W",
+        "dc": 5.0,
+        "dt": 0.02,
+        "MAP": 103.101,
+        "HR": 93.4,
+        "PaO2": 64.85,
+        "PaCO2": 40.26,
+        "chemo_drive": 0.040862
+      },
+      "5_0.01": {
+        "condition": "W",
+        "dc": 5.0,
+        "dt": 0.01,
+        "MAP": 103.902,
+        "HR": 93.33,
+        "PaO2": 72.5,
+        "PaCO2": 34.14,
+        "chemo_drive": 0.040449
+      },
+      "5_0.005": {
+        "condition": "W",
+        "dc": 5.0,
+        "dt": 0.005,
+        "MAP": 103.896,
+        "HR": 93.31,
+        "PaO2": 73.73,
+        "PaCO2": 33.15,
+        "chemo_drive": 0.040378
+      },
+      "5_0.002": {
+        "condition": "W",
+        "dc": 5.0,
+        "dt": 0.002,
+        "MAP": 103.892,
+        "HR": 93.31,
+        "PaO2": 74.18,
+        "PaCO2": 32.79,
+        "chemo_drive": 0.040343
+      },
+      "5_0.001": {
+        "condition": "W",
+        "dc": 5.0,
+        "dt": 0.001,
+        "MAP": 103.891,
         "HR": 93.3,
         "PaO2": 74.33,
         "PaCO2": 32.67,

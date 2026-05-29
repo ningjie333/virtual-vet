@@ -196,8 +196,6 @@ The 7-line fix comprises three independent corrections:
 - **B**: remove chemo_HR_add from net_HR_add and add continuous chemo path in heart.py
 - **C**: apply exponential rate conversion to SVR-multiply FC (SVR_new = SVR × net_SVR_mult^dt) to correct the analogous multiplicative dt-dependency in the SVR channel
 
-Figure 3 shows the complete code diff for all three changes.
-
 To determine their independent contributions, we conducted a four-condition isolation experiment using subprocess-isolated runs. Because the path consolidation (B) also changed the chemo gain constant (10 bpm/s on the FC path vs 15 bpm/s on the continuous path), a fourth condition W disambiguates the confound:
 
 - **X (baseline buggy)**: FC as bpm/step, chemo in net_HR_add, no continuous path
@@ -398,21 +396,14 @@ This research did not receive any specific grant from funding agencies in the pu
 
 ## Figures
 
-**Figure 1**: Spurious steady state schematic — mechanism flow from true fixed point through drift to spurious steady state via HR saturation ceiling
+**Figure 1**: Spurious steady state mechanism — circular flow showing how a threshold-gated FactorCommand emitting a per-step constant K (without dt scaling) creates a spurious fixed point that is stable under dt refinement
 ![Figure 1](fig1_pseudo_convergence_schematic.png)
 
 **Figure 2**: MAP bias vs dt (log-log) — pre-fix, three regimes: unsaturated drift (bias ∝ 1/dt), saturation plateau (MAP = 144.7 mmHg), and the dimensional analysis confirming bias × dt ≈ const
 ![Figure 2](fig2_map_bias_vs_dt.png)
 
-**Figure 3**: Code diff — the 7-line fix: FC dt-scaling (A), chemo path consolidation (B), and SVR exponential rate conversion (C)
-![Figure 3](fig3_code_diff.png)
-
 ---
-*Table 3 and Table 4 provide the quantitative comparison data for the isolation experiment and toy model, respectively, replacing the bar chart and side-by-side plot previously shown as Figures 4 and 5.*
-
----
-
 ## Data and Code Availability
 
-The Virtual Vet simulation engine, experiment scripts (exp6–exp9), and experimental data (JSON files) are available at <https://github.com/ningjie333/virtual-vet>. All experiments can be reproduced by running the Python scripts in the `experiments/` directory with Python 3.13+ and the dependencies listed in `pyproject.toml`. The static lint tool `check_fc_dimensions.py` is included in the repository under `tools/`.
+The Virtual Vet simulation engine, experiment scripts (exp6–exp9), and experimental data (JSON files) are available at <https://github.com/ningjie333/virtual-vet-paper>. All experiments can be reproduced by running the Python scripts in the `experiments/` directory with Python 3.13+ and the dependencies listed in `pyproject.toml`. The static lint tool `check_fc_dimensions.py` is included in the repository under `tools/`.
 

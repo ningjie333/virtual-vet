@@ -70,6 +70,15 @@ def patch_Y(name, src):
         )
     return src
 
+def patch_W(name, src):
+    """Condition W (Z+gain=10): continuous chemo with gain=10 instead of 15."""
+    if name == "heart":
+        src = src.replace(
+            "chemo_HR = chemoreceptor_drive * 15.0",
+            "chemo_HR = chemoreceptor_drive * 10.0"
+        )
+    return src
+
 # Condition Z: no patch (current code)
 def no_patch(name, src):
     return src
@@ -77,12 +86,12 @@ def no_patch(name, src):
 if __name__ == "__main__":
     import json, argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("condition", choices=["X","Y","Z"])
+    parser.add_argument("condition", choices=["X","Y","Z","W"])
     parser.add_argument("dc", type=float)
     parser.add_argument("dt", type=float)
     args = parser.parse_args()
 
-    patch_map = {"X": patch_X, "Y": patch_Y, "Z": no_patch}
+    patch_map = {"X": patch_X, "Y": patch_Y, "Z": no_patch, "W": patch_W}
     _load_all_modules(patch_map[args.condition])
 
     from simulation import VirtualCreature

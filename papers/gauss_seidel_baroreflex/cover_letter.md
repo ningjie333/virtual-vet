@@ -1,6 +1,6 @@
 Dear Editor-in-Chief,
 
-We are submitting our manuscript entitled "Spurious Steady State from a dt-Dimensional Mismatch in FactorCommand Events: A Canine Cardiovascular Case Study" for consideration as a Technical Note in SIMULATION: Transactions of the Society for Modeling and Simulation International.
+We are submitting our manuscript entitled "Spurious Steady State from dt-Dimensional Ambiguity in Modular ODE Coupling: A Failure Mode, Detection Protocol, and Cardiovascular Demonstration" for consideration as a Technical Note in SIMULATION: Transactions of the Society for Modeling and Simulation International.
 
 **Contribution.** This paper documents a previously unreported verification failure mode: a threshold-gated discrete inter-module event was implemented with a per-step increment (bpm/step) instead of a time-normalized rate (bpm/s), producing a steady-state MAP bias of +44.7 mmHg that passed all standard verification diagnostics — dt refinement, steady-state detection, parameter sweeps, and ordering swap tests. We term this a "spurious steady state" — a stable fixed point of the discrete system that does not correspond to any fixed point of the continuous-limit system. The correction required 7 lines of code; the detection required a non-obvious dimensional analysis that no automated tool flagged.
 
@@ -11,7 +11,7 @@ We are submitting our manuscript entitled "Spurious Steady State from a dt-Dimen
 3. It proposes a three-condition isolation experiment design using subprocess isolation to disentangle multiple simultaneous code corrections — a verification methodology applicable to any multi-fix debugging scenario.
 4. It releases a static lint tool (`check_fc_dimensions.py`) that automatically detects dimensional inconsistencies in discrete event emissions, providing a reusable V&V artifact for the simulation community.
 
-**Scope and format.** The manuscript (~4,500 words, 4 figures, 4 tables) is structured as a Technical Note documenting the complete journey from discovery through diagnosis to correction. All results are reproducible from open-source code and data at <https://github.com/ningjie333/virtual-vet>.
+**Scope and format.** The manuscript (~5,000 words of body text, 2 figures, 4 tables) is structured as a Technical Note documenting the complete journey from discovery through diagnosis to correction. All results are reproducible from open-source code and data at <https://github.com/ningjie333/virtual-vet-paper>.
 
 **Suggested classification.** We suggest the paper be classified under *Theory and Methodology — Verification, Validation and Accreditation* (primary) and *Applications in Science and Engineering — Biomedical and Medicine* (secondary).
 
@@ -21,6 +21,6 @@ We believe this paper will be of interest to the SIMULATION readership as a case
 
 Sincerely,
 
-Ning Jie
+Yibo Wang
 College of Animal Sciences, Zhejiang University
-<ningjie@zju.edu.cn>
+<3230100266@zju.edu.cn>

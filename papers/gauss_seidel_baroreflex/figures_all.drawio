@@ -1,0 +1,761 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36" version="24.2.5">
+  <diagram name="Figure 1 — Spurious Steady State Schematic" id="page-fig1">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="950" pageHeight="550" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ════ Figure title ════ -->
+        <mxCell id="f1-2" value="Figure 1: Spurious Steady State — Drift and Saturation Mechanism" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="0" y="10" width="950" height="30" />
+        </mxCell>
+
+        <!-- ════ Panel labels ════ -->
+        <mxCell id="f1-3" value="A" style="text;html=1;align=left;verticalAlign=top;fontSize=13;fontStyle=1;fontFamily=Helvetica;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="30" y="55" width="30" height="20" />
+        </mxCell>
+        <mxCell id="f1-4" value="B" style="text;html=1;align=left;verticalAlign=top;fontSize=13;fontStyle=1;fontFamily=Helvetica;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="30" y="220" width="30" height="20" />
+        </mxCell>
+        <mxCell id="f1-5" value="C" style="text;html=1;align=left;verticalAlign=top;fontSize=13;fontStyle=1;fontFamily=Helvetica;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="30" y="310" width="30" height="20" />
+        </mxCell>
+        <mxCell id="f1-6" value="D" style="text;html=1;align=left;verticalAlign=top;fontSize=13;fontStyle=1;fontFamily=Helvetica;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="30" y="420" width="30" height="20" />
+        </mxCell>
+
+        <!-- ════ Node 1: True Fixed Point (Top-Left) ════ -->
+        <mxCell id="f1-10" value="&lt;b&gt;True Fixed Point&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:9px;color:#666;&quot;&gt;MAP ≈ 100 mmHg&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#006BA6;strokeWidth=2;fontSize=11;fontFamily=Times New Roman;arcSize=14;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="120" y="65" width="210" height="70" />
+        </mxCell>
+
+        <!-- ════ Node 2: Spurious Fixed Point (Top-Right) ════ -->
+        <mxCell id="f1-11" value="&lt;b&gt;Spurious Fixed Point&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:9px;color:#666;&quot;&gt;MAP ≈ 144.7 mmHg&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0E8;strokeColor=#D55E00;strokeWidth=2;fontSize=11;fontFamily=Times New Roman;arcSize=14;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="620" y="65" width="210" height="70" />
+        </mxCell>
+
+        <!-- ════ Node 3: HR Saturation (Mid-Right) ════ -->
+        <mxCell id="f1-12" value="&lt;b&gt;HR Saturation at 180 bpm&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:9px;color:#666;&quot;&gt;physiological ceiling truncates drift&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#c8860a;strokeWidth=2;fontSize=11;fontFamily=Times New Roman;arcSize=14;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="600" y="230" width="250" height="70" />
+        </mxCell>
+
+        <!-- ════ Node 4: Continuous Baroreflex Path (Bottom-Left) ════ -->
+        <mxCell id="f1-13" value="&lt;b&gt;Continuous Baroreflex Path&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:9px;color:#666;&quot;&gt;HR_delta = (symp + para + chemo) × dt → correct&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#009E73;strokeWidth=2;fontSize=11;fontFamily=Times New Roman;arcSize=14;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="110" y="395" width="220" height="70" />
+        </mxCell>
+
+        <!-- ════ Node 5: Discrete FC Path (Bottom-Right) ════ -->
+        <mxCell id="f1-14" value="&lt;b&gt;Discrete FC Path (buggy)&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:9px;color:#666;&quot;&gt;net_HR_add = K bpm/step → K × T/dt total injection&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0E8;strokeColor=#D55E00;strokeWidth=2;fontSize=11;fontFamily=Times New Roman;arcSize=14;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="610" y="395" width="230" height="70" />
+        </mxCell>
+
+        <!-- ════ Arrow 1: True FP → Spurious FP (main drift arrow) ════ -->
+        <mxCell id="f1-20" value="&lt;b&gt;drift ∝ K × T / dt&lt;/b&gt;&lt;hr&gt;&lt;span style=&quot;font-size:8.5px;font-style:italic;&quot;&gt;(FC emission as bpm/step, not bpm/s)&lt;/span&gt;" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;endArrow=classic;endFill=1;strokeColor=#D55E00;strokeWidth=2.5;fontSize=10;fontFamily=Times New Roman;align=center;verticalAlign=middle;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="f1-10" target="f1-11">
+          <mxGeometry x="0.5" y="-10" relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="-30" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ════ Arrow 2: HR Sat → Spurious FP ════ -->
+        <mxCell id="f1-21" value="&lt;i&gt;truncates drift&lt;/i&gt;" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;endArrow=classic;endFill=1;strokeColor=#c8860a;strokeWidth=1.8;fontSize=9;fontFamily=Times New Roman;align=left;verticalAlign=middle;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="f1-12" target="f1-11">
+          <mxGeometry x="0.5" relative="1" as="geometry">
+            <mxPoint x="-60" y="20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ════ Arrow 3: Cont Baro → True FP (dashed green) ════ -->
+        <mxCell id="f1-22" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;endArrow=classic;endFill=1;strokeColor=#009E73;strokeWidth=1.5;dashed=1;dashPattern=8 5;" edge="1" parent="1" source="f1-13" target="f1-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ════ Arrow 4: Disc FC → HR Sat (dashed red) ════ -->
+        <mxCell id="f1-23" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;endArrow=classic;endFill=1;strokeColor=#D55E00;strokeWidth=1.5;dashed=1;dashPattern=8 5;" edge="1" parent="1" source="f1-14" target="f1-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ════ Legend box ════ -->
+        <mxCell id="f1-30" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;── correct path&lt;br&gt;─ ─ error propagation&lt;br&gt;&lt;span style=&quot;color:#D55E00;&quot;&gt;● buggy/incorrect&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;color:#009E73;&quot;&gt;● correct&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#CCCCCC;strokeWidth=1;fontSize=9;fontFamily=Times New Roman;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="800" y="480" width="120" height="60" />
+        </mxCell>
+
+        <!-- ════ Section A subtitle ════ -->
+        <mxCell id="f1-31" value="&lt;span style=&quot;font-size:9px;color:#888;&quot;&gt;Module A: continuous relaxation keeps x at setpoint&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=9;fontFamily=Times New Roman;fillColor=none;strokeColor=none;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="135" width="280" height="20" />
+        </mxCell>
+
+        <!-- ════ Section B subtitle ════ -->
+        <mxCell id="f1-32" value="&lt;span style=&quot;font-size:9px;color:#888;&quot;&gt;Module B: threshold-gated FC emission, K bpm/step&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=9;fontFamily=Times New Roman;fillColor=none;strokeColor=none;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="300" width="280" height="20" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram name="Figure 2 — MAP Bias vs dt" id="page-fig2">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="480" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ════ Title ════ -->
+        <mxCell id="f2-2" value="Figure 2: MAP Bias vs Time Step — Pre-Fix Anomaly (DC=10)" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="0" y="5" width="1100" height="30" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- Panel (a): MAP vs dt (log-x) — left half -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <mxCell id="f2-10" value="(a) Pre-fix MAP vs dt (log x-scale)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="50" y="35" width="450" height="25" />
+        </mxCell>
+
+        <!-- Plot area bg -->
+        <mxCell id="f2-11" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#333333;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="60" y="65" width="440" height="310" />
+        </mxCell>
+
+        <!-- Y-axis label -->
+        <mxCell id="f2-12" value="MAP (mmHg)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;rotation=-90;" vertex="1" parent="1">
+          <mxGeometry x="10" y="180" width="40" height="20" />
+        </mxCell>
+
+        <!-- X-axis label -->
+        <mxCell id="f2-13" value="Time step dt (s)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="220" y="385" width="120" height="20" />
+        </mxCell>
+
+        <!-- Y-axis ticks -->
+        <mxCell id="f2-14" value="100" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="25" y="350" width="30" height="15" />
+        </mxCell>
+        <mxCell id="f2-15" value="110" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="25" y="276" width="30" height="15" />
+        </mxCell>
+        <mxCell id="f2-16" value="120" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="25" y="202" width="30" height="15" />
+        </mxCell>
+        <mxCell id="f2-17" value="130" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="25" y="128" width="30" height="15" />
+        </mxCell>
+        <mxCell id="f2-18" value="140" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="25" y="74" width="30" height="15" />
+        </mxCell>
+
+        <!-- X-axis tick labels (log positions) -->
+        <mxCell id="f2-19" value="0.001" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="60" y="376" width="50" height="15" />
+        </mxCell>
+        <mxCell id="f2-20" value="0.01" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="185" y="376" width="45" height="15" />
+        </mxCell>
+        <mxCell id="f2-21" value="0.1" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="350" y="376" width="40" height="15" />
+        </mxCell>
+
+        <!-- Grid lines (horizontal) -->
+        <mxCell id="f2-22" value="" style="line;html=1;strokeColor=#DDDDDD;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="345" width="440" height="10" />
+        </mxCell>
+        <mxCell id="f2-23" value="" style="line;html=1;strokeColor=#DDDDDD;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="271" width="440" height="10" />
+        </mxCell>
+        <mxCell id="f2-24" value="" style="line;html=1;strokeColor=#DDDDDD;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="197" width="440" height="10" />
+        </mxCell>
+        <mxCell id="f2-25" value="" style="line;html=1;strokeColor=#DDDDDD;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="123" width="440" height="10" />
+        </mxCell>
+
+        <!-- Data points: dt=0.1, 0.05, 0.02, 0.01, 0.005, 0.001 -->
+        <!-- Log mapping: x_log = 60 + 440 * log10(dt/0.001)/log10(0.1/0.001) = 60 + 440 * log10(dt/0.001)/2 -->
+        <!-- dt=0.1:  x = 60 + 440*1/2 = 280,   y=345-((111-100)/(145-100))*310 = 345-11/45*310 = 269 -->
+        <!-- dt=0.05: x = 60 + 440*log10(50)/2 = 60+440*0.699/2 = 214, y=345-21.1/45*310 = 200 -->
+        <!-- dt=0.02: x = 60 + 440*log10(20)/2 = 60+440*0.301/2 = 126, y=345-44.7/45*310 = 37 -->
+        <!-- dt<=0.01: saturation, MAP=144.7 -->
+        <!-- dt=0.01: x = 60 + 440*log10(10)/2 = 60+440*0.5 = 280,  y=37 -->
+        <!-- dt=0.005: x = 60 + 440*log10(5)/2 = 60+440*0.349 = 214, y=37 -->
+        <!-- dt=0.001: x = 60, y=37 -->
+
+        <!-- Line connecting data points (piecewise) -->
+        <mxCell id="f2-26" value="" style="line;html=1;strokeColor=#006BA6;strokeWidth=2.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="280" y="269" width="10" height="10" />
+        </mxCell>
+        <!-- Path: approximate polyline -->
+        <mxCell id="f2-27" value="" style="shape=curved;html=1;strokeColor=#006BA6;strokeWidth=2.5;fillColor=none;rounded=1;" edge="1" parent="1">
+          <mxGeometry width="440" height="310" as="geometry">
+            <mxPoint x="280" y="269" as="sourcePoint" />
+            <mxPoint x="214" y="200" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="126" y="37" />
+              <mxPoint x="280" y="37" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Actually, for a log plot, let me use individual segments more precisely -->
+        <!-- Let me redraw the data line properly -->
+
+        <!-- Nominal MAP line (green dashed) -->
+        <mxCell id="f2-28" value="" style="line;html=1;strokeColor=#009E73;strokeWidth=1.5;dashed=1;dashPattern=8 5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="345" width="440" height="10" />
+        </mxCell>
+        <mxCell id="f2-29" value="Nominal MAP (100 mmHg)" style="text;html=1;align=left;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fontStyle=2;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="410" y="335" width="100" height="15" />
+        </mxCell>
+
+        <!-- Saturation plateau line (red dotted) -->
+        <mxCell id="f2-30" value="" style="line;html=1;strokeColor=#D55E00;strokeWidth=1;dashed=1;dashPattern=3 3;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="37" width="440" height="10" />
+        </mxCell>
+        <mxCell id="f2-31" value="Saturation plateau (144.7 mmHg)" style="text;html=1;align=left;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="410" y="27" width="100" height="15" />
+        </mxCell>
+
+        <!-- Annotations -->
+        <mxCell id="f2-32" value="Unsaturated&amp;nbsp;&lt;br&gt;(bias ∝ 1/dt)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#006BA6;strokeWidth=1;fontSize=9;fontFamily=Times New Roman;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="165" y="155" width="90" height="35" />
+        </mxCell>
+        <mxCell id="f2-33" value="Saturated&amp;nbsp;&lt;br&gt;(MAP plateau)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D55E00;strokeWidth=1;fontSize=9;fontFamily=Times New Roman;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="150" y="42" width="85" height="35" />
+        </mxCell>
+
+        <!-- Arrow: unsaturated region marker -->
+        <mxCell id="f2-34" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;endArrow=open;endFill=0;strokeColor=#006BA6;strokeWidth=1;" edge="1" parent="1">
+          <mxGeometry x="0.5" relative="1" as="geometry">
+            <mxPoint x="210" y="170" as="sourcePoint" />
+            <mxPoint x="240" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- Panel (b): Dimensional analysis — right half -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <mxCell id="f2-40" value="(b) Dimensional Analysis — bias ∝ 1/dt (log-log)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="560" y="35" width="480" height="25" />
+        </mxCell>
+
+        <!-- Plot area bg -->
+        <mxCell id="f2-41" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#333333;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="570" y="65" width="460" height="310" />
+        </mxCell>
+
+        <!-- Y-axis label -->
+        <mxCell id="f2-42" value="|bias| or bias × dt" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;rotation=-90;" vertex="1" parent="1">
+          <mxGeometry x="520" y="170" width="40" height="25" />
+        </mxCell>
+
+        <!-- X-axis label -->
+        <mxCell id="f2-43" value="Time step dt (s)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="730" y="385" width="120" height="20" />
+        </mxCell>
+
+        <!-- X-axis tick labels -->
+        <mxCell id="f2-44" value="0.001" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="570" y="376" width="50" height="15" />
+        </mxCell>
+        <mxCell id="f2-45" value="0.01" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="705" y="376" width="45" height="15" />
+        </mxCell>
+        <mxCell id="f2-46" value="0.1" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="880" y="376" width="40" height="15" />
+        </mxCell>
+
+        <!-- Y-axis tick labels for log scale -->
+        <mxCell id="f2-47" value="0.1" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="535" y="345" width="30" height="15" />
+        </mxCell>
+        <mxCell id="f2-48" value="1" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="535" y="180" width="30" height="15" />
+        </mxCell>
+        <mxCell id="f2-49" value="10" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="535" y="74" width="30" height="15" />
+        </mxCell>
+
+        <!-- Grid lines -->
+        <mxCell id="f2-50" value="" style="line;html=1;strokeColor=#DDDDDD;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="570" y="345" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f2-51" value="" style="line;html=1;strokeColor=#DDDDDD;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="570" y="180" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f2-52" value="" style="line;html=1;strokeColor=#DDDDDD;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="570" y="74" width="460" height="10" />
+        </mxCell>
+
+        <!-- |bias| line (blue) — log scale -->
+        <!-- bias values: 11, 21.1, 44.7, 44.7, 44.7, 44.7 -->
+        <!-- y 345-310*log(y)/log(50) ... approximate -->
+        <mxCell id="f2-53" value="" style="shape=curved;html=1;strokeColor=#006BA6;strokeWidth=2.5;fillColor=none;rounded=1;" edge="1" parent="1">
+          <mxGeometry width="460" height="310" as="geometry">
+            <mxPoint x="880" y="220" as="sourcePoint" />
+            <mxPoint x="812" y="195" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="705" y="142" />
+              <mxPoint x="705" y="74" />
+              <mxPoint x="812" y="74" />
+              <mxPoint x="570" y="74" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- bias × dt line (orange squares, unsaturated region only) -->
+        <mxCell id="f2-54" value="" style="shape=curved;html=1;strokeColor=#E68A2E;strokeWidth=2;fillColor=none;rounded=1;dashed=1;dashPattern=6 3;" edge="1" parent="1">
+          <mxGeometry width="460" height="310" as="geometry">
+            <!-- bias x dt values: 11*0.1=1.1, 21.1*0.05=1.055, 44.7*0.02=0.894 (saturated region excluded) -->
+            <!-- y: approx constant ~= 1.0 mmHg·s region -->
+            <mxPoint x="880" y="180" as="sourcePoint" />
+            <mxPoint x="812" y="180" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="705" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Annotation box for constant product -->
+        <mxCell id="f2-55" value="bias × dt ≈ const.&lt;br&gt;= 1.14 ± 0.04 (unsaturated)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#E68A2E;strokeWidth=1;fontSize=9;fontFamily=Times New Roman;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="760" y="125" width="140" height="40" />
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="f2-56" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;color:#006BA6;&quot;&gt;●&lt;/span&gt; |bias| = |MAP − 100|&lt;br&gt;&lt;span style=&quot;color:#E68A2E;&quot;&gt;− −&lt;/span&gt; bias × dt (constant)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#CCCCCC;strokeWidth=1;fontSize=8;fontFamily=Times New Roman;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="575" y="355" width="160" height="48" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram name="Figure 4 — Isolation Experiment Bar Chart" id="page-fig4">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="950" pageHeight="520" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ════ Title ════ -->
+        <mxCell id="f4-2" value="Figure 4: MAP Range Across dt Sweep — Four-Condition Isolation (DC=25, 15, 10, 5)" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="0" y="5" width="950" height="28" />
+        </mxCell>
+
+        <!-- ════ Plot area ════ -->
+        <mxCell id="f4-10" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#333333;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="80" y="50" width="800" height="350" />
+        </mxCell>
+
+        <!-- Y-axis label -->
+        <mxCell id="f4-11" value="MAP range across dt sweep (mmHg)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;rotation=-90;" vertex="1" parent="1">
+          <mxGeometry x="15" y="180" width="55" height="20" />
+        </mxCell>
+
+        <!-- X-axis label -->
+        <mxCell id="f4-12" value="Hypoxemia severity (DC value)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="380" y="415" width="160" height="20" />
+        </mxCell>
+
+        <!-- Y-axis tick labels -->
+        <mxCell id="f4-13" value="0" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="50" y="388" width="25" height="15" />
+        </mxCell>
+        <mxCell id="f4-14" value="10" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="50" y="298" width="25" height="15" />
+        </mxCell>
+        <mxCell id="f4-15" value="20" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="50" y="208" width="25" height="15" />
+        </mxCell>
+        <mxCell id="f4-16" value="30" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="50" y="118" width="25" height="15" />
+        </mxCell>
+
+        <!-- Grid lines -->
+        <mxCell id="f4-17" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="385" width="800" height="10" />
+        </mxCell>
+        <mxCell id="f4-18" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="295" width="800" height="10" />
+        </mxCell>
+        <mxCell id="f4-19" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="205" width="800" height="10" />
+        </mxCell>
+        <mxCell id="f4-20" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="115" width="800" height="10" />
+        </mxCell>
+
+        <!-- X-axis group labels -->
+        <!-- 4 groups: DC=25 (normal), DC=15 (mild), DC=10 (moderate), DC=5 (severe) -->
+        <!-- Group centers at x=145, 305, 465, 625 (spacing=160) -->
+        <!-- Within each group: 3 bars X (left), Y (center), Z (right) -->
+        <!-- Bar width=38, gap between groups=160-3*38=46, gap between bars within group=4 -->
+        <!-- Start X at group_center - 38*1.5 - 3 = ... -->
+        <!-- Actually: first bar X starts at group_center - 57 - 2 = ...
+             Let me simplify: just place 3 bars manually per group -->
+
+        <!-- DC=25 group (center x=150) -->
+        <!-- X_range=0.10 (near 0), Y_range=0.10, Z_range=0.35 -->
+        <!-- Scaling: 350px / 35 max = 10 px per unit -->
+        <!-- X bar at x=98, w=34, y=385-1=384, h=1+ -->
+        <!-- Y bar at x=136, w=34, y=385-1=384, h=1+ -->
+        <!-- Z bar at x=174, w=34, y=385-3.5=381, h=4+ -->
+
+        <!-- DC=15 group (center x=310) -->
+        <!-- X_range=2.52, Y_range=2.52, Z_range=2.80 -->
+        <!-- X bar at x=258, w=34, y=385-25=360, h=25+ -->
+        <!-- Y bar at x=296, w=34, y=385-25=360, h=25+ -->
+        <!-- Z bar at x=334, w=34, y=385-28=357, h=28+ -->
+
+        <!-- DC=10 group (center x=470) — THE KEY GROUP with A_contrib=31.58 -->
+        <!-- X_range=31.99 → y=385-320=65, h=320 -->
+        <!-- Y_range=0.41 → near 0 -->
+        <!-- Z_range=0.51 → near 0 -->
+        <!-- X: x=418, w=34, y=65, h=320 -->
+        <!-- Y: x=456, w=34, y=385-4=381, h=4+ -->
+        <!-- Z: x=494, w=34, y=385-5=380, h=5+ -->
+
+        <!-- DC=5 group (center x=630) -->
+        <!-- X_range=20.84 → y=385-208=177, h=208 -->
+        <!-- Y_range=2.20 -->
+        <!-- Z_range=2.21 -->
+        <!-- X: x=578, w=34, y=177, h=208 -->
+        <!-- Y: x=616, w=34, y=385-22=363, h=22 -->
+        <!-- Z: x=654, w=34, y=385-22=363, h=22 -->
+
+        <!-- ════ Group 1: DC=25 ════ -->
+        <mxCell id="f4-100" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D55E00;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="98" y="384" width="34" height="2" />
+        </mxCell>
+        <mxCell id="f4-101" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E68A2E;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="136" y="384" width="34" height="2" />
+        </mxCell>
+        <mxCell id="f4-102" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#009E73;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="174" y="381" width="34" height="5" />
+        </mxCell>
+        <mxCell id="f4-103" value="DC=25&lt;br&gt;(normal)" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="120" y="400" width="60" height="25" />
+        </mxCell>
+
+        <!-- ════ Group 2: DC=15 ════ -->
+        <mxCell id="f4-200" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D55E00;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="258" y="360" width="34" height="26" />
+        </mxCell>
+        <mxCell id="f4-201" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E68A2E;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="296" y="360" width="34" height="26" />
+        </mxCell>
+        <mxCell id="f4-202" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#009E73;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="334" y="357" width="34" height="29" />
+        </mxCell>
+        <mxCell id="f4-203" value="DC=15&lt;br&gt;(mild)" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="280" y="400" width="60" height="25" />
+        </mxCell>
+
+        <!-- ════ Group 3: DC=10 (the dramatic one) ════ -->
+        <mxCell id="f4-300" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D55E00;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="418" y="65" width="34" height="321" />
+        </mxCell>
+        <mxCell id="f4-301" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E68A2E;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="456" y="381" width="34" height="5" />
+        </mxCell>
+        <mxCell id="f4-302" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#009E73;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="494" y="380" width="34" height="6" />
+        </mxCell>
+        <mxCell id="f4-303" value="DC=10&lt;br&gt;(moderate)" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="440" y="400" width="60" height="25" />
+        </mxCell>
+
+        <!-- A_contrib annotation on X bar at DC=10 -->
+        <mxCell id="f4-304" value="A = 31.6" style="text;html=1;align=center;verticalAlign=middle;fontSize=9;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="418" y="48" width="34" height="16" />
+        </mxCell>
+
+        <!-- ════ Group 4: DC=5 ════ -->
+        <mxCell id="f4-400" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D55E00;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="578" y="177" width="34" height="209" />
+        </mxCell>
+        <mxCell id="f4-401" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E68A2E;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="616" y="363" width="34" height="23" />
+        </mxCell>
+        <mxCell id="f4-402" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#009E73;strokeColor=none;fillOpacity=85;" vertex="1" parent="1">
+          <mxGeometry x="654" y="363" width="34" height="23" />
+        </mxCell>
+        <mxCell id="f4-403" value="DC=5&lt;br&gt;(severe)" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="600" y="400" width="60" height="25" />
+        </mxCell>
+
+        <!-- A_contrib annotation on X bar at DC=5 -->
+        <mxCell id="f4-404" value="A = 18.6" style="text;html=1;align=center;verticalAlign=middle;fontSize=9;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="578" y="160" width="34" height="16" />
+        </mxCell>
+
+        <!-- ════ Legend ════ -->
+        <mxCell id="f4-500" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D55E00;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="768" y="62" width="18" height="14" />
+        </mxCell>
+        <mxCell id="f4-501" value="X (buggy: FC bpm/step)" style="text;html=1;align=left;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="790" y="62" width="110" height="14" />
+        </mxCell>
+        <mxCell id="f4-502" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E68A2E;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="768" y="80" width="18" height="14" />
+        </mxCell>
+        <mxCell id="f4-503" value="Y (A-only: FC × dt)" style="text;html=1;align=left;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="790" y="80" width="110" height="14" />
+        </mxCell>
+        <mxCell id="f4-504" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#009E73;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="768" y="98" width="18" height="14" />
+        </mxCell>
+        <mxCell id="f4-505" value="Z (A+B: FC×dt+cont.)" style="text;html=1;align=left;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="790" y="98" width="110" height="14" />
+        </mxCell>
+
+        <!-- ════ Caption note ════ -->
+        <mxCell id="f4-510" value="A = X_range − Y_range&lt;br&gt;FC dt-scaling alone eliminates &gt;99% of the bias" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7F7F7F;strokeWidth=0.5;fontSize=8;fontFamily=Times New Roman;fontStyle=2;arcSize=6;align=center;opacity=80;" vertex="1" parent="1">
+          <mxGeometry x="440" y="440" width="280" height="30" />
+        </mxCell>
+
+        <!-- ════ Inset: W condition text ════ -->
+        <mxCell id="f4-520" value="4th condition W (gain=10, not shown) confirms B_contrib &amp; C_contrib &amp;lt; 0.2 mmHg" style="text;html=1;align=center;verticalAlign=middle;fontSize=7.5;fontFamily=Times New Roman;fontStyle=2;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="120" y="440" width="300" height="18" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram name="Figure 5 — Toy Model vs Virtual Vet" id="page-fig5">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1050" pageHeight="480" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ════ Title ════ -->
+        <mxCell id="f5-2" value="Figure 5: Spurious Steady State — Toy Model vs Virtual Vet — Identical Bias Pattern" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="0" y="5" width="1050" height="28" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- Panel (a): Toy Model — left half -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <mxCell id="f5-10" value="(a) Toy Model — Minimal 2-Variable ODE System" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="30" y="35" width="480" height="22" />
+        </mxCell>
+        <mxCell id="f5-11" value="dx/dt = −k·(x−x₀) + FC_event  |  saturation: x ≤ 180" style="text;html=1;align=center;verticalAlign=middle;fontSize=9;fontFamily=Times New Roman;fontStyle=2;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="30" y="58" width="480" height="18" />
+        </mxCell>
+
+        <!-- Plot bg -->
+        <mxCell id="f5-12" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#333333;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="460" height="310" />
+        </mxCell>
+
+        <!-- Y-axis label -->
+        <mxCell id="f5-13" value="State x (a.u.)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;rotation=-90;" vertex="1" parent="1">
+          <mxGeometry x="0" y="200" width="35" height="20" />
+        </mxCell>
+
+        <!-- X-axis label -->
+        <mxCell id="f5-14" value="Time step dt (s)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="230" y="400" width="120" height="20" />
+        </mxCell>
+
+        <!-- Y-axis tick labels -->
+        <mxCell id="f5-15" value="100" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="8" y="372" width="28" height="15" />
+        </mxCell>
+        <mxCell id="f5-16" value="120" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="8" y="270" width="28" height="15" />
+        </mxCell>
+        <mxCell id="f5-17" value="140" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="8" y="168" width="28" height="15" />
+        </mxCell>
+        <mxCell id="f5-18" value="160" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="8" y="66" width="28" height="15" />
+        </mxCell>
+        <mxCell id="f5-19" value="180" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="8" y="-20" width="28" height="15" />
+        </mxCell>
+
+        <!-- X-axis tick labels (log) -->
+        <mxCell id="f5-20" value="0.001" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="390" width="50" height="15" />
+        </mxCell>
+        <mxCell id="f5-21" value="0.01" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="180" y="390" width="45" height="15" />
+        </mxCell>
+        <mxCell id="f5-22" value="0.1" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="350" y="390" width="40" height="15" />
+        </mxCell>
+
+        <!-- Grid lines -->
+        <mxCell id="f5-23" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="370" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f5-24" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="268" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f5-25" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="166" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f5-26" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="64" width="460" height="10" />
+        </mxCell>
+
+        <!-- Correct SS line -->
+        <mxCell id="f5-30" value="" style="line;html=1;strokeColor=#009E73;strokeWidth=1;dashed=1;dashPattern=8 5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="257" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f5-31" value="Correct SS ≈ 102" style="text;html=1;align=left;verticalAlign=middle;fontSize=7.5;fontFamily=Times New Roman;fontStyle=2;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="420" y="248" width="80" height="15" />
+        </mxCell>
+
+        <!-- Toy buggy data path (~log scale) -->
+        <!-- dt=0.1 → x=120, dt=0.05 → x=140, dt≤0.02 → x=180 -->
+        <!-- Log x positions: 0.001→40, 0.01→180, 0.1→350
+             y: ~370 scaled for 100-180 range. (y-64) = (370-64)*(x-100)/(180-100) ... simplify -->
+        <!-- 100→370, 120→300, 140→230, 180→64 -->
+        <!-- Buggy: curve through (350,300)→(255,230)→(180,64)→stays at 64 -->
+        <mxCell id="f5-32" value="" style="shape=curved;html=1;strokeColor=#D55E00;strokeWidth=2.5;fillColor=none;rounded=1;" edge="1" parent="1">
+          <mxGeometry width="460" height="310" as="geometry">
+            <mxPoint x="350" y="300" as="sourcePoint" />
+            <mxPoint x="255" y="230" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="180" y="64" />
+              <mxPoint x="180" y="64" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Continue line from 0.01 to 0.001 -->
+        <mxCell id="f5-33" value="" style="line;html=1;strokeColor=#D55E00;strokeWidth=2.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="64" width="140" height="10" />
+        </mxCell>
+
+        <!-- Toy fixed data path (flat at ~102) -->
+        <mxCell id="f5-34" value="" style="line;html=1;strokeColor=#006BA6;strokeWidth=2.5;dashed=1;dashPattern=10 4;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="257" width="460" height="10" />
+        </mxCell>
+
+        <!-- Annotations -->
+        <mxCell id="f5-35" value="Unsaturated&lt;br&gt;(bias ∝ 1/dt)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D55E00;strokeWidth=1;fontSize=8;fontFamily=Times New Roman;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="250" y="156" width="80" height="30" />
+        </mxCell>
+        <mxCell id="f5-36" value="Saturated&lt;br&gt;(ceiling=180)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#c8860a;strokeWidth=1;fontSize=8;fontFamily=Times New Roman;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="40" width="80" height="30" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- Panel (b): Virtual Vet — right half -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <mxCell id="f5-40" value="(b) Virtual Vet — 11-Organ Canine Cardiovascular Simulation" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontStyle=1;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="540" y="35" width="490" height="22" />
+        </mxCell>
+
+        <!-- Plot bg -->
+        <mxCell id="f5-41" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#333333;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="550" y="80" width="460" height="310" />
+        </mxCell>
+
+        <!-- Y-axis -->
+        <mxCell id="f5-42" value="MAP (mmHg)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;rotation=-90;" vertex="1" parent="1">
+          <mxGeometry x="510" y="200" width="35" height="20" />
+        </mxCell>
+
+        <!-- X-axis -->
+        <mxCell id="f5-43" value="Time step dt (s)" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="740" y="400" width="120" height="20" />
+        </mxCell>
+
+        <!-- Y-axis tick labels -->
+        <mxCell id="f5-44" value="100" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="518" y="372" width="28" height="15" />
+        </mxCell>
+        <mxCell id="f5-45" value="120" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="518" y="270" width="28" height="15" />
+        </mxCell>
+        <mxCell id="f5-46" value="140" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="518" y="168" width="28" height="15" />
+        </mxCell>
+        <mxCell id="f5-47" value="160" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="518" y="66" width="28" height="15" />
+        </mxCell>
+        <mxCell id="f5-48" value="180" style="text;html=1;align=right;verticalAlign=middle;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="518" y="-20" width="28" height="15" />
+        </mxCell>
+
+        <!-- X-axis tick labels -->
+        <mxCell id="f5-49" value="0.001" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="550" y="390" width="50" height="15" />
+        </mxCell>
+        <mxCell id="f5-50" value="0.01" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="690" y="390" width="45" height="15" />
+        </mxCell>
+        <mxCell id="f5-51" value="0.1" style="text;html=1;align=center;verticalAlign=top;fontSize=8;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="860" y="390" width="40" height="15" />
+        </mxCell>
+
+        <!-- Grid lines -->
+        <mxCell id="f5-52" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="550" y="370" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f5-53" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="550" y="268" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f5-54" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="550" y="166" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f5-55" value="" style="line;html=1;strokeColor=#E0E0E0;strokeWidth=0.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="550" y="64" width="460" height="10" />
+        </mxCell>
+
+        <!-- Correct SS line -->
+        <mxCell id="f5-60" value="" style="line;html=1;strokeColor=#009E73;strokeWidth=1;dashed=1;dashPattern=8 5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="550" y="257" width="460" height="10" />
+        </mxCell>
+        <mxCell id="f5-61" value="Correct SS ≈ 102" style="text;html=1;align=left;verticalAlign=middle;fontSize=7.5;fontFamily=Times New Roman;fontStyle=2;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="930" y="248" width="80" height="15" />
+        </mxCell>
+
+        <!-- VT pre-fix data: MAP=111→121.1→144.7→saturation -->
+        <!-- y: 111→345, 121→270, 144.7→168→stays at 168 -->
+        <mxCell id="f5-62" value="" style="shape=curved;html=1;strokeColor=#D55E00;strokeWidth=2.5;fillColor=none;rounded=1;" edge="1" parent="1">
+          <mxGeometry width="460" height="310" as="geometry">
+            <mxPoint x="860" y="335" as="sourcePoint" />
+            <mxPoint x="690" y="270" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="690" y="168" />
+              <mxPoint x="690" y="168" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f5-63" value="" style="line;html=1;strokeColor=#D55E00;strokeWidth=2.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="550" y="168" width="140" height="10" />
+        </mxCell>
+
+        <!-- VT post-fix data (flat at ~102) -->
+        <mxCell id="f5-64" value="" style="line;html=1;strokeColor=#006BA6;strokeWidth=2.5;dashed=1;dashPattern=10 4;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="550" y="257" width="460" height="10" />
+        </mxCell>
+
+        <!-- Annotations -->
+        <mxCell id="f5-65" value="Unsaturated&lt;br&gt;(bias ∝ 1/dt)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D55E00;strokeWidth=1;fontSize=8;fontFamily=Times New Roman;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="740" y="200" width="80" height="30" />
+        </mxCell>
+        <mxCell id="f5-66" value="Saturated&lt;br&gt;(HR ceiling=180)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#c8860a;strokeWidth=1;fontSize=8;fontFamily=Times New Roman;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="570" y="40" width="80" height="30" />
+        </mxCell>
+
+        <!-- ════ Legend (shared, placed at bottom center) ════ -->
+        <mxCell id="f5-70" value="" style="line;html=1;strokeColor=#D55E00;strokeWidth=2.5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="230" y="440" width="30" height="10" />
+        </mxCell>
+        <mxCell id="f5-71" value="Buggy (unit/step)" style="text;html=1;align=left;verticalAlign=middle;fontSize=9;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="265" y="440" width="80" height="15" />
+        </mxCell>
+        <mxCell id="f5-72" value="" style="line;html=1;strokeColor=#006BA6;strokeWidth=2.5;dashed=1;dashPattern=10 4;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="380" y="440" width="30" height="10" />
+        </mxCell>
+        <mxCell id="f5-73" value="Fixed (unit/s)" style="text;html=1;align=left;verticalAlign=middle;fontSize=9;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="415" y="440" width="80" height="15" />
+        </mxCell>
+        <mxCell id="f5-74" value="" style="line;html=1;strokeColor=#009E73;strokeWidth=1;dashed=1;dashPattern=8 5;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="530" y="440" width="30" height="10" />
+        </mxCell>
+        <mxCell id="f5-75" value="Correct SS" style="text;html=1;align=left;verticalAlign=middle;fontSize=9;fontFamily=Times New Roman;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="565" y="440" width="80" height="15" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

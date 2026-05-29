@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ode_diseases_schema.json",
+  "title": "Virtual Vet ODE Diseases Schema",
+  "description": "Schema for data/ode_diseases.json — config-driven disease definitions for VirtualCreature simulation engine.",
+  "type": "object",
+  "additionalProperties": true,
+  "definitions": {
+
+    "severityPresets": {
+      "type": "object",
+      "description": "Severity level → parameter overrides. At least 'mild', 'moderate', or 'severe' recommended.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": ["number", "integer"]
+        }
+      }
+    },
+
+    "stateVariableDef": {
+      "type": "object",
+      "required": ["initial", "ode_type", "params", "clamp"],
+      "properties": {
+        "initial": {
+          "description": "Initial value (number), or string key into severity_presets of parent disease.",
+          "oneOf": [
+            {"type": "number"},
+            {"type": "string", "pattern": "^[a-z_]+$"}
+          ]
+        },
+        "clamp": {
+          "description": "[min, max] clamp. null = no bound.",
+          "type": ["array", "null"],
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"type": ["number", "null"]}
+        },
+        "ode_type": {
+          "type": "string",
+          "enum": ["logistic", "algebraic", "first_order_lag", "custom"],
+          "description": "ODE integration type"
+        },
+        "params": {
+          "type": "object",
+          "description": "ODE-type-specific parameters",
+          "additionalProperties": {
+            "oneOf": [
+              {"type": "number"},
+              {"type": "string"},
+              {"type": "object"}
+            ]
+          }
+        }
+      }
+    },
+
+    "outputMappingDef": {
+      "type": "object",
+      "required": ["target", "op", "fn"],
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "FactorCommand target path (e.g. 'heart.heart_rate'). Must be registered in _PARAM_PATHS.",
+          "pattern": "^[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*$"
+        },
+        "op": {
+          "type": "string",
+          "enum": ["multiply", "add", "set"]
+        },
+        "fn": {
+          "type": "string",
+          "description": "Python expression evaluated at runtime. Available: state variable names, params keys, 'engine' dict."
+        },
+        "condition": {
+          "type": "string",
+          "description": "Optional Python expression — output only applied when condition is True."
+        }
+      }
+    },
+
+    "reference": {
+      "type": "object",
+      "required": ["id", "text"],
+      "properties": {
+        "id": {"type": "string"},
+        "text": {"type": "string"},
+        "url": {"type": "string", "default": ""}
+      }
+    },
+
+    "labels": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "array",
+          "items": {"type": "string"},
+          "default": []
+        },
+        "organ_systems": {
+          "type": "array",
+          "items": {"type": "string"},
+          "default": []
+        },
+        "symptoms": {
+          "type": "array",
+          "items": {"type": "string"},
+          "default": []
+        }
+      }
+    },
+
+    "equationDesc": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["logistic", "algebraic", "first_order_lag", "custom"]
+        },
+        "formula": {
+          "type": "string",
+          "description": "LaTeX-friendly formula string for display"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable Chinese description of this equation"
+        }
+      }
+    },
+
+    "diseaseMeta": {
+      "type": "object",
+      "properties": {
+        "references": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/reference"},
+          "default": []
+        },
+        "labels": {
+          "$ref": "#/definitions/labels"
+        },
+        "equations": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/equationDesc"
+          }
+        }
+      }
+    },
+
+    "diseaseBody": {
+      "type": "object",
+      "required": ["state_variables", "outputs"],
+      "properties": {
+        "display_name": {
+          "type": "string",
+          "description": "Human-readable disease name (Chinese)"
+        },
+        "meta": {
+          "$ref": "#/definitions/diseaseMeta"
+        },
+        "severity_presets": {
+          "$ref": "#/definitions/severityPresets"
+        },
+        "state_variables": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/stateVariableDef"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/outputMappingDef"
+          }
+        }
+      }
+    }
+
+  },
+
+  "properties": {
+    "_schema": {
+      "type": "string",
+      "description": "Schema version identifier",
+      "const": "ode_diseases v1"
+    },
+    "_comment": {
+      "type": "string"
+    }
+  },
+
+  "patternProperties": {
+    "^[a-z_][a-z0-9_]*$": {
+      "$ref": "#/definitions/diseaseBody"
+    }
+  }
+
+}

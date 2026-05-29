@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert manuscript_v5.md to a Word document formatted for SIMULATION journal."""
+"""Convert manuscript_v6.md to a Word document formatted for SIMULATION journal."""
 import re, os
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -7,8 +7,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.style import WD_STYLE_TYPE
 
 PAPER_DIR = os.path.dirname(os.path.abspath(__file__))
-MD_PATH = os.path.join(PAPER_DIR, "manuscript_v5.md")
-DOCX_PATH = os.path.join(PAPER_DIR, "manuscript_v5.docx")
+MD_PATH = os.path.join(PAPER_DIR, "manuscript_v6.md")
+DOCX_PATH = os.path.join(PAPER_DIR, "manuscript_v6.docx")
 
 doc = Document()
 
@@ -45,6 +45,7 @@ in_code_block = False
 code_lines = []
 in_table = False
 table_rows = []
+prev_was_hr = False  # track consecutive --- for page breaks
 
 def flush_code():
     global code_lines
@@ -120,9 +121,16 @@ for line in lines:
     if not stripped.strip():
         continue
 
-    # Horizontal rule
+    # Horizontal rule — consecutive --- with only whitespace between = page break
     if stripped.strip() == '---':
+        if prev_was_hr:
+            doc.add_page_break()
+            prev_was_hr = False
+        else:
+            prev_was_hr = True
         continue
+    else:
+        prev_was_hr = False
 
     # Headings
     heading_match = re.match(r'^(#{1,3})\s+(.*)', stripped)
@@ -139,12 +147,9 @@ for line in lines:
         run.bold = True
         continue
 
-    # Image
+    # Image — skip (text-only version)
     img_match = re.match(r'!\[.*?\]\((.*?)\)', stripped)
     if img_match:
-        img_path = os.path.join(PAPER_DIR, img_match.group(1))
-        if os.path.exists(img_path):
-            doc.add_picture(img_path, width=Inches(5.5))
         continue
 
     # Figure caption
