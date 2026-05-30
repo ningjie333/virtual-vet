@@ -14,19 +14,27 @@ def total_blood_volume_ml(weight_kg: float) -> float:
     return 86.0 * weight_kg
 
 def stroke_volume_ml(weight_kg: float) -> float:
-    """每搏输出量: 1.0-1.5 mL/kg, 取 1.0 (危重基准线)"""
+    """犬每搏输出量: 1.0-1.5 mL/kg, 取 1.0 (危重基准线)"""
     return 1.0 * weight_kg
 
+def stroke_volume_ml_feline(weight_kg: float) -> float:
+    """猫每搏输出量: 0.5-0.6 mL/kg（猫是"高心率+低每搏量"模式）"""
+    return 0.55 * weight_kg
+
 def base_cardiac_output_ml_min(weight_kg: float) -> float:
-    """基础心输出量: HR × SV"""
+    """犬基础心输出量: HR × SV"""
     return HEART_RATE_REST_BPM * stroke_volume_ml(weight_kg)
 
 def tidal_volume_ml(weight_kg: float) -> float:
-    """潮气量: 临床标准 10-12 mL/kg, 取 12"""
+    """犬潮气量: 临床标准 10-12 mL/kg, 取 12"""
     return 12.0 * weight_kg
 
+def tidal_volume_ml_feline(weight_kg: float) -> float:
+    """猫潮气量: 7-8 mL/kg（猫比犬略低）"""
+    return 7.5 * weight_kg
+
 def base_minute_ventilation(weight_kg: float) -> float:
-    """基础分钟通气量: TV × RR"""
+    """犬基础分钟通气量: TV × RR"""
     return tidal_volume_ml(weight_kg) * RESPIRATORY_RATE_REST
 
 def renal_blood_flow_ml_min(weight_kg: float) -> float:
@@ -48,9 +56,12 @@ def baseline_urine_output_ml_min(weight_kg: float) -> float:
 
 # --- 心血管系统 ---
 # REF: textbook:nelson | Nelson & Couto 5e Ch22 | Canine normal resting HR 60-140 bpm
-HEART_RATE_REST_BPM = 85                          # 静息心率 bpm
+HEART_RATE_REST_BPM = 85                          # 犬静息心率 bpm
+# REF: Ninomiya 1988 PMID:3236570 | Cat resting HR 164±10 bpm; UC Davis CVET 100-140
+HEART_RATE_REST_BPM_FELINE = 150                  # 猫静息心率 bpm (120-180 范围内)
 # REF: textbook:nelson | Nelson & Couto 5e Ch22 | Estimated maximum ~180 bpm
-HEART_RATE_STRESS_BPM = 180                       # 应激心率上限 bpm
+HEART_RATE_STRESS_BPM = 180                       # 犬应激心率上限 bpm
+HEART_RATE_STRESS_BPM_FELINE = 250                # 猫应激心率上限 bpm
 
 # 血管阻力 (mmHg·s/mL = PRU)
 # REF: textbook:guyton | Guyton 14e Ch26 | TPR ≈ 1.4 mmHg·s/mL in resting dog
@@ -75,8 +86,11 @@ PULMONARY_ARTERIAL_PRESSURE_MMHG = 15.0           # 肺动脉压 mmHg
 
 # --- 呼吸系统 ---
 # REF: textbook:nelson | Nelson & Couto 5e Ch6 | Normal RR 10-30 /min (resting)
-RESPIRATORY_RATE_REST = 18                        # 静息呼吸频率 /min
-RESPIRATORY_RATE_STRESS = 40                      # 应激呼吸频率 /min
+RESPIRATORY_RATE_REST = 18                        # 犬静息呼吸频率 /min
+# REF: Dijkstra 2018 PMID:29680402 | Cat resting RR 20-30 /min; UC Davis CVET 20-30
+RESPIRATORY_RATE_REST_FELINE = 25                 # 猫静息呼吸频率 /min
+RESPIRATORY_RATE_STRESS = 40                      # 犬应激呼吸频率 /min
+RESPIRATORY_RATE_STRESS_FELINE = 50               # 猫应激呼吸频率 /min
 
 # 气体分压 (mmHg)
 # REF: textbook:guyton | Guyton 14e Ch40 | Standard atmospheric 760 mmHg (sea level)
@@ -89,9 +103,11 @@ ALVEOLAR_PCO2_NORMAL = 40.0                       # 正常肺泡CO2分压
 
 # 动脉血气
 # REF: textbook:nelson | Nelson & Couto 5e Ch6 | Normal PaO2 90-100 mmHg
-ARTERIAL_PO2_NORMAL = 95.0                        # 正常动脉血氧分压 mmHg
+ARTERIAL_PO2_NORMAL = 95.0                        # 犬正常动脉血氧分压 mmHg
 # REF: textbook:nelson | Nelson & Couto 5e Ch6 | Normal PaCO2 35-45 mmHg
-ARTERIAL_PCO2_NORMAL = 40.0                       # 正常动脉血CO2分压 mmHg
+ARTERIAL_PCO2_NORMAL = 40.0                       # 犬正常动脉血CO2分压 mmHg
+# REF: Merck Veterinary Manual | Cat PaCO2 29-42 mmHg
+ARTERIAL_PCO2_NORMAL_FELINE = 35.0                # 猫正常动脉血CO2分压 mmHg
 ARTERIAL_SATURATION_NORMAL = 0.97                 # 正常血氧饱和度
 # REF: textbook:guyton | Guyton 14e Ch31 | O2 capacity ≈ 20 mL O2/100mL blood
 BLOOD_O2_CAPACITY_ML_O2_PER_100ML = 20.0          # 100mL血液携氧量 mL O2/100mL blood

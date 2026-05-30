@@ -27,10 +27,15 @@ from src.organs.coupling import CouplingEngine, OrganContext, PhysiologicalSigna
 from parameters import (
     DT_SECONDS, SIMULATION_STEP_MS, T_MAX_MINUTES,
     PLASMA_VOLUME_FRACTION,
-    total_blood_volume_ml, stroke_volume_ml, base_cardiac_output_ml_min,
-    tidal_volume_ml, base_minute_ventilation,
+    total_blood_volume_ml, stroke_volume_ml, stroke_volume_ml_feline,
+    base_cardiac_output_ml_min,
+    tidal_volume_ml, tidal_volume_ml_feline, base_minute_ventilation,
     renal_blood_flow_ml_min, gfr_ml_min, baseline_urine_output_ml_min,
     DEFAULT_AGE_DAYS,
+    HEART_RATE_REST_BPM, HEART_RATE_REST_BPM_FELINE,
+    HEART_RATE_STRESS_BPM, HEART_RATE_STRESS_BPM_FELINE,
+    ARTERIAL_PCO2_NORMAL, ARTERIAL_PCO2_NORMAL_FELINE,
+    RESPIRATORY_RATE_REST, RESPIRATORY_RATE_REST_FELINE,
 )
 
 logger = logging.getLogger(__name__)
@@ -284,13 +289,29 @@ class VirtualCreature:
         self.species = species
         self._solver = solver  # "euler" | "radau"
 
-        # 根据实际体重计算 A 类参数
+        # 根据物种选择特异性参数
+        if species == "feline":
+            _hr_rest = HEART_RATE_REST_BPM_FELINE      # 150 bpm
+            _hr_stress = HEART_RATE_STRESS_BPM_FELINE  # 250 bpm
+            _pco2_normal = ARTERIAL_PCO2_NORMAL_FELINE # 35 mmHg
+        else:
+            _hr_rest = HEART_RATE_REST_BPM              # 85 bpm
+            _hr_stress = HEART_RATE_STRESS_BPM          # 180 bpm
+            _pco2_normal = ARTERIAL_PCO2_NORMAL         # 40 mmHg
+
+        # 根据实际体重计算 A 类参数（根据物种选择不同函数）
         _tbv = total_blood_volume_ml(body_weight_kg)
-        _sv  = stroke_volume_ml(body_weight_kg)
-        _co  = base_cardiac_output_ml_min(body_weight_kg)
-        _tv  = tidal_volume_ml(body_weight_kg)
-        _mv  = base_minute_ventilation(body_weight_kg)
-        _rbf = renal_blood_flow_ml_min(body_weight_kg)
+        if species == "feline":
+            _sv  = stroke_volume_ml_feline(body_weight_kg)   # 猫：0.55 mL/kg
+            _tv  = tidal_volume_ml_feline(body_weight_kg)    # 猫：7.5 mL/kg
+            _rr  = RESPIRATORY_RATE_REST_FELINE              # 猫：25 /min
+        else:
+            _sv  = stroke_volume_ml(body_weight_kg)          # 犬：1.0 mL/kg
+            _tv  = tidal_volume_ml(body_weight_kg)           # 犬：12 mL/kg
+            _rr  = RESPIRATORY_RATE_REST                     # 犬：18 /min
+        _co  = _hr_rest * _sv                                # 心输出量 = HR × SV
+        _mv  = _tv * _rr                                     # 分钟通气量 = TV × RR
+        _rbf = 0.20 * _co                                    # 肾血流量 = 20% CO
         _gfr = gfr_ml_min(body_weight_kg)
         _urine = baseline_urine_output_ml_min(body_weight_kg)
 
@@ -304,6 +325,7 @@ class VirtualCreature:
         self.heart = HeartModule(
             weight_kg=body_weight_kg, blood=self.blood,
             sv_ml=_sv, base_co_ml_min=_co,
+            HR_rest=_hr_rest, HR_max=_hr_stress,
         )
         self.lung = LungModule(
             weight_kg=body_weight_kg, blood=self.blood,
@@ -619,9 +641,9 @@ class VirtualCreature:
         - "radau": solve_ivp(method='Radau') 统一积分，精度 O(dt^5)
         """
         if self._solver == "radau":
-            self._step_radau()
+            return self._step_radau()
         else:
-            self._step_euler()
+            return self._step_euler()
 
     def _step_euler(self):
         """
@@ -1029,6 +1051,7 @@ class VirtualCreature:
 
         # 8. 记录历史（同 Euler 路径最后部分）
         self._record_history(dt)
+        return {}
 
     def _record_history(self, dt: float):
         """记录当前状态到 history dict（Euler 和 Radau 共用）。"""

@@ -10,8 +10,10 @@ import DiagnosisPanel from "./components/DiagnosisPanel.vue";
 import VitalCard from "./components/VitalCard.vue";
 import GameLog from "./components/GameLog.vue";
 import GameOverOverlay from "./components/GameOverOverlay.vue";
+import DebugParams from "./components/DebugParams.vue";
 
 // ── State ──
+const showDebug = ref(false);
 const phase = ref<"select" | "game" | "done">("select");
 const tab = ref<"exam" | "report" | "diag">("exam");
 const sessionId = ref("");
@@ -258,6 +260,14 @@ function goBack() {
   diagnosisInput.value = "";
 }
 
+function openDebug() {
+  showDebug.value = true;
+}
+
+function closeDebug() {
+  showDebug.value = false;
+}
+
 function restart() {
   phase.value = "select";
   caseData.value = null;
@@ -270,11 +280,18 @@ function restart() {
 </script>
 
 <template>
-  <div class="game-app">
+  <!-- 调试器页面 -->
+  <DebugParams v-if="showDebug" @close="closeDebug" />
+
+  <!-- 游戏页面 -->
+  <div v-else class="game-app">
     <!-- ── Top Bar ── -->
     <div class="top-bar">
       <div class="top-left">
         <span class="top-logo">🐾 Virtual Vet · 兽医诊断游戏</span>
+        <button class="btn-debug" @click="openDebug" title="打开参数调试器">
+          🔬 调试器
+        </button>
         <button v-if="phase !== 'select'" class="btn-back" @click="goBack" title="返回病例选择">
           ← 返回
         </button>
@@ -425,6 +442,21 @@ function restart() {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.btn-debug {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-debug:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
 }
 .btn-back {
   background: transparent;

@@ -1,0 +1,52 @@
+{
+  "_schema": "breed_standards v1",
+  "_comment": "品种→体重映射。来源：AKC/FCI 标准 + 兽医临床参考。",
+
+  "canine": {
+    "chihuahua": { "display": "吉娃娃", "weight_kg": {"min": 1.5, "max": 3.0, "default": 2.5}, "size_category": "toy" },
+    "yorkshire_terrier": { "display": "约克夏", "weight_kg": {"min": 2.0, "max": 3.2, "default": 2.8}, "size_category": "toy" },
+    "pomeranian": { "display": "博美", "weight_kg": {"min": 1.8, "max": 3.5, "default": 2.5}, "size_category": "toy" },
+    "maltese": { "display": "马尔济斯", "weight_kg": {"min": 1.8, "max": 3.6, "default": 2.7}, "size_category": "toy" },
+    "shih_tzu": { "display": "西施", "weight_kg": {"min": 4.0, "max": 7.5, "default": 5.5}, "size_category": "small" },
+    "cavalier_king_charles": { "display": "骑士查理王", "weight_kg": {"min": 5.0, "max": 8.0, "default": 6.5}, "size_category": "small" },
+    "dachshund": { "display": "腊肠", "weight_kg": {"min": 7.0, "max": 14.0, "default": 9.0}, "size_category": "small" },
+    "cocker_spaniel": { "display": "可卡", "weight_kg": {"min": 10.0, "max": 14.0, "default": 12.0}, "size_category": "medium" },
+    "corgi": { "display": "柯基", "weight_kg": {"min": 10.0, "max": 14.0, "default": 12.0}, "size_category": "medium" },
+    "beagle": { "display": "比格", "weight_kg": {"min": 9.0, "max": 11.0, "default": 10.0}, "size_category": "medium" },
+    "border_collie": { "display": "边牧", "weight_kg": {"min": 14.0, "max": 20.0, "default": 18.0}, "size_category": "medium" },
+    "bulldog": { "display": "斗牛犬", "weight_kg": {"min": 18.0, "max": 25.0, "default": 22.0}, "size_category": "medium" },
+    "shiba_inu": { "display": "柴犬", "weight_kg": {"min": 8.0, "max": 11.0, "default": 9.5}, "size_category": "medium" },
+    "samoyed": { "display": "萨摩耶", "weight_kg": {"min": 16.0, "max": 30.0, "default": 23.0}, "size_category": "large" },
+    "golden_retriever": { "display": "金毛", "weight_kg": {"min": 25.0, "max": 34.0, "default": 30.0}, "size_category": "large" },
+    "labrador": { "display": "拉布拉多", "weight_kg": {"min": 25.0, "max": 36.0, "default": 30.0}, "size_category": "large" },
+    "german_shepherd": { "display": "德牧", "weight_kg": {"min": 22.0, "max": 40.0, "default": 32.0}, "size_category": "large" },
+    "husky": { "display": "哈士奇", "weight_kg": {"min": 16.0, "max": 27.0, "default": 22.0}, "size_category": "large" },
+    "rottweiler": { "display": "罗威纳", "weight_kg": {"min": 35.0, "max": 60.0, "default": 45.0}, "size_category": "large" },
+    "doberman": { "display": "杜宾", "weight_kg": {"min": 30.0, "max": 45.0, "default": 38.0}, "size_category": "large" },
+    "standard_poodle": { "display": "标准贵宾", "weight_kg": {"min": 20.0, "max": 32.0, "default": 26.0}, "size_category": "large" },
+    "great_dane": { "display": "大丹", "weight_kg": {"min": 50.0, "max": 90.0, "default": 65.0}, "size_category": "giant" },
+    "saint_bernard": { "display": "圣伯纳", "weight_kg": {"min": 50.0, "max": 90.0, "default": 70.0}, "size_category": "giant" },
+    "mastiff": { "display": "獒犬", "weight_kg": {"min": 55.0, "max": 100.0, "default": 75.0}, "size_category": "giant" },
+    "bernese_mountain_dog": { "display": "伯恩山", "weight_kg": {"min": 35.0, "max": 55.0, "default": 45.0}, "size_category": "giant" },
+    "mixed": { "display": "混血/未知", "weight_kg": {"min": 10.0, "max": 25.0, "default": 18.0}, "size_category": "medium" }
+  },
+
+  "feline": {
+    "siamese": { "display": "暹罗", "weight_kg": {"min": 2.7, "max": 4.5, "default": 3.6}, "size_category": "small" },
+    "persian": { "display": "波斯", "weight_kg": {"min": 3.2, "max": 5.4, "default": 4.5}, "size_category": "medium" },
+    "maine_coon": { "display": "缅因", "weight_kg": {"min": 4.5, "max": 11.3, "default": 8.0}, "size_category": "large" },
+    "ragdoll": { "display": "布偶", "weight_kg": {"min": 3.6, "max": 9.1, "default": 7.0}, "size_category": "large" },
+    "british_shorthair": { "display": "英短", "weight_kg": {"min": 3.5, "max": 8.0, "default": 5.5}, "size_category": "medium" },
+    "dsh": { "display": "家猫（短毛）", "weight_kg": {"min": 3.0, "max": 5.5, "default": 4.5}, "size_category": "medium" },
+    "bengal": { "display": "孟加拉猫", "weight_kg": {"min": 3.6, "max": 6.8, "default": 5.0}, "size_category": "medium" },
+    "mixed": { "display": "混血/未知", "weight_kg": {"min": 3.0, "max": 6.0, "default": 4.5}, "size_category": "medium" }
+  },
+
+  "equine": {
+    "thoroughbred": { "display": "纯血马", "weight_kg": {"min": 450, "max": 550, "default": 500}, "size_category": "large" },
+    "arabian": { "display": "阿拉伯马", "weight_kg": {"min": 360, "max": 500, "default": 450}, "size_category": "large" },
+    "quarter_horse": { "display": "夸特马", "weight_kg": {"min": 430, "max": 590, "default": 500}, "size_category": "large" },
+    "miniature": { "display": "迷你马", "weight_kg": {"min": 90, "max": 200, "default": 150}, "size_category": "small" },
+    "mixed": { "display": "混血/未知", "weight_kg": {"min": 350, "max": 550, "default": 450}, "size_category": "large" }
+  }
+}

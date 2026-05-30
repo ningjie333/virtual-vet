@@ -1,0 +1,201 @@
+{
+  "_schema": "lifecycle_profiles v1",
+  "_description": "Species-specific lifecycle profiles. Literature-sourced numerical values. Generated from research (2026-05).",
+
+  "species": {
+    "canine": {
+      "size_category": "medium",
+      "maturity_age_days": 84,
+      "geriatric_age_days_by_size": {
+        "small": 4380,
+        "medium": 3285,
+        "large": 2555,
+        "giant": 2190
+      },
+      "organs": {
+        "kidney": {
+          "maturation": {
+            "curve": "sigmoid",
+            "k": 0.08,
+            "midpoint_days": 42
+          },
+          "decline": {
+            "curve": "gompertz",
+            "onset_days": 2555,
+            "rate_per_day": 5.0e-5
+          },
+          "adult_reference": 100.0
+        },
+        "liver": {
+          "maturation": {
+            "curve": "sigmoid_three_phase",
+            "k_rise": 0.15,
+            "k_fall": 0.06,
+            "peak_days": 42,
+            "peak_value": 1.0
+          },
+          "decline": {
+            "curve": "gompertz",
+            "onset_days": 3650,
+            "rate_per_day": 2.0e-5
+          },
+          "adult_reference": 1.0
+        },
+        "heart": {
+          "maturation": {
+            "curve": "linear_saturate",
+            "max_days": 49
+          },
+          "decline": {
+            "curve": "gompertz",
+            "onset_days": 3650,
+            "rate_per_day": 1.5e-5
+          },
+          "adult_reference": 1.0
+        },
+        "immune": {
+          "maturation": {
+            "curve": "linear_saturate",
+            "max_days": 730
+          },
+          "decline": {
+            "curve": "gompertz",
+            "onset_days": 1825,
+            "rate_per_day": 3.0e-5
+          },
+          "adult_reference": 1.0
+        },
+        "respiratory": {
+          "maturation": {
+            "curve": "linear_saturate",
+            "max_days": 84
+          },
+          "decline": {
+            "curve": "constant"
+          },
+          "adult_reference": 1.0
+        }
+      },
+      "hematology": {
+        "EPO_source": {
+          "description": "犬类 EPO 生理学独特：成年犬肝脏仍是 EPO 主要来源（产量是肾脏的 2.5 倍）。与人类不同，人类成年后肾脏是主要 EPO 来源（~90%），而犬类肝脏贡献 >70%。文献来源：Nefedov 1986 PMID 3768502（犬肝脏灌注实验）。",
+          "adult_primary_organ": "liver",
+          "adult_secondary_organ": "kidney",
+          "liver_to_kidney_ratio": 2.5,
+          "neonatal_switch_timing": "unknown",
+          "neonatal_switch_note": "犬类无直接发育数据。猪数据提示 5 周完成转移（PMID 12457957）。保守估计 8 周。",
+          "phases": [
+            {"age_days_max": 56, "primary_organ": "liver", "secondary_organ": "liver"},
+            {"age_days_min": 57, "primary_organ": "liver", "secondary_organ": "kidney"}
+          ],
+          "molecular_regulation": {
+            "transcription_factor": "HIF-2alpha",
+            "hepatic_regulator": "GATA-4",
+            "note": "GATA-4 在胎儿肝脏高表达，成年后下调，可能导致肝脏 EPO 产生减少（Dame 2004 PMID 14583613）。犬类可能保留更高的 GATA-4 活性。"
+          }
+        },
+        "CKD_anemia": {
+          "mechanism": "multifactorial",
+          "description": "犬类 CKD 贫血是多因素的，不仅仅是 EPO 缺乏。人类 CKD 贫血主要是 EPO 缺乏（~90%），犬类 CKD 贫血在 Stages 3-4 出现，伴随多种机制。",
+          "factors": [
+            {"name": "EPO_deficiency", "stage": "3-4", "evidence": "King 1992 PMID 1432900"},
+            {"name": "GI_bleeding", "stage": "all", "evidence": "Borin-Crivellenti 2023 PMID 37586694"},
+            {"name": "PTH_elevation", "stage": "3-4", "evidence": "Petrites-Murphy 1989 PMID 2619121"},
+            {"name": "TNF_alpha_inflammation", "stage": "3-4", "evidence": "Borin-Crivellenti 2023 PMID 37586694"},
+            {"name": "urinary_iron_loss", "stage": "3-4", "evidence": "Sannamwong 2023 PMID 36855344"},
+            {"name": "uremic_toxin_RBC_damage", "stage": "all", "evidence": "Cowgill 1992"}
+          ],
+          "prevalence_dogs": "30-65%",
+          "prevalence_humans": "~90% at ESRD",
+          "onset_dogs": "Stages 3-4",
+          "onset_humans": "Stages 2-3"
+        },
+        "liver_disease_anemia": {
+          "mechanism": "iron_dysregulation_primary",
+          "description": "犬类肝病贫血主要是铁代谢紊乱（高铁调素），而非纯 EPO 缺乏。肝脏同时是 EPO 生产和清除器官（Briggs 1973 PMID 4746908）。",
+          "factors": [
+            {"name": "hepcidin_elevation", "evidence": "Vizi 2025 PMID 40850004（门脉分流犬）"},
+            {"name": "subclinical_hemolysis", "evidence": "Rothuizen 1992 PMID 1506635（几乎所有肝病犬）"},
+            {"name": "GI_bleeding", "evidence": "Couture 2024 PMID 38699882（门脉分流犬）"},
+            {"name": "potential_EPO_reduction", "evidence": "Murphy 1970 PMID 4985811（唯一直接测量）"}
+          ],
+          "RBC_morphology": "microcytic_hypochromic",
+          "note": "与 CKD 贫血（normocytic_normochromic）形成对比"
+        },
+        "GFR_puppies_8wk_ml_min_kg": 4.7,
+        "GFR_adult_ml_min_kg": 2.5,
+        "GFR_geriatric_pct_of_adult": 0.72,
+        "EPO_treatment": {
+          "darbepoetin": {
+            "efficacy": "85% response rate",
+            "dose": "0.5 mcg/kg SC weekly",
+            "time_to_response_days": 29,
+            "PRCA_risk": "6%",
+            "evidence": "Fiocchi 2017 PMID 28256075"
+          },
+          "recombinant_canine_EPO": {
+            "status": "experimental",
+            "efficacy": "effective but not commercially available",
+            "advantage": "avoids PRCA",
+            "evidence": "Randolph 2004 PMID 14765736, MacLeod 1998 PMID 9736393"
+          }
+        }
+      },
+      "CYP450": {
+        "description": "CYP450 maturation. Three-phase: low at birth, peaks at 4-6 weeks, settles to adult by 8-12 weeks. Type 1 enzymes (CYP1A2, CYP3A, CYP2E1) peak at 350% of newborn at 28-42 days. Source: Tavoloni 1985 PMID 2988654, Tanaka 1998 PMID 9741958.",
+        "puppy_8wk_pct_adult": 70,
+        "adult_12wk_pct": 100,
+        "juvenile_clearance_reduction": 0.3
+      },
+      "cardiac": {
+        "HR_puppy_bpm": 120,
+        "HR_adult_bpm": 85,
+        "HR_senior_bpm": 90,
+        "description": "Resting HR. Adult values: Chetbrol 2025 PMID 41030684. Puppy HR: Pereira 2024 PMID 39682383."
+      },
+      "immune": {
+        "sj_TREC_decline_onset_years": {
+          "large": 2,
+          "small": 4
+        },
+        "description": "Thymic output decline. Holder 2017 PMID 27824893: sj-TREC decline begins at 2 yr (large breeds) vs 4 yr (small breeds). Giant breeds: 45% undetectable by 10 yr."
+      }
+    },
+
+    "feline": {
+      "size_category": "small",
+      "maturity_age_days": 84,
+      "geriatric_age_days_by_size": {
+        "small": 3650,
+        "medium": 3285
+      },
+      "organs": {
+        "kidney": {
+          "maturation": {"curve": "sigmoid", "k": 0.08, "midpoint_days": 42},
+          "decline": {"curve": "gompertz", "onset_days": 3650, "rate_per_day": 2.0e-5},
+          "adult_reference": 100.0
+        },
+        "liver": {
+          "maturation": {"curve": "sigmoid_three_phase", "k_rise": 0.15, "k_fall": 0.06, "peak_days": 42, "peak_value": 1.0},
+          "decline": {"curve": "gompertz", "onset_days": 4000, "rate_per_day": 1.0e-5},
+          "adult_reference": 1.0
+        },
+        "heart": {
+          "maturation": {"curve": "linear_saturate", "max_days": 49},
+          "decline": {"curve": "gompertz", "onset_days": 4000, "rate_per_day": 5.0e-6},
+          "adult_reference": 1.0
+        },
+        "immune": {
+          "maturation": {"curve": "linear_saturate", "max_days": 730},
+          "decline": {"curve": "gompertz", "onset_days": 2555, "rate_per_day": 2.5e-5},
+          "adult_reference": 1.0
+        },
+        "respiratory": {
+          "maturation": {"curve": "linear_saturate", "max_days": 84},
+          "decline": {"curve": "constant"},
+          "adult_reference": 1.0
+        }
+      }
+    }
+  }
+}

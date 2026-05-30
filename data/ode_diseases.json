@@ -2443,5 +2443,308 @@
         }
       }
     }
+  },
+  "ckd_anemia": {
+    "display_name": "慢性肾病贫血（CKD Anemia）",
+    "severity_presets": {
+      "mild": {
+        "damage_rate": 0.002,
+        "damage_K": 0.3
+      },
+      "moderate": {
+        "damage_rate": 0.005,
+        "damage_K": 0.6
+      },
+      "severe": {
+        "damage_rate": 0.010,
+        "damage_K": 0.9
+      }
+    },
+    "state_variables": {
+      "nephron_loss": {
+        "initial": 0.05,
+        "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "damage_rate",
+          "K_key": "damage_K",
+          "seed_threshold": 0.02,
+          "seed_boost": 0.0003
+        }
+      },
+      "eop_deficiency": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "max(0.0, min(1.0, (nephron_loss - 0.4) / 0.5))"
+      },
+      "gi_blood_loss": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 1200.0,
+          "target_fn": "min(nephron_loss * 0.6, 0.8)"
+        }
+      },
+      "pth_elevation": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 1800.0,
+          "target_fn": "min(nephron_loss * 0.9, 0.95)"
+        }
+      },
+      "inflammation": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 900.0,
+          "target_fn": "nephron_loss * 0.5"
+        }
+      },
+      "iron_loss": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 2400.0,
+          "target_fn": "nephron_loss * 0.4"
+        }
+      },
+      "anemia_severity": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "min(1.0, eop_deficiency * 0.4 + gi_blood_loss * 0.2 + pth_elevation * 0.15 + inflammation * 0.1 + iron_loss * 0.15)"
+      }
+    },
+    "outputs": [
+      {
+        "target": "blood.red_cell_volume_ml",
+        "op": "set",
+        "fn": "max(400.0, 2000.0 * (1.0 - anemia_severity * 0.75))"
+      },
+      {
+        "target": "blood.creatinine",
+        "op": "set",
+        "fn": "min(12.0, 1.0 + nephron_loss * 11.0)"
+      },
+      {
+        "target": "blood.BUN",
+        "op": "set",
+        "fn": "min(150.0, 25.0 + nephron_loss * 125.0)"
+      },
+      {
+        "target": "blood.potassium",
+        "op": "set",
+        "fn": "min(7.0, 4.2 + nephron_loss * 2.8)"
+      },
+      {
+        "target": "blood.pH",
+        "op": "set",
+        "fn": "max(7.15, 7.40 - nephron_loss * 0.25)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "anemia_severity * 25.0"
+      },
+      {
+        "target": "kidney.GFR",
+        "op": "multiply",
+        "fn": "max(0.05, 1.0 - nephron_loss * 0.95)"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:1432900",
+          "text": "King LG et al. Anemia of chronic renal failure in dogs. J Vet Intern Med 1992.",
+          "url": ""
+        },
+        {
+          "id": "PMID:37586694",
+          "text": "Borin-Crivellenti S et al. Hematologic and biochemical variables in dogs with CKD. AJVR 2023.",
+          "url": ""
+        },
+        {
+          "id": "PMID:36855344",
+          "text": "Sannamwong N et al. Urinary iron and transferrin loss in dogs with CKD. Vet World 2023.",
+          "url": ""
+        },
+        {
+          "id": "PMID:2619121",
+          "text": "Petrites-Murphy MB et al. Role of PTH in renal anemia in dogs. AJVR 1989.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": ["nephrology", "hematology"],
+        "organ_systems": ["kidney", "blood", "bone_marrow"],
+        "symptoms": ["pale_mucous_membranes", "lethargy", "polyuria", "polydipsia"]
+      },
+      "equations": {
+        "nephron_loss": {
+          "type": "logistic",
+          "formula": "dnephron_loss/dt = r·nephron_loss·(1 - nephron_loss/damage_K) + seed_boost",
+          "description": "肾单位损失（logistic 增长）"
+        },
+        "eop_deficiency": {
+          "type": "algebraic",
+          "formula": "eop_deficiency = max(0, (nephron_loss - 0.4) / 0.5)",
+          "description": "EPO 缺乏（肾单位损失 >40% 时开始）"
+        },
+        "anemia_severity": {
+          "type": "algebraic",
+          "formula": "anemia_severity = eop_deficiency×0.4 + gi_blood_loss×0.2 + pth_elevation×0.15 + inflammation×0.1 + iron_loss×0.15",
+          "description": "贫血严重程度（多因素加权）"
+        }
+      }
+    }
+  },
+  "hepatic_anemia": {
+    "display_name": "肝病贫血（Hepatic Anemia）",
+    "severity_presets": {
+      "mild": {
+        "dysfunction_rate": 0.003,
+        "dysfunction_K": 0.3
+      },
+      "moderate": {
+        "dysfunction_rate": 0.006,
+        "dysfunction_K": 0.6
+      },
+      "severe": {
+        "dysfunction_rate": 0.012,
+        "dysfunction_K": 0.9
+      }
+    },
+    "state_variables": {
+      "hepatic_dysfunction": {
+        "initial": 0.05,
+        "clamp": [0, 1],
+        "ode_type": "logistic",
+        "params": {
+          "rate_key": "dysfunction_rate",
+          "K_key": "dysfunction_K",
+          "seed_threshold": 0.02,
+          "seed_boost": 0.0005
+        }
+      },
+      "hepcidin_elevation": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "hepatic_dysfunction * 0.9"
+        }
+      },
+      "iron_deficiency": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "min(1.0, hepcidin_elevation * 1.2)"
+      },
+      "hemolysis": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 900.0,
+          "target_fn": "hepatic_dysfunction * 0.5"
+        }
+      },
+      "gi_bleeding": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 600.0,
+          "target_fn": "hepatic_dysfunction * 0.4"
+        }
+      },
+      "anemia_severity": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "min(1.0, iron_deficiency * 0.45 + hemolysis * 0.3 + gi_bleeding * 0.25)"
+      }
+    },
+    "outputs": [
+      {
+        "target": "blood.red_cell_volume_ml",
+        "op": "set",
+        "fn": "max(500.0, 2000.0 * (1.0 - anemia_severity * 0.7))"
+      },
+      {
+        "target": "blood.ALT",
+        "op": "set",
+        "fn": "min(2000.0, 25.0 + hepatic_dysfunction * 1975.0)"
+      },
+      {
+        "target": "blood.albumin",
+        "op": "set",
+        "fn": "max(1.0, 3.0 - hepatic_dysfunction * 1.8)"
+      },
+      {
+        "target": "blood.bilirubin_mg_dL",
+        "op": "set",
+        "fn": "min(15.0, 0.1 + hemolysis * 10.0 + hepatic_dysfunction * 5.0)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "anemia_severity * 20.0"
+      }
+    ],
+    "meta": {
+      "references": [
+        {
+          "id": "PMID:40850004",
+          "text": "Vizi Z et al. Elevated hepcidin in dogs with portosystemic shunt. Res Vet Sci 2025.",
+          "url": ""
+        },
+        {
+          "id": "PMID:1506635",
+          "text": "Rothuizen J et al. Bilirubin kinetics in dogs with hepatobiliary disease. J Hepatol 1992.",
+          "url": ""
+        },
+        {
+          "id": "PMID:9132478",
+          "text": "Simpson KW et al. Iron status in dogs with portosystemic vascular anomalies. JVIM 1997.",
+          "url": ""
+        },
+        {
+          "id": "PMID:38699882",
+          "text": "Couture Y et al. Hematologic variables in dogs with portosystemic shunts. JVIM 2024.",
+          "url": ""
+        }
+      ],
+      "labels": {
+        "category": ["hepatology", "hematology"],
+        "organ_systems": ["liver", "blood", "spleen"],
+        "symptoms": ["pale_mucous_membranes", "jaundice", "ascites", "hepatic_encephalopathy"]
+      },
+      "equations": {
+        "hepatic_dysfunction": {
+          "type": "logistic",
+          "formula": "dhepatic_dysfunction/dt = r·hepatic_dysfunction·(1 - hepatic_dysfunction/dysfunction_K) + seed_boost",
+          "description": "肝功能障碍（logistic 增长）"
+        },
+        "hepcidin_elevation": {
+          "type": "first_order_lag",
+          "formula": "dhepcidin_elevation/dt = (target - hepcidin_elevation) / τ (τ=600.0s)",
+          "description": "铁调素升高（一阶滞后）"
+        },
+        "anemia_severity": {
+          "type": "algebraic",
+          "formula": "anemia_severity = iron_deficiency×0.45 + hemolysis×0.3 + gi_bleeding×0.25",
+          "description": "贫血严重程度（铁代谢紊乱为主）"
+        }
+      }
+    }
   }
 }

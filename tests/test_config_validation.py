@@ -384,7 +384,7 @@ def test_validate_all_returns_errors_by_file(real_ode_diseases, real_examination
     # Use the real configs — should have no errors
     results = validate_all()
     assert isinstance(results, dict)
-    assert set(results.keys()) == {"ode_diseases.json", "examinations.json", "exam_templates.json", "diseases.json"}
+    assert set(results.keys()) == {"ode_diseases.json", "examinations.json", "exam_templates.json", "diseases.json", "coupling_rules.json"}
     for filename, errors in results.items():
         assert isinstance(errors, list)
         assert all(isinstance(e, ValidationError) for e in errors)
@@ -415,6 +415,9 @@ def test_validate_all_structure_with_bad_data(tmp_path, monkeypatch):
     src_schemas = Path(__file__).resolve().parents[1] / "data" / "schemas"
     tmp_schemas = tmp_data / "schemas"
     shutil.copytree(src_schemas, tmp_schemas)
+    # Also copy coupling_rules_schema.json which lives in data/, not data/schemas/
+    src_coupling_schema = Path(__file__).resolve().parents[1] / "data" / "coupling_rules_schema.json"
+    shutil.copy(src_coupling_schema, tmp_data / "coupling_rules_schema.json")
 
     # Monkey-patch the data dir path
     import src.config_validation as cv

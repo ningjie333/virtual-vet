@@ -118,3 +118,11 @@ export const api = {
     actions: Record<string, unknown>[];
   }> => request("GET", "/sessions/" + sessionId + "/replay"),
 };
+
+// ── 调试器 API ──────────────────────────────────────────────────────────────
+
+export const debugApi = {
+  getSpecies: (): Promise<Record<string, Record<string, { display: string; weight_kg: { min: number; max: number; default: number }; size_category: string }>>> => request("GET", "/debug/species"),
+
+  getParams: (params: { species: string; breed: string; age_days: number; weight_kg?: number }): Promise<Record<string, unknown>> => request("POST", "/debug/params", params),
+};

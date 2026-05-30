@@ -113,3 +113,50 @@ export interface ApiResponse<T = unknown> {
   error?: string;
   data?: T;
 }
+
+// ── 调试器类型 ──────────────────────────────────────────────────────────────
+
+export interface BreedInfo {
+  display: string;
+  weight_kg: { min: number; max: number; default: number };
+  size_category: string;
+}
+
+export interface SpeciesBreeds {
+  [breed: string]: BreedInfo;
+}
+
+export interface SpeciesData {
+  [species: string]: SpeciesBreeds;
+}
+
+export interface DebugParamEntry {
+  value: number;
+  unit: string;
+  label_zh: string;
+}
+
+export interface DebugOrganParams {
+  [param: string]: DebugParamEntry;
+}
+
+export interface DebugParamsResponse {
+  input: {
+    species: string;
+    breed: string;
+    age_days: number;
+    weight_kg: number;
+  };
+  lifecycle: {
+    phase: string;
+    age_days: number;
+    organ_function: Record<string, number>;
+  };
+  organs: {
+    [organ: string]: DebugOrganParams;
+  };
+  summary: {
+    total: number;
+    organs: number;
+  };
+}

@@ -671,6 +671,43 @@ def _calc_score(state: GameState) -> dict:
 
 
 # ============================================================
+# 调试路由（独立于游戏逻辑）
+# ============================================================
+
+
+@app.route("/api/debug/species", methods=["GET"])
+def api_debug_species():
+    """返回可用的物种、品种和体重范围。"""
+    from src.debug_params import get_available_species
+    return jsonify(get_available_species())
+
+
+@app.route("/api/debug/params", methods=["POST"])
+def api_debug_params():
+    """
+    计算指定物种/品种/年龄的生理参数。
+
+    POST body: {"species": "canine", "breed": "labrador", "age_days": 1095, "weight_kg": 30.0}
+    """
+    data = request.get_json(force=True) or {}
+    species = data.get("species", "canine")
+    breed = data.get("breed", "mixed")
+    age_days = float(data.get("age_days", 1095.0))
+    weight_kg = data.get("weight_kg")
+    if weight_kg is not None:
+        weight_kg = float(weight_kg)
+
+    from src.debug_params import compute_debug_params
+    result = compute_debug_params(
+        species=species,
+        breed=breed,
+        age_days=age_days,
+        weight_kg=weight_kg,
+    )
+    return jsonify(result)
+
+
+# ============================================================
 # 启动
 # ============================================================
 if __name__ == "__main__":

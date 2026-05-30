@@ -244,29 +244,37 @@ class TestOrganReserve:
 
 class TestApplyAgeFactors:
     def test_captures_original_baselines(self):
+        # Note: heart.contractility_factor is no longer controlled by lifecycle
+        # (removed because direct set overwrote drug effects); use kidney.GFR instead.
         creature = DummyCreature()
         eng = LifecycleEngine(species="canine", initial_age_days=1095.0)
+        eng.capture_baselines(creature)
         eng.apply_age_factors(creature)
-        assert "heart.contractility_factor" in eng._original_baselines
-        assert eng._original_baselines["heart.contractility_factor"] == 1.0
+        assert "kidney.GFR" in eng._original_baselines
 
     def test_sets_age_adjusted_values(self):
+        # heart.contractility_factor moved out of lifecycle control; use kidney.GFR.
         creature = DummyCreature()
         eng = LifecycleEngine(species="canine", initial_age_days=6.0 * 365.0)
+        eng.capture_baselines(creature)
         eng.apply_age_factors(creature)
         # At 6 yr: multiplier ≈ exp(-0.0693*3) ≈ 0.81
-        mult = eng.organ_multiplier("heart")
-        assert 0.7 < creature.heart.contractility_factor < 0.9
+        mult = eng.organ_multiplier("kidney")
+        assert 0.7 < mult < 0.9
+        baseline_gfr = eng._original_baselines["kidney.GFR"]
+        assert creature.kidney.GFR == pytest.approx(baseline_gfr * mult, rel=1e-3)
 
     def test_does_not_override_original_baselines(self):
+        # heart.contractility_factor moved out of lifecycle control; use kidney.GFR.
         creature = DummyCreature()
         eng = LifecycleEngine(species="canine", initial_age_days=6.0 * 365.0)
+        eng.capture_baselines(creature)
         eng.apply_age_factors(creature)
-        first_value = creature.heart.contractility_factor
-        creature.heart.contractility_factor = 999  # tamper
+        first_gfr = creature.kidney.GFR
+        creature.kidney.GFR = 999  # tamper
         eng.apply_age_factors(creature)
         # Should still use original baseline (1.0), not the tampered value
-        assert creature.heart.contractility_factor == pytest.approx(first_value)
+        assert creature.kidney.GFR == pytest.approx(first_gfr)
 
 
 # ── LifecycleEngine — Serialization ───────────────────────────────────────────
@@ -289,6 +297,7 @@ class TestSerialization:
     def test_serialize_preserves_original_baselines(self):
         creature = DummyCreature()
         eng = LifecycleEngine(species="canine", initial_age_days=1095.0)
+        eng.capture_baselines(creature)
         eng.apply_age_factors(creature)
         data = eng.serialize()
         assert "_original_baselines" in data
