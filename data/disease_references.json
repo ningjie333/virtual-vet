@@ -1,0 +1,409 @@
+{
+  "pneumonia": {
+    "guidelines": [
+      {
+        "authors": "Lappin MR, Blondeau J, Boothe D, et al.",
+        "year": 2017,
+        "title": "Antimicrobial use Guidelines for Treatment of Respiratory Tract Disease in Dogs and Cats",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/jvim.14627",
+        "type": "consensus"
+      },
+      {
+        "authors": "Dear JD",
+        "year": 2020,
+        "title": "Bacterial Pneumonia in Dogs and Cats: An Update",
+        "journal": "Vet Clin North Am Small Anim Pract",
+        "pmid": "PMC7114575",
+        "type": "review"
+      }
+    ],
+    "criteria": {
+      "PaO2_low": {"threshold": "<80 mmHg", "source": "Dear 2020", "mechanism": "V/Q mismatch from alveolar exudate"},
+      "PaCO2_high": {"threshold": ">50 mmHg", "source": "Dear 2020", "mechanism": "Respiratory failure / hypoventilation"},
+      "wbc_high": {"threshold": "Leukocytosis in 66%", "source": "Helsinki thesis; Dear 2020", "mechanism": "Systemic inflammatory response"},
+      "rr_high": {"threshold": "Compensatory tachypnea", "source": "Dear 2020", "mechanism": "Compensate for hypoxemia"},
+      "temp_high": {"threshold": ">39.5°C", "source": "Dear 2020", "mechanism": "Pyrogen release from infection"},
+      "lung_exudate_xray": {"threshold": "Alveolar pattern", "source": "Dear 2020", "mechanism": "Alveolar filling with inflammatory cells"},
+      "crackles": {"threshold": "Audible on auscultation", "source": "Dear 2020", "mechanism": "Fluid in alveoli"}
+    },
+    "treatment_basis": {
+      "fluid_bolus": {"rationale": "Restore perfusion, careful to avoid fluid overload worsening pulmonary edema", "source": "ISCAID 2017"}
+    }
+  },
+  "acute_renal_failure": {
+    "guidelines": [
+      {
+        "authors": "Segev G, Cortellini S, Foster JD, et al.",
+        "year": 2024,
+        "title": "IRIS Best Practice Consensus Guidelines for AKI in Cats and Dogs",
+        "journal": "Vet J",
+        "doi": "10.1016/j.tvjl.2024.106068",
+        "type": "consensus"
+      }
+    ],
+    "criteria": {
+      "gfr_low": {"threshold": "<50 mL/min", "source": "IRIS 2024", "mechanism": "Nephron loss reduces filtration"},
+      "bun_high": {"threshold": ">30 mg/dL", "source": "IRIS 2024", "mechanism": "Impaired renal excretion + catabolism"},
+      "potassium_high": {"threshold": ">5.5 mEq/L", "source": "IRIS 2024", "mechanism": "Impaired renal K+ excretion, oliguria"},
+      "ph_low": {"threshold": "<7.35", "source": "IRIS 2024", "mechanism": "Impaired H+ excretion, reduced HCO3- reabsorption"},
+      "cr_high": {"threshold": "≥0.3 mg/dL rise from baseline", "source": "IRIS 2024", "mechanism": "Primary AKI grading biomarker"},
+      "usg_low": {"threshold": "<1.030 with azotemia", "source": "IRIS 2024", "mechanism": "Loss of concentrating ability"},
+      "t_wave_tall": {"threshold": "K+ 5.5-6.0", "source": "Iimori 2026; Today's Vet Pract 2022", "mechanism": "Accelerated repolarization from elevated extracellular K+"},
+      "qrs_wide": {"threshold": "K+ 6.5-7.0", "source": "Iimori 2026", "mechanism": "Slowed ventricular conduction"}
+    },
+    "iris_grading": {
+      "I": {"creatinine_mg_dl": "<1.4", "description": "Non-azotemic AKI"},
+      "II": {"creatinine_mg_dl": "1.4-2.8", "description": "Mild azotemia"},
+      "III": {"creatinine_mg_dl": "2.9-5.0", "description": "Moderate azotemia"},
+      "IV": {"creatinine_mg_dl": "5.1-10.0", "description": "Severe azotemia"},
+      "V": {"creatinine_mg_dl": ">10.0", "description": "End-stage"}
+    }
+  },
+  "dilated_cardiomyopathy": {
+    "guidelines": [
+      {
+        "authors": "Fuentes VL, Abbott J, Chetboul V, et al.",
+        "year": 2020,
+        "title": "ACVIM Consensus Statement: Guidelines for DCM in Dogs",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/jvim.15821",
+        "type": "consensus"
+      }
+    ],
+    "criteria": {
+      "hr_high": {"threshold": "Compensatory tachycardia", "source": "ACVIM 2020", "mechanism": "Reduced stroke volume → compensatory HR increase"},
+      "hr_low": {"threshold": "Bradycardia if advanced", "source": "ACVIM 2020", "mechanism": "Myocardial failure, arrhythmias"},
+      "map_low": {"threshold": "<90 mmHg", "source": "ACVIM 2020", "mechanism": "Reduced cardiac output → hypotension"},
+      "cvp_high": {"threshold": "Elevated", "source": "ACVIM 2020", "mechanism": "Right heart failure → venous congestion"},
+      "cardiomegaly_xray": {"threshold": "VHS >10.7 vertebrae", "source": "Buchanan 1995", "mechanism": "Chamber dilation"},
+      "cardiomegaly_us": {"threshold": "FS% <20-25%", "source": "O'Grady 2008; Cornell 2004", "mechanism": "Systolic dysfunction"},
+      "weak_pulse": {"threshold": "Reduced pulse pressure", "source": "ACVIM 2020", "mechanism": "Low stroke volume"},
+      "qrs_wide": {"threshold": ">0.06s", "source": "O'Grady 2001", "mechanism": "Intraventricular conduction delay"}
+    },
+    "echo_reference": {
+      "LVIDd_normal": "<1.7 indexed",
+      "LVIDd_occult": ">1.85 indexed",
+      "LVIDd_clinical": ">2.0 indexed",
+      "FS_normal": "25-45%",
+      "FS_occult": "<20-25%",
+      "FS_clinical": "<15-20%"
+    }
+  },
+  "phosphorus_poisoning": {
+    "guidelines": [
+      {
+        "authors": "Gray SL, Lee JA, Hovda LR, Brutlag AG",
+        "year": 2011,
+        "title": "Potential zinc phosphide rodenticide toxicosis in dogs: 362 cases",
+        "journal": "JAVMA",
+        "doi": "10.2460/javma.239.5.646",
+        "type": "retrospective"
+      }
+    ],
+    "criteria": {
+      "hr_high": {"threshold": "Tachycardia", "source": "Gray 2011; Trakulsrichai 2017", "mechanism": "Compensatory response to hypotension + direct cardiotoxicity"},
+      "hr_low": {"threshold": "Bradycardia (late)", "source": "Merck Vet Manual", "mechanism": "Myocardial depression from PH3"},
+      "map_low": {"threshold": "Hypotension/shock", "source": "Gray 2011", "mechanism": "Vasodilation + myocardial depression"},
+      "ph_low": {"threshold": "<7.35", "source": "PMC12322358", "mechanism": "High anion gap metabolic acidosis from impaired oxidative phosphorylation"},
+      "temp_high": {"threshold": "Hyperthermia", "source": "Gray 2011", "mechanism": "Muscle tremors, seizures"},
+      "temp_low": {"threshold": "Hypothermia (late)", "source": "Gray 2011", "mechanism": "Cardiovascular collapse"},
+      "p_wave_absent": {"threshold": "Arrhythmia", "source": "Jadhav 2012; Singh 1991", "mechanism": "Myocardial necrosis from PH3"}
+    },
+    "mechanism": {
+      "pathway": "Zn3P2 + 6HCl → 3ZnCl2 + 2PH3",
+      "target": "Cytochrome C oxidase (Complex IV)",
+      "effect": "Disrupts oxidative phosphorylation → cellular anoxia + ROS",
+      "lethal_dose": "20-40 mg/kg",
+      "toxic_dose": "2-4 mg/kg"
+    }
+  },
+  "gastric_dilatation_volvulus": {
+    "guidelines": [
+      {
+        "authors": "Glickman LT, Glickman NW, Perez CM, et al.",
+        "year": 1994,
+        "title": "Analysis of risk factors for GDV in dogs: 1934 cases",
+        "journal": "JAVMA",
+        "pmid": "8050972",
+        "type": "retrospective"
+      },
+      {
+        "authors": "Mooney E, Raw C, Hughes D",
+        "year": 2014,
+        "title": "Plasma lactate as prognostic biomarker in GDV",
+        "journal": "Top Companion Anim Med",
+        "doi": "10.1053/j.tcam.2014.09.005",
+        "type": "prognostic"
+      }
+    ],
+    "criteria": {
+      "hr_high": {"threshold": "Tachycardia", "source": "Beck 2006", "mechanism": "Pain, hypovolemia, compensatory"},
+      "hr_low": {"threshold": "Bradycardia (late)", "source": "Beck 2006", "mechanism": "Vagal stimulation from gastric distension"},
+      "map_low": {"threshold": "Hypotension", "source": "Beck 2006", "mechanism": "Hypovolemic + obstructive shock"},
+      "cvp_low": {"threshold": "Low CVP initially", "source": "Schertel 1997", "mechanism": "Hypovolemia"},
+      "ph_low": {"threshold": "Lactic acidosis", "source": "Mooney 2014", "mechanism": "Tissue hypoperfusion → anaerobic metabolism"},
+      "lactate_high": {"threshold": ">4 mmol/L", "source": "Mooney 2014", "mechanism": "Tissue ischemia; >6 = gastric necrosis likely"},
+      "abdominal_distension": {"threshold": "Visible/tympanic", "source": "Rosselli 2022", "mechanism": "Gastric dilatation with gas accumulation"},
+      "arrhythmia": {"threshold": "Ventricular arrhythmias", "source": "Pike 2022", "mechanism": "Myocardial ischemia, reperfusion injury; onset 12-36h post-surgery"}
+    },
+    "prognosis": {
+      "lactate_lt4": "Better survival",
+      "lactate_gt6": "Gastric necrosis more likely",
+      "lactate_drop_40pct": "Good prognosis after fluids",
+      "mortality": "16.2% (Beck 2006)",
+      "high_risk_breeds": ["great_dane (OR 10.0)", "weimaraner (OR 4.6)", "saint_bernard (OR 4.2)"]
+    }
+  },
+  "immune_mediated_hemolytic_anemia": {
+    "guidelines": [
+      {
+        "authors": "Garden OA, Kidd L, Mexas AM, et al.",
+        "year": 2019,
+        "title": "ACVIM Consensus: Diagnosis of IMHA in Dogs and Cats",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/jvim.15441",
+        "type": "consensus"
+      },
+      {
+        "authors": "Swann JW, Garden OA, Fellman CL, et al.",
+        "year": 2019,
+        "title": "ACVIM Consensus: Treatment of IMHA in Dogs",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/jvim.15463",
+        "type": "consensus"
+      }
+    ],
+    "diagnostic_criteria": {
+      "required": "≥2 of 4 criteria",
+      "criteria": [
+        "Anemia (HCT <35%)",
+        "Spherocytosis on blood smear",
+        "Positive Coombs test (DAT)",
+        "Autoagglutination (saline disaggregation test)"
+      ]
+    },
+    "criteria": {
+      "hr_high": {"threshold": "Tachycardia", "source": "ACVIM 2019", "mechanism": "Compensatory for anemia → reduced O2 carrying capacity"},
+      "hct_low": {"threshold": "<35%, often <20%", "source": "ACVIM 2019", "mechanism": "Autoimmune RBC destruction"},
+      "bilirubin_high": {"threshold": ">0.5 mg/dL", "source": "Goggs 2020", "mechanism": "Hemoglobin → heme → bilirubin from RBC destruction"},
+      "icterus": {"threshold": "Visible at bilirubin >2.0 mg/dL", "source": "Goggs 2020", "mechanism": "Unconjugated bilirubin overwhelms hepatic conjugation"},
+      "weak_pulse": {"threshold": "Reduced pulse quality", "source": "ACVIM 2019", "mechanism": "Reduced O2 delivery, possible hypotension"}
+    },
+    "transfusion_thresholds": {
+      "no_signs": ">20%",
+      "mild_signs": "15-20%",
+      "moderate_severe": "<15-20%",
+      "critical": "<12-15%"
+    }
+  },
+  "urinary_obstruction": {
+    "guidelines": [
+      {
+        "authors": "McLoughlin MA",
+        "year": 2000,
+        "title": "Surgical emergencies of the urinary tract",
+        "journal": "Vet Clin North Am Small Anim Pract",
+        "pmid": "10853277",
+        "type": "review"
+      },
+      {
+        "authors": "Iimori Y, Johnson PA, Thomovsky EJ, et al.",
+        "year": 2026,
+        "title": "Emergency management of hyperkalemia in dogs and cats",
+        "journal": "Can Vet J",
+        "pmid": "41929733",
+        "type": "review"
+      }
+    ],
+    "criteria": {
+      "hr_low": {"threshold": "Bradycardia", "source": "Iimori 2026", "mechanism": "Hyperkalemia depresses cardiac conduction"},
+      "hr_high": {"threshold": "Tachycardia (early)", "source": "McLoughlin 2000", "mechanism": "Pain, distress"},
+      "map_high": {"threshold": "Hypertension", "source": "McLoughlin 2000", "mechanism": "Volume overload, RAAS activation"},
+      "potassium_high": {"threshold": ">5.5 mEq/L", "source": "Iimori 2026", "mechanism": "Impaired renal K+ excretion from obstruction"},
+      "ph_low": {"threshold": "<7.35", "source": "Iimori 2026", "mechanism": "Impaired H+ excretion"},
+      "bladder_distension": {"threshold": "Firm, non-expressible", "source": "McLoughlin 2000", "mechanism": "Outflow obstruction → urine accumulation"},
+      "anuria": {"threshold": "<0.5 mL/kg/h", "source": "McLoughlin 2000", "mechanism": "Complete outflow obstruction"},
+      "t_wave_tall": {"threshold": "K+ 5.5-6.0", "source": "Iimori 2026", "mechanism": "Accelerated repolarization"},
+      "qrs_wide": {"threshold": "K+ 6.5-7.0", "source": "Iimori 2026", "mechanism": "Slowed ventricular conduction"}
+    }
+  },
+  "diabetic_ketoacidosis": {
+    "guidelines": [
+      {
+        "authors": "Gal A, Odunayo A",
+        "year": 2023,
+        "title": "DKA and HHS in companion animals",
+        "journal": "Vet Clin North Am Small Anim Pract",
+        "type": "review"
+      },
+      {
+        "authors": "Monnet E, et al.",
+        "year": 2014,
+        "title": "Accuracy of capillary BHB for detection of canine DKA",
+        "journal": "BMC Vet Res",
+        "pmid": "PMC4087234",
+        "type": "diagnostic"
+      }
+    ],
+    "diagnostic_triad": {
+      "D": "Hyperglycemia ≥250 mg/dL",
+      "K": "Ketonemia BHB ≥3.5-3.8 mmol/L",
+      "A": "Metabolic acidosis pH <7.3, HCO3- <15"
+    },
+    "criteria": {
+      "hr_high": {"threshold": "Tachycardia", "source": "Gal 2023", "mechanism": "Dehydration, compensatory"},
+      "map_low": {"threshold": "Hypotension", "source": "Gal 2023", "mechanism": "Dehydration (5-10%), osmotic diuresis"},
+      "rr_high": {"threshold": "Kussmaul respiration", "source": "Gal 2023; de Morais & DiBartola", "mechanism": "Respiratory compensation for metabolic acidosis: pCO2 ↓0.7 per 1 mEq/L HCO3- ↓"},
+      "ph_low": {"threshold": "<7.3", "source": "Gal 2023", "mechanism": "Ketoacid accumulation (BHB, acetoacetate)"},
+      "glucose_high": {"threshold": "≥250 mg/dL", "source": "Monnet 2014; Gal 2023", "mechanism": "Insulin deficiency → unrestrained gluconeogenesis + glycogenolysis"},
+      "hco3_low": {"threshold": "<15 mEq/L", "source": "Gal 2023", "mechanism": "Buffering of ketoacids consumes HCO3-"},
+      "dehydration": {"threshold": "5-10%", "source": "Gal 2023", "mechanism": "Osmotic diuresis from glycosuria"},
+      "ketone_high": {"threshold": "BHB >3.8 mmol/L", "source": "Monnet 2014", "mechanism": "Hepatic ketogenesis from fatty acid oxidation"},
+      "potassium_low": {"threshold": "<3.5 mEq/L", "source": "Hess 2013", "mechanism": "Osmotic diuresis loss + insulin-driven intracellular shift"}
+    }
+  },
+  "pericardial_effusion": {
+    "guidelines": [
+      {
+        "authors": "Shaw SP, Rush JE",
+        "year": 2007,
+        "title": "Canine pericardial effusion: diagnosis, treatment, and prognosis",
+        "journal": "Compendium",
+        "pmid": "17727047",
+        "type": "review"
+      },
+      {
+        "authors": "DeFrancesco TC",
+        "year": 2013,
+        "title": "Management of cardiac emergencies in small animals",
+        "journal": "Vet Clin North Am Small Anim Pract",
+        "doi": "10.1016/j.cvsm.2013.03.012",
+        "type": "review"
+      }
+    ],
+    "criteria": {
+      "hr_high": {"threshold": "Tachycardia", "source": "Shaw 2007", "mechanism": "Compensatory for reduced cardiac output"},
+      "map_low": {"threshold": "Hypotension", "source": "DeFrancesco 2013", "mechanism": "Cardiac tamponade → impaired filling → reduced CO"},
+      "cvp_high": {"threshold": "Elevated JVP", "source": "Shaw 2007", "mechanism": "Impaired right heart filling → venous congestion"},
+      "SpO2_low": {"threshold": "Desaturation", "source": "Shaw 2007", "mechanism": "Reduced cardiac output → poor tissue perfusion"},
+      "weak_pulse": {"threshold": "Weak/absent", "source": "DeFrancesco 2013", "mechanism": "Reduced stroke volume from tamponade"},
+      "pulsus_paradoxus": {"threshold": ">10% SBP drop on inspiration", "source": "Nogueira 2011", "mechanism": "Exaggerated interventricular dependence"},
+      "muffled_heart_sounds": {"threshold": "Audible muffled", "source": "Shaw 2007", "mechanism": "Fluid buffer between heart and chest wall"},
+      "jugular_distension": {"threshold": "Visible JVD", "source": "Shaw 2007", "mechanism": "Elevated CVP from impaired venous return"}
+    },
+    "common_causes": [
+      {"cause": "Hemangiosarcoma", "frequency": "50-60%", "breeds": "German Shepherd, Golden Retriever", "source": "Aronsohn 1985"},
+      {"cause": "Idiopathic pericarditis", "frequency": "20-30%", "prognosis": "Good", "source": "Levi 2021"},
+      {"cause": "Chemodectoma", "frequency": "5-10%", "breeds": "Brachycephalic", "source": "Mincă 2025"}
+    ]
+  },
+  "disseminated_intravascular_coagulation": {
+    "guidelines": [
+      {
+        "authors": "Taylor FB Jr, Toh CH, Hoots WK, Wada H, Levi M",
+        "year": 2001,
+        "title": "ISTH scoring system for DIC",
+        "journal": "Thromb Haemost",
+        "pmid": "11816725",
+        "type": "consensus"
+      },
+      {
+        "authors": "Wiinberg B, Jensen AL, Johansson PI, et al.",
+        "year": 2010,
+        "title": "Canine DIC scoring model",
+        "journal": "Vet J",
+        "doi": "10.1016/j.tvjl.2009.06.003",
+        "type": "validation"
+      }
+    ],
+    "criteria": {
+      "hr_high": {"threshold": "Tachycardia", "source": "Ralph 2012", "mechanism": "Compensatory for hypovolemia/hemorrhage"},
+      "map_low": {"threshold": "Hypotension", "source": "Ralph 2012", "mechanism": "Hemorrhage + microvascular thrombosis → organ failure"},
+      "ph_low": {"threshold": "<7.35", "source": "Bruchim 2008", "mechanism": "Lactic acidosis from tissue ischemia"},
+      "plt_low": {"threshold": "<100-150 × 10³/μL", "source": "Wiinberg 2010; Taylor 2001", "mechanism": "Consumptive thrombocytopenia"},
+      "hemorrhage": {"threshold": "Multi-site bleeding", "source": "Bruchim 2008", "mechanism": "Consumption of clotting factors + secondary fibrinolysis"},
+      "petechiae": {"threshold": "Visible petechiae/ecchymoses", "source": "Bruchim 2008", "mechanism": "Thrombocytopenia + endothelial damage from microthrombi"}
+    },
+    "isth_scoring": {
+      "plt": {"gt100": 0, "lt100": 1, "lt50": 2},
+      "fibrin_markers": {"no_increase": 0, "moderate": 2, "strong": 3},
+      "pt_prolongation": {"lt3s": 0, "3to6s": 1, "gt6s": 2},
+      "fibrinogen": {"gt1.0": 0, "lt1.0": 1},
+      "overt_dic_threshold": 5
+    }
+  },
+  "hepatic_failure_coagulopathy": {
+    "guidelines": [
+      {
+        "authors": "Kelley D, Lester C, Shaw S, de Laforcade A, Webster CRL",
+        "year": 2015,
+        "title": "Thromboelastographic Evaluation of Dogs with Acute Liver Disease",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/jvim.13441",
+        "type": "diagnostic"
+      },
+      {
+        "authors": "Gow AG",
+        "year": 2017,
+        "title": "Hepatic Encephalopathy",
+        "journal": "Vet Clin North Am Small Anim Pract",
+        "doi": "10.1016/j.cvsm.2016.11.008",
+        "type": "review"
+      }
+    ],
+    "criteria": {
+      "pt_prolonged": {"threshold": ">1.5× ULN = ALF", "source": "Kelley 2015", "mechanism": "Decreased synthesis of vitamin K-dependent factors (II, VII, IX, X)"},
+      "aptt_prolonged": {"threshold": "Prolonged", "source": "Richardson 2018", "mechanism": "Decreased factor synthesis"},
+      "fibrinogen_low": {"threshold": "<100 mg/dL", "source": "Richardson 2018", "mechanism": "Decreased hepatic synthesis; distinguishes from DIC (bimodal) and rodenticide (increased)"},
+      "albumin_low": {"threshold": "<2.0 g/dL", "source": "Sevelius 1995", "mechanism": "Decreased hepatic synthesis; most consistent finding in cirrhosis (96%)"},
+      "ammonia_high": {"threshold": ">50 μmol/L", "source": "Gow 2017; Lidbury 2016", "mechanism": "Impaired urea cycle → hyperammonemia → astrocyte swelling → HE"},
+      "alt_high": {"threshold": ">2× elevation", "source": "Assawarachan 2020", "mechanism": "Hepatocyte leakage; 40-65% sensitivity alone, 90% combined with ALP"}
+    },
+    "vitamin_k_test": {
+      "liver_failure": "No response (parenchymal defect)",
+      "rodenticide": "PT normalizes within 12-24h",
+      "dose": "Vitamin K1 2.5 mg/kg SC",
+      "source": "Kelley 2015; Richardson 2018"
+    }
+  },
+  "splenic_rupture": {
+    "guidelines": [
+      {
+        "authors": "Schick AR, Grimes JA",
+        "year": 2022,
+        "title": "Double two-thirds rule for diagnosing HSA: systematic review",
+        "journal": "JAVMA",
+        "doi": "10.2460/javma.22.08.0389",
+        "type": "systematic_review"
+      },
+      {
+        "authors": "Hammond TN, Pesillo-Crosby SA",
+        "year": 2008,
+        "title": "Prevalence of HSA in anemic dogs with splenic mass",
+        "journal": "JAVMA",
+        "doi": "10.2460/javma.232.4.553",
+        "type": "retrospective"
+      }
+    ],
+    "criteria": {
+      "hr_high": {"threshold": "Tachycardia", "source": "Hammond 2014", "mechanism": "Hemorrhagic shock compensatory response"},
+      "map_low": {"threshold": "Hypotension", "source": "Hammond 2014", "mechanism": "Hypovolemic shock from hemoperitoneum"},
+      "hct_low": {"threshold": "Acute drop", "source": "Hammond 2008", "mechanism": "Hemorrhage; HSA significantly lower than benign"},
+      "lactate_high": {"threshold": "Elevated", "source": "Hammond 2014", "mechanism": "Tissue hypoperfusion → anaerobic metabolism"},
+      "splenic_mass": {"threshold": "Palpable/ultrasound", "source": "Schick 2022", "mechanism": "Neoplastic or benign splenic lesion"},
+      "abdominal_pain": {"threshold": "Pain on palpation", "source": "Stewart 2020", "mechanism": "Capsular stretch from hemorrhage"},
+      "distended_abdomen": {"threshold": "Visible distension", "source": "Stewart 2020", "mechanism": "Hemoperitoneum accumulation"},
+      "pale_mucous_membranes": {"threshold": "Pale/white", "source": "Hammond 2008", "mechanism": "Anemia from acute blood loss"}
+    },
+    "epidemiology": {
+      "malignancy_rate": "~73% (Schick 2022 systematic review)",
+      "hsa_of_malignancies": "~87%",
+      "hsa_of_all_cases": "~63%",
+      "high_risk_breeds": ["German Shepherd", "Golden Retriever", "Labrador"],
+      "perioperative_survival": "95% (Stewart 2020)",
+      "median_survival_surgery_only": "~66 days",
+      "median_survival_surgery_chemo": "~142 days"
+    }
+  }
+}

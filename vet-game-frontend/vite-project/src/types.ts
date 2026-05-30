@@ -69,6 +69,37 @@ export interface DiagnosisMatch {
   total_clues: number;
 }
 
+// ── 疾病文献引用类型 ──────────────────────────────────────────────────────────
+
+export interface ReferenceGuideline {
+  authors: string;
+  year: number;
+  title: string;
+  journal: string;
+  doi?: string;
+  pmid?: string;
+  type: string; // "consensus" | "review" | "retrospective" | "diagnostic" | "prognostic"
+}
+
+export interface CriterionReference {
+  threshold: string;
+  source: string;
+  mechanism: string;
+}
+
+export interface DiseaseReference {
+  guidelines: ReferenceGuideline[];
+  criteria?: Record<string, CriterionReference>;
+  matched_criteria?: Record<string, CriterionReference>;
+  [key: string]: unknown; // 允许额外字段 (mechanism, echo_reference, etc.)
+}
+
+export interface DiagnosisResponse {
+  matches: DiagnosisMatch[];
+  suggested_tests: string[];
+  references: Record<string, DiseaseReference>;
+}
+
 export interface TreatmentResult {
   success: boolean;
   correct: boolean;

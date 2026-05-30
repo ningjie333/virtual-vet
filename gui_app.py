@@ -561,8 +561,11 @@ def api_diagnosis():
         {
             "matches": [...],          # match_diseases() 结果，按 confidence 降序
             "suggested_tests": [...],  # get_suggested_tests() 结果
+            "references": {...},       # 疾病文献引用 (仅 top 3)
         }
     """
+    from game.diagnosis_engine import get_disease_references_with_clues
+
     session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
     state = _game_sessions.get(session_id)
     if not state:
@@ -571,12 +574,44 @@ def api_diagnosis():
     matches = match_diseases(state.reports)
     suggested = get_suggested_tests(matches)
 
+    # 为 top 3 候选疾病添加文献引用
+    references = {}
+    for m in matches[:3]:
+        disease = m["disease"]
+        refs = get_disease_references_with_clues(disease, m["matched_clues"])
+        if refs["guidelines"] or refs["matched_criteria"]:
+            references[disease] = refs
+
     return jsonify(
         {
             "matches": matches,
             "suggested_tests": suggested,
+            "references": references,
         }
     )
+
+
+@app.route("/api/disease-references/<disease_name>", methods=["GET"])
+def api_disease_references(disease_name):
+    """
+    返回指定疾病的完整文献引用数据。
+
+    Args:
+        disease_name: 疾病名称 (如 "pneumonia")
+
+    Returns:
+        {
+            "guidelines": [...],
+            "criteria": {...},
+            ...
+        }
+    """
+    from game.diagnosis_engine import get_disease_references
+
+    ref = get_disease_references(disease_name)
+    if ref is None:
+        return jsonify({"error": "未找到该疾病的引用数据"}), 404
+    return jsonify(ref)
 
 
 # ============================================================

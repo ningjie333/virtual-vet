@@ -1,4 +1,4 @@
-import type { Case, Report, Vitals, GameState, TreatmentResult, GameOverData, DiagnosisMatch, DrugEntry, AdministerDrugResponse } from "./types";
+import type { Case, Report, Vitals, GameState, TreatmentResult, GameOverData, DiagnosisResponse, DiseaseReference, DrugEntry, AdministerDrugResponse } from "./types";
 
 const BASE = "/api";
 
@@ -98,10 +98,11 @@ export const api = {
   getHint: (sessionId: string): Promise<{ hint: string }> =>
     request("GET", `/hint?session_id=${sessionId}`),
 
-  getDiagnosis: (sessionId: string): Promise<{
-    matches: DiagnosisMatch[];
-    suggested_tests: string[];
-  }> => request("GET", `/diagnosis?session_id=${sessionId}`),
+  getDiagnosis: (sessionId: string): Promise<DiagnosisResponse> =>
+    request("GET", `/diagnosis?session_id=${sessionId}`),
+
+  getDiseaseReferences: (diseaseName: string): Promise<DiseaseReference> =>
+    request("GET", `/disease-references/${diseaseName}`),
 
   getDrugs: (): Promise<Record<string, { name: string; half_life_h: number; description: string }>> =>
     request("GET", "/drugs"),

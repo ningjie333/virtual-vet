@@ -25,6 +25,15 @@ _DISEASE_CLUES: dict[str, list[str]] = _DISEASE_DATA["clues"]
 CLUE_DESCRIPTIONS: dict[str, str] = _DISEASE_DATA["clue_descriptions"]
 _CLUE_TO_TEST: dict[str, str] = _DISEASE_DATA["clue_to_test"]
 
+# ── 从 data/disease_references.json 加载文献引用 ──
+_REF_PATH = os.path.join(_DATA_DIR, "disease_references.json")
+if os.path.exists(_REF_PATH):
+    with open(_REF_PATH, encoding="utf-8") as _f:
+        _DISEASE_REFERENCES: dict[str, dict] = json.load(_f)
+else:
+    _DISEASE_REFERENCES: dict[str, dict] = {}
+    logger.warning("disease_references.json not found, references disabled")
+
 
 def _extract_clues_from_report(report: dict) -> list[str]:
     """
@@ -173,3 +182,45 @@ def register_disease_clues(disease_name: str, clues: list[str]) -> None:
     """
     _DISEASE_CLUES[disease_name] = clues
     logger.info("注册疾病线索: %s → %d 条", disease_name, len(clues))
+
+
+def get_disease_references(disease_name: str) -> dict | None:
+    """
+    返回指定疾病的文献引用数据。
+
+    Args:
+        disease_name: 疾病名称 (如 "pneumonia", "acute_renal_failure")
+
+    Returns:
+        引用数据字典，包含 guidelines, criteria, mechanism 等
+    """
+    return _DISEASE_REFERENCES.get(disease_name)
+
+
+def get_disease_references_with_clues(disease_name: str, matched_clues: list[str]) -> dict:
+    """
+    返回疾病的引用数据，仅包含已匹配线索的诊断依据。
+
+    Args:
+        disease_name: 疾病名称
+        matched_clues: 已匹配的线索 ID 列表
+
+    Returns:
+        包含 guidelines 和 matched_criteria 的字典
+    """
+    ref = _DISEASE_REFERENCES.get(disease_name)
+    if not ref:
+        return {"guidelines": [], "matched_criteria": {}}
+
+    # 只返回已匹配线索的引用
+    all_criteria = ref.get("criteria", {})
+    matched_criteria = {
+        clue: all_criteria[clue]
+        for clue in matched_clues
+        if clue in all_criteria
+    }
+
+    return {
+        "guidelines": ref.get("guidelines", []),
+        "matched_criteria": matched_criteria,
+    }

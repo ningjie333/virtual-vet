@@ -122,12 +122,13 @@ function onBreedChange() {
 async function computeParams() {
   loading.value = true;
   try {
-    result.value = await debugApi.getParams({
+    const data = await debugApi.getParams({
       species: species.value,
       breed: breed.value,
       age_days: ageDays.value,
       weight_kg: weightKg.value,
-    }) as DebugParamsResponse;
+    });
+    result.value = data as unknown as DebugParamsResponse;
   } catch (e) {
     console.error("Debug params error:", e);
   } finally {
