@@ -27,15 +27,15 @@ from src.organs.coupling import CouplingEngine, OrganContext, PhysiologicalSigna
 from parameters import (
     DT_SECONDS, SIMULATION_STEP_MS, T_MAX_MINUTES,
     PLASMA_VOLUME_FRACTION,
-    total_blood_volume_ml, stroke_volume_ml, stroke_volume_ml_feline,
+    total_blood_volume_ml, stroke_volume_ml, stroke_volume_ml_feline, stroke_volume_ml_equine,
     base_cardiac_output_ml_min,
-    tidal_volume_ml, tidal_volume_ml_feline, base_minute_ventilation,
+    tidal_volume_ml, tidal_volume_ml_feline, tidal_volume_ml_equine, base_minute_ventilation,
     renal_blood_flow_ml_min, gfr_ml_min, baseline_urine_output_ml_min,
     DEFAULT_AGE_DAYS,
-    HEART_RATE_REST_BPM, HEART_RATE_REST_BPM_FELINE,
-    HEART_RATE_STRESS_BPM, HEART_RATE_STRESS_BPM_FELINE,
-    ARTERIAL_PCO2_NORMAL, ARTERIAL_PCO2_NORMAL_FELINE,
-    RESPIRATORY_RATE_REST, RESPIRATORY_RATE_REST_FELINE,
+    HEART_RATE_REST_BPM, HEART_RATE_REST_BPM_FELINE, HEART_RATE_REST_BPM_EQUINE,
+    HEART_RATE_STRESS_BPM, HEART_RATE_STRESS_BPM_FELINE, HEART_RATE_STRESS_BPM_EQUINE,
+    ARTERIAL_PCO2_NORMAL, ARTERIAL_PCO2_NORMAL_FELINE, ARTERIAL_PCO2_NORMAL_EQUINE,
+    RESPIRATORY_RATE_REST, RESPIRATORY_RATE_REST_FELINE, RESPIRATORY_RATE_REST_EQUINE,
 )
 
 logger = logging.getLogger(__name__)
@@ -294,6 +294,10 @@ class VirtualCreature:
             _hr_rest = HEART_RATE_REST_BPM_FELINE      # 150 bpm
             _hr_stress = HEART_RATE_STRESS_BPM_FELINE  # 250 bpm
             _pco2_normal = ARTERIAL_PCO2_NORMAL_FELINE # 35 mmHg
+        elif species == "equine":
+            _hr_rest = HEART_RATE_REST_BPM_EQUINE      # 35 bpm
+            _hr_stress = HEART_RATE_STRESS_BPM_EQUINE  # 70 bpm
+            _pco2_normal = ARTERIAL_PCO2_NORMAL_EQUINE # 42 mmHg
         else:
             _hr_rest = HEART_RATE_REST_BPM              # 85 bpm
             _hr_stress = HEART_RATE_STRESS_BPM          # 180 bpm
@@ -305,6 +309,10 @@ class VirtualCreature:
             _sv  = stroke_volume_ml_feline(body_weight_kg)   # 猫：0.55 mL/kg
             _tv  = tidal_volume_ml_feline(body_weight_kg)    # 猫：7.5 mL/kg
             _rr  = RESPIRATORY_RATE_REST_FELINE              # 猫：25 /min
+        elif species == "equine":
+            _sv  = stroke_volume_ml_equine(body_weight_kg)   # 马：2.0 mL/kg
+            _tv  = tidal_volume_ml_equine(body_weight_kg)    # 马：10 mL/kg
+            _rr  = RESPIRATORY_RATE_REST_EQUINE              # 马：12 /min
         else:
             _sv  = stroke_volume_ml(body_weight_kg)          # 犬：1.0 mL/kg
             _tv  = tidal_volume_ml(body_weight_kg)           # 犬：12 mL/kg
@@ -329,7 +337,7 @@ class VirtualCreature:
         )
         self.lung = LungModule(
             weight_kg=body_weight_kg, blood=self.blood,
-            tidal_vol_ml=_tv, base_minute_vent=_mv,
+            base_RR=_rr, tidal_vol_ml=_tv, base_minute_vent=_mv,
         )
         self.kidney = KidneyModule(
             weight_kg=body_weight_kg, blood=self.blood,

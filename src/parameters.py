@@ -21,6 +21,10 @@ def stroke_volume_ml_feline(weight_kg: float) -> float:
     """猫每搏输出量: 0.5-0.6 mL/kg（猫是"高心率+低每搏量"模式）"""
     return 0.55 * weight_kg
 
+def stroke_volume_ml_equine(weight_kg: float) -> float:
+    """马每搏输出量: 1.7-2.4 mL/kg（马是"低心率+高每搏量"模式）"""
+    return 2.0 * weight_kg
+
 def base_cardiac_output_ml_min(weight_kg: float) -> float:
     """犬基础心输出量: HR × SV"""
     return HEART_RATE_REST_BPM * stroke_volume_ml(weight_kg)
@@ -32,6 +36,10 @@ def tidal_volume_ml(weight_kg: float) -> float:
 def tidal_volume_ml_feline(weight_kg: float) -> float:
     """猫潮气量: 7-8 mL/kg（猫比犬略低）"""
     return 7.5 * weight_kg
+
+def tidal_volume_ml_equine(weight_kg: float) -> float:
+    """马潮气量: 10-12 mL/kg（马是深慢呼吸模式）"""
+    return 10.0 * weight_kg
 
 def base_minute_ventilation(weight_kg: float) -> float:
     """犬基础分钟通气量: TV × RR"""
@@ -62,6 +70,10 @@ HEART_RATE_REST_BPM_FELINE = 150                  # 猫静息心率 bpm (120-180
 # REF: textbook:nelson | Nelson & Couto 5e Ch22 | Estimated maximum ~180 bpm
 HEART_RATE_STRESS_BPM = 180                       # 犬应激心率上限 bpm
 HEART_RATE_STRESS_BPM_FELINE = 250                # 猫应激心率上限 bpm
+# REF: Merck Vet Manual; Reed & Bayly Equine Internal Medicine | Horse resting HR 28-44 bpm
+HEART_RATE_REST_BPM_EQUINE = 35                   # 马静息心率 bpm (28-44 范围内)
+# REF: Thomas & Fregin 1990 PMID:9259809 | Horse max exercise HR 220-240 bpm
+HEART_RATE_STRESS_BPM_EQUINE = 70                 # 马应激心率上限 bpm (轻度应激)
 
 # 血管阻力 (mmHg·s/mL = PRU)
 # REF: textbook:guyton | Guyton 14e Ch26 | TPR ≈ 1.4 mmHg·s/mL in resting dog
@@ -89,6 +101,8 @@ PULMONARY_ARTERIAL_PRESSURE_MMHG = 15.0           # 肺动脉压 mmHg
 RESPIRATORY_RATE_REST = 18                        # 犬静息呼吸频率 /min
 # REF: Dijkstra 2018 PMID:29680402 | Cat resting RR 20-30 /min; UC Davis CVET 20-30
 RESPIRATORY_RATE_REST_FELINE = 25                 # 猫静息呼吸频率 /min
+# REF: Merck Vet Manual; BMC Vet Res 2016 | Horse resting RR 8-16 /min, typical ~12
+RESPIRATORY_RATE_REST_EQUINE = 12                 # 马静息呼吸频率 /min
 RESPIRATORY_RATE_STRESS = 40                      # 犬应激呼吸频率 /min
 RESPIRATORY_RATE_STRESS_FELINE = 50               # 猫应激呼吸频率 /min
 
@@ -108,6 +122,8 @@ ARTERIAL_PO2_NORMAL = 95.0                        # 犬正常动脉血氧分压 
 ARTERIAL_PCO2_NORMAL = 40.0                       # 犬正常动脉血CO2分压 mmHg
 # REF: Merck Veterinary Manual | Cat PaCO2 29-42 mmHg
 ARTERIAL_PCO2_NORMAL_FELINE = 35.0                # 猫正常动脉血CO2分压 mmHg
+# REF: Sherlock et al. 2019 PMID:31471125 (n=139) | Horse PaCO2 36.3-54.0, median 45.2
+ARTERIAL_PCO2_NORMAL_EQUINE = 42.0                # 马正常动脉血CO2分压 mmHg
 ARTERIAL_SATURATION_NORMAL = 0.97                 # 正常血氧饱和度
 # REF: textbook:guyton | Guyton 14e Ch31 | O2 capacity ≈ 20 mL O2/100mL blood
 BLOOD_O2_CAPACITY_ML_O2_PER_100ML = 20.0          # 100mL血液携氧量 mL O2/100mL blood
