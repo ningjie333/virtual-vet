@@ -19,16 +19,47 @@
       }
     ],
     "criteria": {
-      "PaO2_low": {"threshold": "<80 mmHg", "source": "Dear 2020", "mechanism": "V/Q mismatch from alveolar exudate"},
-      "PaCO2_high": {"threshold": ">50 mmHg", "source": "Dear 2020", "mechanism": "Respiratory failure / hypoventilation"},
-      "wbc_high": {"threshold": "Leukocytosis in 66%", "source": "Helsinki thesis; Dear 2020", "mechanism": "Systemic inflammatory response"},
-      "rr_high": {"threshold": "Compensatory tachypnea", "source": "Dear 2020", "mechanism": "Compensate for hypoxemia"},
-      "temp_high": {"threshold": ">39.5°C", "source": "Dear 2020", "mechanism": "Pyrogen release from infection"},
-      "lung_exudate_xray": {"threshold": "Alveolar pattern", "source": "Dear 2020", "mechanism": "Alveolar filling with inflammatory cells"},
-      "crackles": {"threshold": "Audible on auscultation", "source": "Dear 2020", "mechanism": "Fluid in alveoli"}
+      "PaO2_low": {
+        "threshold": "<80 mmHg",
+        "source": "Dear 2020",
+        "mechanism": "V/Q mismatch from alveolar exudate"
+      },
+      "PaCO2_high": {
+        "threshold": ">50 mmHg",
+        "source": "Dear 2020",
+        "mechanism": "Respiratory failure / hypoventilation"
+      },
+      "wbc_high": {
+        "threshold": "Leukocytosis in 66%",
+        "source": "Helsinki thesis; Dear 2020",
+        "mechanism": "Systemic inflammatory response"
+      },
+      "rr_high": {
+        "threshold": "Compensatory tachypnea",
+        "source": "Dear 2020",
+        "mechanism": "Compensate for hypoxemia"
+      },
+      "temp_high": {
+        "threshold": ">39.5°C",
+        "source": "Dear 2020",
+        "mechanism": "Pyrogen release from infection"
+      },
+      "lung_exudate_xray": {
+        "threshold": "Alveolar pattern",
+        "source": "Dear 2020",
+        "mechanism": "Alveolar filling with inflammatory cells"
+      },
+      "crackles": {
+        "threshold": "Audible on auscultation",
+        "source": "Dear 2020",
+        "mechanism": "Fluid in alveoli"
+      }
     },
     "treatment_basis": {
-      "fluid_bolus": {"rationale": "Restore perfusion, careful to avoid fluid overload worsening pulmonary edema", "source": "ISCAID 2017"}
+      "fluid_bolus": {
+        "rationale": "Restore perfusion, careful to avoid fluid overload worsening pulmonary edema",
+        "source": "ISCAID 2017"
+      }
     }
   },
   "acute_renal_failure": {
@@ -40,24 +71,117 @@
         "journal": "Vet J",
         "doi": "10.1016/j.tvjl.2024.106068",
         "type": "consensus"
+      },
+      {
+        "authors": "Cowgill LD, Elliott DA, Grauer GF",
+        "year": 2023,
+        "title": "IRIS Staging of CKD and AKI: Updated 2023 Guidelines",
+        "journal": "International Renal Interest Society",
+        "url": "https://www.iris-kidney.com/guidelines/acute-kidney-injury.html",
+        "type": "consensus"
       }
     ],
     "criteria": {
-      "gfr_low": {"threshold": "<50 mL/min", "source": "IRIS 2024", "mechanism": "Nephron loss reduces filtration"},
-      "bun_high": {"threshold": ">30 mg/dL", "source": "IRIS 2024", "mechanism": "Impaired renal excretion + catabolism"},
-      "potassium_high": {"threshold": ">5.5 mEq/L", "source": "IRIS 2024", "mechanism": "Impaired renal K+ excretion, oliguria"},
-      "ph_low": {"threshold": "<7.35", "source": "IRIS 2024", "mechanism": "Impaired H+ excretion, reduced HCO3- reabsorption"},
-      "cr_high": {"threshold": "≥0.3 mg/dL rise from baseline", "source": "IRIS 2024", "mechanism": "Primary AKI grading biomarker"},
-      "usg_low": {"threshold": "<1.030 with azotemia", "source": "IRIS 2024", "mechanism": "Loss of concentrating ability"},
-      "t_wave_tall": {"threshold": "K+ 5.5-6.0", "source": "Iimori 2026; Today's Vet Pract 2022", "mechanism": "Accelerated repolarization from elevated extracellular K+"},
-      "qrs_wide": {"threshold": "K+ 6.5-7.0", "source": "Iimori 2026", "mechanism": "Slowed ventricular conduction"}
+      "gfr_low": {
+        "threshold": "<50 mL/min",
+        "source": "IRIS 2024",
+        "mechanism": "Nephron loss reduces filtration"
+      },
+      "bun_high": {
+        "threshold": ">30 mg/dL",
+        "source": "IRIS 2024",
+        "mechanism": "Impaired renal excretion + catabolism"
+      },
+      "potassium_high": {
+        "threshold": ">5.5 mEq/L",
+        "source": "IRIS 2024",
+        "mechanism": "Impaired renal K+ excretion, oliguria"
+      },
+      "ph_low": {
+        "threshold": "<7.35",
+        "source": "IRIS 2024",
+        "mechanism": "Impaired H+ excretion, reduced HCO3- reabsorption"
+      },
+      "cr_high": {
+        "threshold": "≥0.3 mg/dL rise from baseline",
+        "source": "IRIS 2024",
+        "mechanism": "Primary AKI grading biomarker"
+      },
+      "usg_low": {
+        "threshold": "<1.030 with azotemia",
+        "source": "IRIS 2024",
+        "mechanism": "Loss of concentrating ability"
+      },
+      "t_wave_tall": {
+        "threshold": "K+ 5.5-6.0",
+        "source": "Iimori 2026; Today's Vet Pract 2022",
+        "mechanism": "Accelerated repolarization from elevated extracellular K+"
+      },
+      "qrs_wide": {
+        "threshold": "K+ 6.5-7.0",
+        "source": "Iimori 2026",
+        "mechanism": "Slowed ventricular conduction"
+      },
+      "SDMA_high": {
+        "threshold": ">14 ug/dL",
+        "source": "Nabity 2015; IRIS 2023",
+        "mechanism": "SDMA rises earlier than creatinine (25-50% GFR loss vs 75% for Cr); less affected by muscle mass"
+      },
+      "urine_output_low": {
+        "threshold": "<1 mL/kg/hr (oliguria) or 0 (anuria)",
+        "source": "Cowgill 2023",
+        "mechanism": "Nephron damage -> impaired concentrating ability or tubular obstruction"
+      },
+      "USG_low": {
+        "threshold": "<1.035 (cat) / <1.030 (dog) = isosthenuria",
+        "source": "IRIS 2023",
+        "mechanism": "Loss of >67% nephron function -> inability to concentrate urine"
+      }
     },
     "iris_grading": {
-      "I": {"creatinine_mg_dl": "<1.4", "description": "Non-azotemic AKI"},
-      "II": {"creatinine_mg_dl": "1.4-2.8", "description": "Mild azotemia"},
-      "III": {"creatinine_mg_dl": "2.9-5.0", "description": "Moderate azotemia"},
-      "IV": {"creatinine_mg_dl": "5.1-10.0", "description": "Severe azotemia"},
-      "V": {"creatinine_mg_dl": ">10.0", "description": "End-stage"}
+      "I": {
+        "creatinine_mg_dl": "<1.4",
+        "description": "Non-azotemic AKI"
+      },
+      "II": {
+        "creatinine_mg_dl": "1.4-2.8",
+        "description": "Mild azotemia"
+      },
+      "III": {
+        "creatinine_mg_dl": "2.9-5.0",
+        "description": "Moderate azotemia"
+      },
+      "IV": {
+        "creatinine_mg_dl": "5.1-10.0",
+        "description": "Severe azotemia"
+      },
+      "V": {
+        "creatinine_mg_dl": ">10.0",
+        "description": "End-stage"
+      }
+    },
+    "iris_aki_staging": {
+      "stage_1": {
+        "creatinine": "<1.6 mg/dL (cat) / <1.4 mg/dL (dog)",
+        "clinical": "Non-azotemic AKI: oliguria/anuria, urine sediment abnormalities, or imaging evidence"
+      },
+      "stage_2": {
+        "creatinine": "1.7-2.5 mg/dL (cat) / 1.5-2.5 mg/dL (dog)",
+        "clinical": "Mild azotemia"
+      },
+      "stage_3": {
+        "creatinine": "2.6-5.0 mg/dL",
+        "clinical": "Moderate azotemia"
+      },
+      "stage_4": {
+        "creatinine": "5.1-10.0 mg/dL",
+        "clinical": "Severe azotemia"
+      },
+      "stage_5": {
+        "creatinine": ">10.0 mg/dL",
+        "clinical": "Severe azotemia with life-threatening complications"
+      },
+      "source": "IRIS 2023 AKI Guidelines"
     }
   },
   "dilated_cardiomyopathy": {
@@ -69,25 +193,101 @@
         "journal": "J Vet Intern Med",
         "doi": "10.1111/jvim.15821",
         "type": "consensus"
+      },
+      {
+        "authors": "Dukes-McEwan J, Borgarelli M, Tidholm A, et al.",
+        "year": 2003,
+        "title": "Proposed Guidelines for the Diagnosis of Canine Idiopathic Dilated Cardiomyopathy",
+        "journal": "J Vet Cardiol",
+        "doi": "10.1016/S1760-2734(06)70026-3",
+        "type": "consensus"
       }
     ],
     "criteria": {
-      "hr_high": {"threshold": "Compensatory tachycardia", "source": "ACVIM 2020", "mechanism": "Reduced stroke volume → compensatory HR increase"},
-      "hr_low": {"threshold": "Bradycardia if advanced", "source": "ACVIM 2020", "mechanism": "Myocardial failure, arrhythmias"},
-      "map_low": {"threshold": "<90 mmHg", "source": "ACVIM 2020", "mechanism": "Reduced cardiac output → hypotension"},
-      "cvp_high": {"threshold": "Elevated", "source": "ACVIM 2020", "mechanism": "Right heart failure → venous congestion"},
-      "cardiomegaly_xray": {"threshold": "VHS >10.7 vertebrae", "source": "Buchanan 1995", "mechanism": "Chamber dilation"},
-      "cardiomegaly_us": {"threshold": "FS% <20-25%", "source": "O'Grady 2008; Cornell 2004", "mechanism": "Systolic dysfunction"},
-      "weak_pulse": {"threshold": "Reduced pulse pressure", "source": "ACVIM 2020", "mechanism": "Low stroke volume"},
-      "qrs_wide": {"threshold": ">0.06s", "source": "O'Grady 2001", "mechanism": "Intraventricular conduction delay"}
+      "hr_high": {
+        "threshold": "Compensatory tachycardia",
+        "source": "ACVIM 2020",
+        "mechanism": "Reduced stroke volume → compensatory HR increase"
+      },
+      "hr_low": {
+        "threshold": "Bradycardia if advanced",
+        "source": "ACVIM 2020",
+        "mechanism": "Myocardial failure, arrhythmias"
+      },
+      "map_low": {
+        "threshold": "<90 mmHg",
+        "source": "ACVIM 2020",
+        "mechanism": "Reduced cardiac output → hypotension"
+      },
+      "cvp_high": {
+        "threshold": "Elevated",
+        "source": "ACVIM 2020",
+        "mechanism": "Right heart failure → venous congestion"
+      },
+      "cardiomegaly_xray": {
+        "threshold": "VHS >10.7 vertebrae",
+        "source": "Buchanan 1995",
+        "mechanism": "Chamber dilation"
+      },
+      "cardiomegaly_us": {
+        "threshold": "FS% <20-25%",
+        "source": "O'Grady 2008; Cornell 2004",
+        "mechanism": "Systolic dysfunction"
+      },
+      "weak_pulse": {
+        "threshold": "Reduced pulse pressure",
+        "source": "ACVIM 2020",
+        "mechanism": "Low stroke volume"
+      },
+      "qrs_wide": {
+        "threshold": ">0.06s",
+        "source": "O'Grady 2001",
+        "mechanism": "Intraventricular conduction delay"
+      },
+      "LVIDd_high": {
+        "threshold": ">1.85 cm/kg (M-mode)",
+        "source": "Dukes-McEwan 2003",
+        "mechanism": "Ventricular dilation with systolic dysfunction"
+      },
+      "FS_low": {
+        "threshold": "<25%",
+        "source": "Dukes-McEwan 2003",
+        "mechanism": "Reduced myocardial contractility"
+      },
+      "LA_AO_high": {
+        "threshold": ">1.6",
+        "source": "Dukes-McEwan 2003",
+        "mechanism": "Left atrial dilation from mitral regurgitation"
+      }
     },
     "echo_reference": {
-      "LVIDd_normal": "<1.7 indexed",
-      "LVIDd_occult": ">1.85 indexed",
-      "LVIDd_clinical": ">2.0 indexed",
-      "FS_normal": "25-45%",
-      "FS_occult": "<20-25%",
-      "FS_clinical": "<15-20%"
+      "LVIDd": {
+        "normal": "<1.7 cm/kg body weight",
+        "DCM": ">1.85 cm/kg (M-mode)",
+        "source": "Dukes-McEwan 2003; Cornell 2004"
+      },
+      "FS_percent": {
+        "normal": "25-45%",
+        "DCM": "<25% (M-mode shortening fraction)",
+        "source": "Dukes-McEwan 2003"
+      },
+      "EPSS": {
+        "normal": "<6 mm",
+        "DCM": ">6 mm (E-point to septal separation)",
+        "source": "Dukes-McEwan 2003",
+        "mechanism": "Increased EPSS reflects reduced LV ejection"
+      },
+      "VHS": {
+        "normal": "<10.7 (dog breed-dependent)",
+        "DCM": ">11.0-11.5",
+        "source": "Lamb 2001"
+      },
+      "LA_AO_ratio": {
+        "normal": "<1.6",
+        "DCM_mild": "1.6-2.0",
+        "DCM_severe": ">2.0",
+        "source": "Dukes-McEwan 2003"
+      }
     }
   },
   "phosphorus_poisoning": {
@@ -99,16 +299,57 @@
         "journal": "JAVMA",
         "doi": "10.2460/javma.239.5.646",
         "type": "retrospective"
+      },
+      {
+        "authors": "Osweiler GD, Hovda LR, Brutlag AG, Lee JA",
+        "year": 2004,
+        "title": "Blackwell's Five-Minute Veterinary Consult Clinical Companion: Small Animal Toxicology",
+        "journal": "Wiley-Blackwell",
+        "isbn": "978-0-8138-2077-6",
+        "type": "textbook"
       }
     ],
     "criteria": {
-      "hr_high": {"threshold": "Tachycardia", "source": "Gray 2011; Trakulsrichai 2017", "mechanism": "Compensatory response to hypotension + direct cardiotoxicity"},
-      "hr_low": {"threshold": "Bradycardia (late)", "source": "Merck Vet Manual", "mechanism": "Myocardial depression from PH3"},
-      "map_low": {"threshold": "Hypotension/shock", "source": "Gray 2011", "mechanism": "Vasodilation + myocardial depression"},
-      "ph_low": {"threshold": "<7.35", "source": "PMC12322358", "mechanism": "High anion gap metabolic acidosis from impaired oxidative phosphorylation"},
-      "temp_high": {"threshold": "Hyperthermia", "source": "Gray 2011", "mechanism": "Muscle tremors, seizures"},
-      "temp_low": {"threshold": "Hypothermia (late)", "source": "Gray 2011", "mechanism": "Cardiovascular collapse"},
-      "p_wave_absent": {"threshold": "Arrhythmia", "source": "Jadhav 2012; Singh 1991", "mechanism": "Myocardial necrosis from PH3"}
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "Gray 2011; Trakulsrichai 2017",
+        "mechanism": "Compensatory response to hypotension + direct cardiotoxicity"
+      },
+      "hr_low": {
+        "threshold": "Bradycardia (late)",
+        "source": "Merck Vet Manual",
+        "mechanism": "Myocardial depression from PH3"
+      },
+      "map_low": {
+        "threshold": "Hypotension/shock",
+        "source": "Gray 2011",
+        "mechanism": "Vasodilation + myocardial depression"
+      },
+      "ph_low": {
+        "threshold": "<7.35",
+        "source": "PMC12322358",
+        "mechanism": "High anion gap metabolic acidosis from impaired oxidative phosphorylation"
+      },
+      "temp_high": {
+        "threshold": "Hyperthermia",
+        "source": "Gray 2011",
+        "mechanism": "Muscle tremors, seizures"
+      },
+      "temp_low": {
+        "threshold": "Hypothermia (late)",
+        "source": "Gray 2011",
+        "mechanism": "Cardiovascular collapse"
+      },
+      "p_wave_absent": {
+        "threshold": "Arrhythmia",
+        "source": "Jadhav 2012; Singh 1991",
+        "mechanism": "Myocardial necrosis from PH3"
+      },
+      "garlic_breath": {
+        "threshold": "Garlic/fishy odor on breath",
+        "source": "Osweiler 2004",
+        "mechanism": "Phosphine gas release from gastric acid reaction with zinc phosphide"
+      }
     },
     "mechanism": {
       "pathway": "Zn3P2 + 6HCl → 3ZnCl2 + 2PH3",
@@ -116,6 +357,20 @@
       "effect": "Disrupts oxidative phosphorylation → cellular anoxia + ROS",
       "lethal_dose": "20-40 mg/kg",
       "toxic_dose": "2-4 mg/kg"
+    },
+    "phosphine_toxicokinetics": {
+      "LD50_dog": "20-30 mg/kg (oral, zinc phosphide)",
+      "LD50_cat": "5-10 mg/kg (more sensitive)",
+      "onset": "15 min - 4 hours post-ingestion",
+      "mechanism_detail": "Phosphine gas released in stomach acid -> mitochondrial complex IV inhibition -> cellular hypoxia",
+      "organ_damage_timeline": {
+        "GI": "0-2h: vomiting, abdominal pain, garlic odor on breath",
+        "cardiac": "2-12h: arrhythmias (VT, VF), myocardial depression, hypotension",
+        "hepatic": "6-24h: elevated ALT/AST, hepatic necrosis",
+        "renal": "12-48h: oliguria, azotemia, acute tubular necrosis",
+        "neuro": "1-6h: seizures, tremors, ataxia (CNS hypoxia)"
+      },
+      "source": "Osweiler 2004; Gupta 2007"
     }
   },
   "gastric_dilatation_volvulus": {
@@ -138,21 +393,57 @@
       }
     ],
     "criteria": {
-      "hr_high": {"threshold": "Tachycardia", "source": "Beck 2006", "mechanism": "Pain, hypovolemia, compensatory"},
-      "hr_low": {"threshold": "Bradycardia (late)", "source": "Beck 2006", "mechanism": "Vagal stimulation from gastric distension"},
-      "map_low": {"threshold": "Hypotension", "source": "Beck 2006", "mechanism": "Hypovolemic + obstructive shock"},
-      "cvp_low": {"threshold": "Low CVP initially", "source": "Schertel 1997", "mechanism": "Hypovolemia"},
-      "ph_low": {"threshold": "Lactic acidosis", "source": "Mooney 2014", "mechanism": "Tissue hypoperfusion → anaerobic metabolism"},
-      "lactate_high": {"threshold": ">4 mmol/L", "source": "Mooney 2014", "mechanism": "Tissue ischemia; >6 = gastric necrosis likely"},
-      "abdominal_distension": {"threshold": "Visible/tympanic", "source": "Rosselli 2022", "mechanism": "Gastric dilatation with gas accumulation"},
-      "arrhythmia": {"threshold": "Ventricular arrhythmias", "source": "Pike 2022", "mechanism": "Myocardial ischemia, reperfusion injury; onset 12-36h post-surgery"}
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "Beck 2006",
+        "mechanism": "Pain, hypovolemia, compensatory"
+      },
+      "hr_low": {
+        "threshold": "Bradycardia (late)",
+        "source": "Beck 2006",
+        "mechanism": "Vagal stimulation from gastric distension"
+      },
+      "map_low": {
+        "threshold": "Hypotension",
+        "source": "Beck 2006",
+        "mechanism": "Hypovolemic + obstructive shock"
+      },
+      "cvp_low": {
+        "threshold": "Low CVP initially",
+        "source": "Schertel 1997",
+        "mechanism": "Hypovolemia"
+      },
+      "ph_low": {
+        "threshold": "Lactic acidosis",
+        "source": "Mooney 2014",
+        "mechanism": "Tissue hypoperfusion → anaerobic metabolism"
+      },
+      "lactate_high": {
+        "threshold": ">4 mmol/L",
+        "source": "Mooney 2014",
+        "mechanism": "Tissue ischemia; >6 = gastric necrosis likely"
+      },
+      "abdominal_distension": {
+        "threshold": "Visible/tympanic",
+        "source": "Rosselli 2022",
+        "mechanism": "Gastric dilatation with gas accumulation"
+      },
+      "arrhythmia": {
+        "threshold": "Ventricular arrhythmias",
+        "source": "Pike 2022",
+        "mechanism": "Myocardial ischemia, reperfusion injury; onset 12-36h post-surgery"
+      }
     },
     "prognosis": {
       "lactate_lt4": "Better survival",
       "lactate_gt6": "Gastric necrosis more likely",
       "lactate_drop_40pct": "Good prognosis after fluids",
       "mortality": "16.2% (Beck 2006)",
-      "high_risk_breeds": ["great_dane (OR 10.0)", "weimaraner (OR 4.6)", "saint_bernard (OR 4.2)"]
+      "high_risk_breeds": [
+        "great_dane (OR 10.0)",
+        "weimaraner (OR 4.6)",
+        "saint_bernard (OR 4.2)"
+      ]
     }
   },
   "immune_mediated_hemolytic_anemia": {
@@ -184,11 +475,31 @@
       ]
     },
     "criteria": {
-      "hr_high": {"threshold": "Tachycardia", "source": "ACVIM 2019", "mechanism": "Compensatory for anemia → reduced O2 carrying capacity"},
-      "hct_low": {"threshold": "<35%, often <20%", "source": "ACVIM 2019", "mechanism": "Autoimmune RBC destruction"},
-      "bilirubin_high": {"threshold": ">0.5 mg/dL", "source": "Goggs 2020", "mechanism": "Hemoglobin → heme → bilirubin from RBC destruction"},
-      "icterus": {"threshold": "Visible at bilirubin >2.0 mg/dL", "source": "Goggs 2020", "mechanism": "Unconjugated bilirubin overwhelms hepatic conjugation"},
-      "weak_pulse": {"threshold": "Reduced pulse quality", "source": "ACVIM 2019", "mechanism": "Reduced O2 delivery, possible hypotension"}
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "ACVIM 2019",
+        "mechanism": "Compensatory for anemia → reduced O2 carrying capacity"
+      },
+      "hct_low": {
+        "threshold": "<35%, often <20%",
+        "source": "ACVIM 2019",
+        "mechanism": "Autoimmune RBC destruction"
+      },
+      "bilirubin_high": {
+        "threshold": ">0.5 mg/dL",
+        "source": "Goggs 2020",
+        "mechanism": "Hemoglobin → heme → bilirubin from RBC destruction"
+      },
+      "icterus": {
+        "threshold": "Visible at bilirubin >2.0 mg/dL",
+        "source": "Goggs 2020",
+        "mechanism": "Unconjugated bilirubin overwhelms hepatic conjugation"
+      },
+      "weak_pulse": {
+        "threshold": "Reduced pulse quality",
+        "source": "ACVIM 2019",
+        "mechanism": "Reduced O2 delivery, possible hypotension"
+      }
     },
     "transfusion_thresholds": {
       "no_signs": ">20%",
@@ -217,15 +528,51 @@
       }
     ],
     "criteria": {
-      "hr_low": {"threshold": "Bradycardia", "source": "Iimori 2026", "mechanism": "Hyperkalemia depresses cardiac conduction"},
-      "hr_high": {"threshold": "Tachycardia (early)", "source": "McLoughlin 2000", "mechanism": "Pain, distress"},
-      "map_high": {"threshold": "Hypertension", "source": "McLoughlin 2000", "mechanism": "Volume overload, RAAS activation"},
-      "potassium_high": {"threshold": ">5.5 mEq/L", "source": "Iimori 2026", "mechanism": "Impaired renal K+ excretion from obstruction"},
-      "ph_low": {"threshold": "<7.35", "source": "Iimori 2026", "mechanism": "Impaired H+ excretion"},
-      "bladder_distension": {"threshold": "Firm, non-expressible", "source": "McLoughlin 2000", "mechanism": "Outflow obstruction → urine accumulation"},
-      "anuria": {"threshold": "<0.5 mL/kg/h", "source": "McLoughlin 2000", "mechanism": "Complete outflow obstruction"},
-      "t_wave_tall": {"threshold": "K+ 5.5-6.0", "source": "Iimori 2026", "mechanism": "Accelerated repolarization"},
-      "qrs_wide": {"threshold": "K+ 6.5-7.0", "source": "Iimori 2026", "mechanism": "Slowed ventricular conduction"}
+      "hr_low": {
+        "threshold": "Bradycardia",
+        "source": "Iimori 2026",
+        "mechanism": "Hyperkalemia depresses cardiac conduction"
+      },
+      "hr_high": {
+        "threshold": "Tachycardia (early)",
+        "source": "McLoughlin 2000",
+        "mechanism": "Pain, distress"
+      },
+      "map_high": {
+        "threshold": "Hypertension",
+        "source": "McLoughlin 2000",
+        "mechanism": "Volume overload, RAAS activation"
+      },
+      "potassium_high": {
+        "threshold": ">5.5 mEq/L",
+        "source": "Iimori 2026",
+        "mechanism": "Impaired renal K+ excretion from obstruction"
+      },
+      "ph_low": {
+        "threshold": "<7.35",
+        "source": "Iimori 2026",
+        "mechanism": "Impaired H+ excretion"
+      },
+      "bladder_distension": {
+        "threshold": "Firm, non-expressible",
+        "source": "McLoughlin 2000",
+        "mechanism": "Outflow obstruction → urine accumulation"
+      },
+      "anuria": {
+        "threshold": "<0.5 mL/kg/h",
+        "source": "McLoughlin 2000",
+        "mechanism": "Complete outflow obstruction"
+      },
+      "t_wave_tall": {
+        "threshold": "K+ 5.5-6.0",
+        "source": "Iimori 2026",
+        "mechanism": "Accelerated repolarization"
+      },
+      "qrs_wide": {
+        "threshold": "K+ 6.5-7.0",
+        "source": "Iimori 2026",
+        "mechanism": "Slowed ventricular conduction"
+      }
     }
   },
   "diabetic_ketoacidosis": {
@@ -252,15 +599,51 @@
       "A": "Metabolic acidosis pH <7.3, HCO3- <15"
     },
     "criteria": {
-      "hr_high": {"threshold": "Tachycardia", "source": "Gal 2023", "mechanism": "Dehydration, compensatory"},
-      "map_low": {"threshold": "Hypotension", "source": "Gal 2023", "mechanism": "Dehydration (5-10%), osmotic diuresis"},
-      "rr_high": {"threshold": "Kussmaul respiration", "source": "Gal 2023; de Morais & DiBartola", "mechanism": "Respiratory compensation for metabolic acidosis: pCO2 ↓0.7 per 1 mEq/L HCO3- ↓"},
-      "ph_low": {"threshold": "<7.3", "source": "Gal 2023", "mechanism": "Ketoacid accumulation (BHB, acetoacetate)"},
-      "glucose_high": {"threshold": "≥250 mg/dL", "source": "Monnet 2014; Gal 2023", "mechanism": "Insulin deficiency → unrestrained gluconeogenesis + glycogenolysis"},
-      "hco3_low": {"threshold": "<15 mEq/L", "source": "Gal 2023", "mechanism": "Buffering of ketoacids consumes HCO3-"},
-      "dehydration": {"threshold": "5-10%", "source": "Gal 2023", "mechanism": "Osmotic diuresis from glycosuria"},
-      "ketone_high": {"threshold": "BHB >3.8 mmol/L", "source": "Monnet 2014", "mechanism": "Hepatic ketogenesis from fatty acid oxidation"},
-      "potassium_low": {"threshold": "<3.5 mEq/L", "source": "Hess 2013", "mechanism": "Osmotic diuresis loss + insulin-driven intracellular shift"}
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "Gal 2023",
+        "mechanism": "Dehydration, compensatory"
+      },
+      "map_low": {
+        "threshold": "Hypotension",
+        "source": "Gal 2023",
+        "mechanism": "Dehydration (5-10%), osmotic diuresis"
+      },
+      "rr_high": {
+        "threshold": "Kussmaul respiration",
+        "source": "Gal 2023; de Morais & DiBartola",
+        "mechanism": "Respiratory compensation for metabolic acidosis: pCO2 ↓0.7 per 1 mEq/L HCO3- ↓"
+      },
+      "ph_low": {
+        "threshold": "<7.3",
+        "source": "Gal 2023",
+        "mechanism": "Ketoacid accumulation (BHB, acetoacetate)"
+      },
+      "glucose_high": {
+        "threshold": "≥250 mg/dL",
+        "source": "Monnet 2014; Gal 2023",
+        "mechanism": "Insulin deficiency → unrestrained gluconeogenesis + glycogenolysis"
+      },
+      "hco3_low": {
+        "threshold": "<15 mEq/L",
+        "source": "Gal 2023",
+        "mechanism": "Buffering of ketoacids consumes HCO3-"
+      },
+      "dehydration": {
+        "threshold": "5-10%",
+        "source": "Gal 2023",
+        "mechanism": "Osmotic diuresis from glycosuria"
+      },
+      "ketone_high": {
+        "threshold": "BHB >3.8 mmol/L",
+        "source": "Monnet 2014",
+        "mechanism": "Hepatic ketogenesis from fatty acid oxidation"
+      },
+      "potassium_low": {
+        "threshold": "<3.5 mEq/L",
+        "source": "Hess 2013",
+        "mechanism": "Osmotic diuresis loss + insulin-driven intracellular shift"
+      }
     }
   },
   "pericardial_effusion": {
@@ -283,19 +666,66 @@
       }
     ],
     "criteria": {
-      "hr_high": {"threshold": "Tachycardia", "source": "Shaw 2007", "mechanism": "Compensatory for reduced cardiac output"},
-      "map_low": {"threshold": "Hypotension", "source": "DeFrancesco 2013", "mechanism": "Cardiac tamponade → impaired filling → reduced CO"},
-      "cvp_high": {"threshold": "Elevated JVP", "source": "Shaw 2007", "mechanism": "Impaired right heart filling → venous congestion"},
-      "SpO2_low": {"threshold": "Desaturation", "source": "Shaw 2007", "mechanism": "Reduced cardiac output → poor tissue perfusion"},
-      "weak_pulse": {"threshold": "Weak/absent", "source": "DeFrancesco 2013", "mechanism": "Reduced stroke volume from tamponade"},
-      "pulsus_paradoxus": {"threshold": ">10% SBP drop on inspiration", "source": "Nogueira 2011", "mechanism": "Exaggerated interventricular dependence"},
-      "muffled_heart_sounds": {"threshold": "Audible muffled", "source": "Shaw 2007", "mechanism": "Fluid buffer between heart and chest wall"},
-      "jugular_distension": {"threshold": "Visible JVD", "source": "Shaw 2007", "mechanism": "Elevated CVP from impaired venous return"}
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "Shaw 2007",
+        "mechanism": "Compensatory for reduced cardiac output"
+      },
+      "map_low": {
+        "threshold": "Hypotension",
+        "source": "DeFrancesco 2013",
+        "mechanism": "Cardiac tamponade → impaired filling → reduced CO"
+      },
+      "cvp_high": {
+        "threshold": "Elevated JVP",
+        "source": "Shaw 2007",
+        "mechanism": "Impaired right heart filling → venous congestion"
+      },
+      "SpO2_low": {
+        "threshold": "Desaturation",
+        "source": "Shaw 2007",
+        "mechanism": "Reduced cardiac output → poor tissue perfusion"
+      },
+      "weak_pulse": {
+        "threshold": "Weak/absent",
+        "source": "DeFrancesco 2013",
+        "mechanism": "Reduced stroke volume from tamponade"
+      },
+      "pulsus_paradoxus": {
+        "threshold": ">10% SBP drop on inspiration",
+        "source": "Nogueira 2011",
+        "mechanism": "Exaggerated interventricular dependence"
+      },
+      "muffled_heart_sounds": {
+        "threshold": "Audible muffled",
+        "source": "Shaw 2007",
+        "mechanism": "Fluid buffer between heart and chest wall"
+      },
+      "jugular_distension": {
+        "threshold": "Visible JVD",
+        "source": "Shaw 2007",
+        "mechanism": "Elevated CVP from impaired venous return"
+      }
     },
     "common_causes": [
-      {"cause": "Hemangiosarcoma", "frequency": "50-60%", "breeds": "German Shepherd, Golden Retriever", "source": "Aronsohn 1985"},
-      {"cause": "Idiopathic pericarditis", "frequency": "20-30%", "prognosis": "Good", "source": "Levi 2021"},
-      {"cause": "Chemodectoma", "frequency": "5-10%", "breeds": "Brachycephalic", "source": "Mincă 2025"}
+      {
+        "cause": "Hemangiosarcoma",
+        "frequency": "50-60%",
+        "breeds": "German Shepherd, Golden Retriever",
+        "source": "Aronsohn 1985"
+      },
+      {
+        "cause": "Idiopathic pericarditis",
+        "frequency": "20-30%",
+        "prognosis": "Good",
+        "source": "Levi 2021"
+      },
+      {
+        "cause": "Chemodectoma",
+        "frequency": "5-10%",
+        "breeds": "Brachycephalic",
+        "source": "Mincă 2025"
+      }
     ]
   },
   "disseminated_intravascular_coagulation": {
@@ -318,18 +748,57 @@
       }
     ],
     "criteria": {
-      "hr_high": {"threshold": "Tachycardia", "source": "Ralph 2012", "mechanism": "Compensatory for hypovolemia/hemorrhage"},
-      "map_low": {"threshold": "Hypotension", "source": "Ralph 2012", "mechanism": "Hemorrhage + microvascular thrombosis → organ failure"},
-      "ph_low": {"threshold": "<7.35", "source": "Bruchim 2008", "mechanism": "Lactic acidosis from tissue ischemia"},
-      "plt_low": {"threshold": "<100-150 × 10³/μL", "source": "Wiinberg 2010; Taylor 2001", "mechanism": "Consumptive thrombocytopenia"},
-      "hemorrhage": {"threshold": "Multi-site bleeding", "source": "Bruchim 2008", "mechanism": "Consumption of clotting factors + secondary fibrinolysis"},
-      "petechiae": {"threshold": "Visible petechiae/ecchymoses", "source": "Bruchim 2008", "mechanism": "Thrombocytopenia + endothelial damage from microthrombi"}
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "Ralph 2012",
+        "mechanism": "Compensatory for hypovolemia/hemorrhage"
+      },
+      "map_low": {
+        "threshold": "Hypotension",
+        "source": "Ralph 2012",
+        "mechanism": "Hemorrhage + microvascular thrombosis → organ failure"
+      },
+      "ph_low": {
+        "threshold": "<7.35",
+        "source": "Bruchim 2008",
+        "mechanism": "Lactic acidosis from tissue ischemia"
+      },
+      "plt_low": {
+        "threshold": "<100-150 × 10³/μL",
+        "source": "Wiinberg 2010; Taylor 2001",
+        "mechanism": "Consumptive thrombocytopenia"
+      },
+      "hemorrhage": {
+        "threshold": "Multi-site bleeding",
+        "source": "Bruchim 2008",
+        "mechanism": "Consumption of clotting factors + secondary fibrinolysis"
+      },
+      "petechiae": {
+        "threshold": "Visible petechiae/ecchymoses",
+        "source": "Bruchim 2008",
+        "mechanism": "Thrombocytopenia + endothelial damage from microthrombi"
+      }
     },
     "isth_scoring": {
-      "plt": {"gt100": 0, "lt100": 1, "lt50": 2},
-      "fibrin_markers": {"no_increase": 0, "moderate": 2, "strong": 3},
-      "pt_prolongation": {"lt3s": 0, "3to6s": 1, "gt6s": 2},
-      "fibrinogen": {"gt1.0": 0, "lt1.0": 1},
+      "plt": {
+        "gt100": 0,
+        "lt100": 1,
+        "lt50": 2
+      },
+      "fibrin_markers": {
+        "no_increase": 0,
+        "moderate": 2,
+        "strong": 3
+      },
+      "pt_prolongation": {
+        "lt3s": 0,
+        "3to6s": 1,
+        "gt6s": 2
+      },
+      "fibrinogen": {
+        "gt1.0": 0,
+        "lt1.0": 1
+      },
       "overt_dic_threshold": 5
     }
   },
@@ -353,12 +822,36 @@
       }
     ],
     "criteria": {
-      "pt_prolonged": {"threshold": ">1.5× ULN = ALF", "source": "Kelley 2015", "mechanism": "Decreased synthesis of vitamin K-dependent factors (II, VII, IX, X)"},
-      "aptt_prolonged": {"threshold": "Prolonged", "source": "Richardson 2018", "mechanism": "Decreased factor synthesis"},
-      "fibrinogen_low": {"threshold": "<100 mg/dL", "source": "Richardson 2018", "mechanism": "Decreased hepatic synthesis; distinguishes from DIC (bimodal) and rodenticide (increased)"},
-      "albumin_low": {"threshold": "<2.0 g/dL", "source": "Sevelius 1995", "mechanism": "Decreased hepatic synthesis; most consistent finding in cirrhosis (96%)"},
-      "ammonia_high": {"threshold": ">50 μmol/L", "source": "Gow 2017; Lidbury 2016", "mechanism": "Impaired urea cycle → hyperammonemia → astrocyte swelling → HE"},
-      "alt_high": {"threshold": ">2× elevation", "source": "Assawarachan 2020", "mechanism": "Hepatocyte leakage; 40-65% sensitivity alone, 90% combined with ALP"}
+      "pt_prolonged": {
+        "threshold": ">1.5× ULN = ALF",
+        "source": "Kelley 2015",
+        "mechanism": "Decreased synthesis of vitamin K-dependent factors (II, VII, IX, X)"
+      },
+      "aptt_prolonged": {
+        "threshold": "Prolonged",
+        "source": "Richardson 2018",
+        "mechanism": "Decreased factor synthesis"
+      },
+      "fibrinogen_low": {
+        "threshold": "<100 mg/dL",
+        "source": "Richardson 2018",
+        "mechanism": "Decreased hepatic synthesis; distinguishes from DIC (bimodal) and rodenticide (increased)"
+      },
+      "albumin_low": {
+        "threshold": "<2.0 g/dL",
+        "source": "Sevelius 1995",
+        "mechanism": "Decreased hepatic synthesis; most consistent finding in cirrhosis (96%)"
+      },
+      "ammonia_high": {
+        "threshold": ">50 μmol/L",
+        "source": "Gow 2017; Lidbury 2016",
+        "mechanism": "Impaired urea cycle → hyperammonemia → astrocyte swelling → HE"
+      },
+      "alt_high": {
+        "threshold": ">2× elevation",
+        "source": "Assawarachan 2020",
+        "mechanism": "Hepatocyte leakage; 40-65% sensitivity alone, 90% combined with ALP"
+      }
     },
     "vitamin_k_test": {
       "liver_failure": "No response (parenchymal defect)",
@@ -387,20 +880,56 @@
       }
     ],
     "criteria": {
-      "hr_high": {"threshold": "Tachycardia", "source": "Hammond 2014", "mechanism": "Hemorrhagic shock compensatory response"},
-      "map_low": {"threshold": "Hypotension", "source": "Hammond 2014", "mechanism": "Hypovolemic shock from hemoperitoneum"},
-      "hct_low": {"threshold": "Acute drop", "source": "Hammond 2008", "mechanism": "Hemorrhage; HSA significantly lower than benign"},
-      "lactate_high": {"threshold": "Elevated", "source": "Hammond 2014", "mechanism": "Tissue hypoperfusion → anaerobic metabolism"},
-      "splenic_mass": {"threshold": "Palpable/ultrasound", "source": "Schick 2022", "mechanism": "Neoplastic or benign splenic lesion"},
-      "abdominal_pain": {"threshold": "Pain on palpation", "source": "Stewart 2020", "mechanism": "Capsular stretch from hemorrhage"},
-      "distended_abdomen": {"threshold": "Visible distension", "source": "Stewart 2020", "mechanism": "Hemoperitoneum accumulation"},
-      "pale_mucous_membranes": {"threshold": "Pale/white", "source": "Hammond 2008", "mechanism": "Anemia from acute blood loss"}
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "Hammond 2014",
+        "mechanism": "Hemorrhagic shock compensatory response"
+      },
+      "map_low": {
+        "threshold": "Hypotension",
+        "source": "Hammond 2014",
+        "mechanism": "Hypovolemic shock from hemoperitoneum"
+      },
+      "hct_low": {
+        "threshold": "Acute drop",
+        "source": "Hammond 2008",
+        "mechanism": "Hemorrhage; HSA significantly lower than benign"
+      },
+      "lactate_high": {
+        "threshold": "Elevated",
+        "source": "Hammond 2014",
+        "mechanism": "Tissue hypoperfusion → anaerobic metabolism"
+      },
+      "splenic_mass": {
+        "threshold": "Palpable/ultrasound",
+        "source": "Schick 2022",
+        "mechanism": "Neoplastic or benign splenic lesion"
+      },
+      "abdominal_pain": {
+        "threshold": "Pain on palpation",
+        "source": "Stewart 2020",
+        "mechanism": "Capsular stretch from hemorrhage"
+      },
+      "distended_abdomen": {
+        "threshold": "Visible distension",
+        "source": "Stewart 2020",
+        "mechanism": "Hemoperitoneum accumulation"
+      },
+      "pale_mucous_membranes": {
+        "threshold": "Pale/white",
+        "source": "Hammond 2008",
+        "mechanism": "Anemia from acute blood loss"
+      }
     },
     "epidemiology": {
       "malignancy_rate": "~73% (Schick 2022 systematic review)",
       "hsa_of_malignancies": "~87%",
       "hsa_of_all_cases": "~63%",
-      "high_risk_breeds": ["German Shepherd", "Golden Retriever", "Labrador"],
+      "high_risk_breeds": [
+        "German Shepherd",
+        "Golden Retriever",
+        "Labrador"
+      ],
       "perioperative_survival": "95% (Stewart 2020)",
       "median_survival_surgery_only": "~66 days",
       "median_survival_surgery_chemo": "~142 days"
@@ -426,15 +955,39 @@
       }
     ],
     "criteria": {
-      "T3_high": {"threshold": ">100 ng/dL", "source": "Peterson 2012", "mechanism": "Autonomous thyroid hormone secretion from adenomatous tissue"},
-      "hr_high": {"threshold": ">220 bpm (cat)", "source": "Carney 2016", "mechanism": "T3-mediated β-adrenergic sensitization → increased chronotropy"},
-      "temp_high": {"threshold": ">39.5°C", "source": "Peterson 2012", "mechanism": "T3 increases basal metabolic rate → hyperthermia"},
-      "weight_loss": {"threshold": "Despite polyphagia", "source": "Carney 2016", "mechanism": "Hypermetabolic state exceeds caloric intake"},
-      "map_high": {"threshold": "Systolic >160 mmHg", "source": "Carney 2016", "mechanism": "T3 increases cardiac output and decreases SVR"}
+      "T3_high": {
+        "threshold": ">100 ng/dL",
+        "source": "Peterson 2012",
+        "mechanism": "Autonomous thyroid hormone secretion from adenomatous tissue"
+      },
+      "hr_high": {
+        "threshold": ">220 bpm (cat)",
+        "source": "Carney 2016",
+        "mechanism": "T3-mediated β-adrenergic sensitization → increased chronotropy"
+      },
+      "temp_high": {
+        "threshold": ">39.5°C",
+        "source": "Peterson 2012",
+        "mechanism": "T3 increases basal metabolic rate → hyperthermia"
+      },
+      "weight_loss": {
+        "threshold": "Despite polyphagia",
+        "source": "Carney 2016",
+        "mechanism": "Hypermetabolic state exceeds caloric intake"
+      },
+      "map_high": {
+        "threshold": "Systolic >160 mmHg",
+        "source": "Carney 2016",
+        "mechanism": "T3 increases cardiac output and decreases SVR"
+      }
     },
     "epidemiology": {
       "prevalence": "~10% of cats >10 years",
-      "risk_factors": ["Indoor cats", "Canned food diet", "Goitrogen exposure"],
+      "risk_factors": [
+        "Indoor cats",
+        "Canned food diet",
+        "Goitrogen exposure"
+      ],
       "source": "Peterson 2012"
     }
   },
@@ -458,12 +1011,36 @@
       }
     ],
     "criteria": {
-      "hr_low": {"threshold": "<60 bpm (bradycardia)", "source": "Klein 2010", "mechanism": "Hyperkalemia → cardiac conduction depression"},
-      "map_low": {"threshold": "Hypotension", "source": "Melian 1996", "mechanism": "Cortisol deficiency → loss of vascular tone + hypovolemia"},
-      "potassium_high": {"threshold": ">5.5 mEq/L", "source": "Klein 2010", "mechanism": "Aldosterone deficiency → impaired renal K+ excretion"},
-      "sodium_low": {"threshold": "<140 mEq/L", "source": "Melian 1996", "mechanism": "Aldosterone deficiency → renal sodium wasting"},
-      "weakness": {"threshold": "Lethargy/collapse", "source": "Klein 2010", "mechanism": "Cortisol deficiency → hypoglycemia + electrolyte imbalance"},
-      "dehydration": {"threshold": "Despite normal drinking", "source": "Melian 1996", "mechanism": "Sodium wasting → osmotic diuresis → dehydration"}
+      "hr_low": {
+        "threshold": "<60 bpm (bradycardia)",
+        "source": "Klein 2010",
+        "mechanism": "Hyperkalemia → cardiac conduction depression"
+      },
+      "map_low": {
+        "threshold": "Hypotension",
+        "source": "Melian 1996",
+        "mechanism": "Cortisol deficiency → loss of vascular tone + hypovolemia"
+      },
+      "potassium_high": {
+        "threshold": ">5.5 mEq/L",
+        "source": "Klein 2010",
+        "mechanism": "Aldosterone deficiency → impaired renal K+ excretion"
+      },
+      "sodium_low": {
+        "threshold": "<140 mEq/L",
+        "source": "Melian 1996",
+        "mechanism": "Aldosterone deficiency → renal sodium wasting"
+      },
+      "weakness": {
+        "threshold": "Lethargy/collapse",
+        "source": "Klein 2010",
+        "mechanism": "Cortisol deficiency → hypoglycemia + electrolyte imbalance"
+      },
+      "dehydration": {
+        "threshold": "Despite normal drinking",
+        "source": "Melian 1996",
+        "mechanism": "Sodium wasting → osmotic diuresis → dehydration"
+      }
     },
     "na_k_ratio": {
       "diagnostic": "<27:1 highly suggestive",
@@ -491,15 +1068,43 @@
       }
     ],
     "criteria": {
-      "hr_high": {"threshold": "Tachycardia", "source": "Sharp 2009", "mechanism": "Distributive shock → compensatory sympathetic activation"},
-      "map_low": {"threshold": "<90 mmHg (MAP)", "source": "Singer 2016", "mechanism": "Vasodilation from cytokine storm → distributive shock"},
-      "temp_high": {"threshold": ">39.7°C", "source": "Sharp 2009", "mechanism": "Pyrogen release → hypothalamic set-point elevation"},
-      "wbc_high": {"threshold": ">16,000/μL or <4,000/μL", "source": "Singer 2016", "mechanism": "Systemic inflammatory response"},
-      "perfusion_poor": {"threshold": "CRT >2s, mottled skin", "source": "Sharp 2009", "mechanism": "Microcirculatory dysfunction from capillary leak"},
-      "petechiae": {"threshold": "Visible", "source": "Sharp 2009", "mechanism": "DIC secondary to sepsis"}
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "Sharp 2009",
+        "mechanism": "Distributive shock → compensatory sympathetic activation"
+      },
+      "map_low": {
+        "threshold": "<90 mmHg (MAP)",
+        "source": "Singer 2016",
+        "mechanism": "Vasodilation from cytokine storm → distributive shock"
+      },
+      "temp_high": {
+        "threshold": ">39.7°C",
+        "source": "Sharp 2009",
+        "mechanism": "Pyrogen release → hypothalamic set-point elevation"
+      },
+      "wbc_high": {
+        "threshold": ">16,000/μL or <4,000/μL",
+        "source": "Singer 2016",
+        "mechanism": "Systemic inflammatory response"
+      },
+      "perfusion_poor": {
+        "threshold": "CRT >2s, mottled skin",
+        "source": "Sharp 2009",
+        "mechanism": "Microcirculatory dysfunction from capillary leak"
+      },
+      "petechiae": {
+        "threshold": "Visible",
+        "source": "Sharp 2009",
+        "mechanism": "DIC secondary to sepsis"
+      }
     },
     "qSOFA_veterinary": {
-      "criteria": ["Altered mentation", "Tachypnea", "Hypotension"],
+      "criteria": [
+        "Altered mentation",
+        "Tachypnea",
+        "Hypotension"
+      ],
       "source": "Adapted from Singer 2016"
     }
   },
@@ -520,13 +1125,42 @@
         "journal": "Vet Surg",
         "doi": "10.1111/j.1532-950X.2007.00308.x",
         "type": "retrospective"
+      },
+      {
+        "authors": "Jeffery ND, Levine JM, Olby NJ, Stein VM",
+        "year": 2013,
+        "title": "Intervertebral Disk Degeneration in Dogs: Consequences, Rehabilitation, and Clinical Trials",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/jvim.12149",
+        "type": "review"
       }
     ],
     "criteria": {
-      "pain_mobility": {"threshold": "Reluctance to move, cervical/thoracolumbar pain", "source": "Levine 2007", "mechanism": "Disc extrusion/protrusion → spinal cord compression + meningeal inflammation"},
-      "hr_high": {"threshold": "Tachycardia", "source": "De Risio 2000", "mechanism": "Pain-mediated sympathetic activation"},
-      "temp_high": {"threshold": "Mild fever possible", "source": "De Risio 2000", "mechanism": "Pain stress response (not infection)"},
-      "weakness": {"threshold": "Paresis to paralysis", "source": "Levine 2007", "mechanism": "Spinal cord compression → upper motor neuron deficits"}
+      "pain_mobility": {
+        "threshold": "Reluctance to move, cervical/thoracolumbar pain",
+        "source": "Levine 2007",
+        "mechanism": "Disc extrusion/protrusion → spinal cord compression + meningeal inflammation"
+      },
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "De Risio 2000",
+        "mechanism": "Pain-mediated sympathetic activation"
+      },
+      "temp_high": {
+        "threshold": "Mild fever possible",
+        "source": "De Risio 2000",
+        "mechanism": "Pain stress response (not infection)"
+      },
+      "weakness": {
+        "threshold": "Paresis to paralysis",
+        "source": "Levine 2007",
+        "mechanism": "Spinal cord compression → upper motor neuron deficits"
+      },
+      "deep_pain_absent": {
+        "threshold": "No response to strong toe pinch",
+        "source": "Jeffery 2013",
+        "mechanism": "Complete spinal cord compression -> loss of all sensory pathways (prognostic indicator)"
+      }
     },
     "neurological_grades": {
       "grade_1": "Pain only",
@@ -535,6 +1169,62 @@
       "grade_4": "Paralysis with deep pain",
       "grade_5": "Paralysis without deep pain",
       "source": "De Risio 2000"
+    },
+    "modified_frankel_scale": {
+      "grade_0": {
+        "description": "Normal",
+        "ambulatory": true,
+        "deep_pain": true
+      },
+      "grade_1": {
+        "description": "Thoracolumbar pain only",
+        "ambulatory": true,
+        "deep_pain": true
+      },
+      "grade_2": {
+        "description": "Ambulatory paraparesis",
+        "ambulatory": true,
+        "deep_pain": true
+      },
+      "grade_3": {
+        "description": "Non-ambulatory paraparesis",
+        "ambulatory": false,
+        "deep_pain": true
+      },
+      "grade_4": {
+        "description": "Paraplegia with intact deep pain",
+        "ambulatory": false,
+        "deep_pain": true
+      },
+      "grade_5": {
+        "description": "Paraplegia with absent deep pain",
+        "ambulatory": false,
+        "deep_pain": false
+      },
+      "source": "Levine 2007; Jeffery 2013"
+    },
+    "surgical_outcomes": {
+      "grade_1_2": {
+        "recovery_rate": "95%+ (medical or surgical)",
+        "timeframe": "4-6 weeks",
+        "approach": "Conservative management acceptable"
+      },
+      "grade_3": {
+        "recovery_rate": "90-95% surgical",
+        "timeframe": "1-3 months",
+        "approach": "Surgery recommended if no improvement in 7-14 days"
+      },
+      "grade_4": {
+        "recovery_rate": "80-90% surgical (if deep pain present <48h)",
+        "timeframe": "1-4 months",
+        "approach": "Emergency surgery recommended"
+      },
+      "grade_5": {
+        "recovery_rate": "50-60% if deep pain absent <12h; <20% if >48h",
+        "timeframe": "3-6 months",
+        "approach": "Emergency surgery within 12-24h critical"
+      },
+      "source": "Levine 2007; Jeffery 2013; Olby 2003"
     }
   },
   "meningitis": {
@@ -554,14 +1244,81 @@
         "journal": "J Vet Intern Med",
         "doi": "10.1111/j.1939-1676.2008.0197.x",
         "type": "retrospective"
+      },
+      {
+        "authors": "Tipold A, Stein VM",
+        "year": 2010,
+        "title": "Inflammatory Diseases of the Meninges",
+        "journal": "Vet Clin North Am Small Anim Pract",
+        "doi": "10.1016/j.cvsm.2010.05.003",
+        "type": "review"
       }
     ],
     "criteria": {
-      "altered_consciousness": {"threshold": "Depression to stupor", "source": "Griffin 2008", "mechanism": "CNS inflammation → cerebral dysfunction"},
-      "seizure": {"threshold": "Focal or generalized", "source": "Tipold 1995", "mechanism": "Cortical irritation from inflammation/edema"},
-      "hr_high": {"threshold": "Tachycardia", "source": "Griffin 2008", "mechanism": "Pain, fever, and autonomic dysfunction"},
-      "temp_high": {"threshold": ">39.5°C", "source": "Tipold 1995", "mechanism": "Infectious/inflammatory pyrogen release"},
-      "neck_pain": {"threshold": "Cervical rigidity", "source": "Griffin 2008", "mechanism": "Meningeal inflammation → nuchal rigidity"}
+      "altered_consciousness": {
+        "threshold": "Depression to stupor",
+        "source": "Griffin 2008",
+        "mechanism": "CNS inflammation → cerebral dysfunction"
+      },
+      "seizure": {
+        "threshold": "Focal or generalized",
+        "source": "Tipold 1995",
+        "mechanism": "Cortical irritation from inflammation/edema"
+      },
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "Griffin 2008",
+        "mechanism": "Pain, fever, and autonomic dysfunction"
+      },
+      "temp_high": {
+        "threshold": ">39.5°C",
+        "source": "Tipold 1995",
+        "mechanism": "Infectious/inflammatory pyrogen release"
+      },
+      "neck_pain": {
+        "threshold": "Cervical rigidity",
+        "source": "Griffin 2008",
+        "mechanism": "Meningeal inflammation → nuchal rigidity"
+      },
+      "csf_wbc_high": {
+        "threshold": ">5 cells/uL (dog)",
+        "source": "Tipold 2010",
+        "mechanism": "Blood-brain barrier disruption -> leukocyte migration into CSF"
+      },
+      "csf_protein_high": {
+        "threshold": ">25 mg/dL (dog)",
+        "source": "Tipold 2010",
+        "mechanism": "BBB permeability increase -> serum protein leakage"
+      },
+      "fever": {
+        "threshold": ">39.5 C",
+        "source": "Tipold 2010",
+        "mechanism": "CNS inflammation -> prostaglandin-mediated hypothalamic set-point elevation"
+      }
+    },
+    "csf_analysis": {
+      "normal_WBC": "<5 cells/uL (dog), <8 cells/uL (cat)",
+      "bacterial": {
+        "WBC": ">100 cells/uL, predominantly neutrophils",
+        "protein": ">100 mg/dL",
+        "glucose_ratio": "<0.5 (CSF:serum)"
+      },
+      "sterile_GME": {
+        "WBC": "5-100 cells/uL, mixed mononuclear",
+        "protein": "50-100 mg/dL",
+        "glucose_ratio": ">0.5"
+      },
+      "viral": {
+        "WBC": "5-50 cells/uL, predominantly lymphocytes",
+        "protein": "25-100 mg/dL"
+      },
+      "source": "Tipold 2010; Granger 2010"
+    },
+    "mri_findings": {
+      "meningeal_enhancement": "Post-contrast T1: leptomeningeal enhancement (gadolinium)",
+      "parenchymal_lesions": "T2/FLAIR hyperintensity in brain/spinal cord parenchyma",
+      "hydrocephalus": "Internal hydrocephalus from CSF outflow obstruction",
+      "source": "Granger 2010; Cherubini 2006"
     }
   },
   "ckd_anemia": {
@@ -581,16 +1338,98 @@
         "journal": "J Vet Intern Med",
         "doi": "10.1111/j.1939-1676.2011.00837.x",
         "type": "clinical_trial"
+      },
+      {
+        "authors": "Chalhoub S, Langston CE, Eatroff A",
+        "year": 2011,
+        "title": "Anemia of Renal Disease: What Is It, What to Do and What's New",
+        "journal": "J Feline Med Surg",
+        "doi": "10.1016/j.jfms.2011.07.009",
+        "type": "review"
       }
     ],
     "criteria": {
-      "hct_low": {"threshold": "<25% (cat) / <37% (dog)", "source": "IRIS 2024", "mechanism": "Decreased EPO production from damaged nephrons"},
-      "cr_high": {"threshold": ">1.6 mg/dL (cat) / >1.4 mg/dL (dog)", "source": "IRIS 2024", "mechanism": "Nephron loss → decreased GFR → creatinine retention"},
-      "bun_high": {"threshold": ">28.6 mg/dL (cat) / >28.6 mg/dL (dog)", "source": "IRIS 2024", "mechanism": "Decreased GFR → nitrogenous waste retention"},
-      "potassium_high": {"threshold": ">5.5 mEq/L", "source": "IRIS 2024", "mechanism": "Decreased renal K+ excretion in advanced CKD"},
-      "ph_low": {"threshold": "<7.35", "source": "IRIS 2024", "mechanism": "Decreased renal HCO3- reabsorption → metabolic acidosis"},
-      "gfr_low": {"threshold": "<25% of normal", "source": "IRIS 2024", "mechanism": "Nephron loss → reduced filtration capacity"},
-      "map_high": {"threshold": "Systolic >160 mmHg", "source": "IRIS 2024", "mechanism": "Sodium retention + RAAS activation → renal hypertension"}
+      "hct_low": {
+        "threshold": "<25% (cat) / <37% (dog)",
+        "source": "IRIS 2024",
+        "mechanism": "Decreased EPO production from damaged nephrons"
+      },
+      "cr_high": {
+        "threshold": ">1.6 mg/dL (cat) / >1.4 mg/dL (dog)",
+        "source": "IRIS 2024",
+        "mechanism": "Nephron loss → decreased GFR → creatinine retention"
+      },
+      "bun_high": {
+        "threshold": ">28.6 mg/dL (cat) / >28.6 mg/dL (dog)",
+        "source": "IRIS 2024",
+        "mechanism": "Decreased GFR → nitrogenous waste retention"
+      },
+      "potassium_high": {
+        "threshold": ">5.5 mEq/L",
+        "source": "IRIS 2024",
+        "mechanism": "Decreased renal K+ excretion in advanced CKD"
+      },
+      "ph_low": {
+        "threshold": "<7.35",
+        "source": "IRIS 2024",
+        "mechanism": "Decreased renal HCO3- reabsorption → metabolic acidosis"
+      },
+      "gfr_low": {
+        "threshold": "<25% of normal",
+        "source": "IRIS 2024",
+        "mechanism": "Nephron loss → reduced filtration capacity"
+      },
+      "map_high": {
+        "threshold": "Systolic >160 mmHg",
+        "source": "IRIS 2024",
+        "mechanism": "Sodium retention + RAAS activation → renal hypertension"
+      },
+      "reticulocyte_low": {
+        "threshold": "<60,000/uL (inappropriately low for anemia)",
+        "source": "Chalhoub 2011",
+        "mechanism": "Decreased EPO production -> inadequate bone marrow response"
+      },
+      "transferrin_saturation_low": {
+        "threshold": "<20%",
+        "source": "Chalhoub 2011",
+        "mechanism": "Functional iron deficiency from chronic inflammation + GI blood loss"
+      }
+    },
+    "iris_anemia_staging": {
+      "stage_1_2": {
+        "HCT": "Usually normal",
+        "reticulocytes": "Normal",
+        "note": "EPO production adequate"
+      },
+      "stage_3": {
+        "HCT": "20-35% (dog) / 20-30% (cat)",
+        "reticulocytes": "Inappropriately low",
+        "note": "Non-regenerative anemia from EPO deficiency"
+      },
+      "stage_4": {
+        "HCT": "<20%",
+        "reticulocytes": "Low",
+        "note": "Severe anemia; consider transfusion"
+      },
+      "source": "IRIS 2024; Chalhoub 2011"
+    },
+    "erythropoiesis_therapy": {
+      "darbepoetin": {
+        "dose": "0.5 ug/kg SC weekly until HCT 30-35%, then every 2-4 weeks",
+        "target_HCT": "30-35%",
+        "source": "Chalhoub 2011"
+      },
+      "EPO_human_recombinant": {
+        "dose": "100 U/kg SC 3x/week",
+        "risk": "20-30% develop anti-EPO antibodies -> pure red cell aplasia",
+        "source": "Chalhoub 2011"
+      },
+      "iron_supplementation": {
+        "oral_iron": "5-10 mg/kg/day elemental iron",
+        "parenteral_iron": "iron dextran 10 mg/kg IM (total dose)",
+        "indication": "Transferrin saturation <20% or ferritin <100 ng/mL",
+        "source": "Chalhoub 2011"
+      }
     }
   },
   "hepatic_anemia": {
@@ -610,14 +1449,85 @@
         "journal": "J Vet Intern Med",
         "doi": "10.1111/j.1939-1676.2006.tb02908.x",
         "type": "retrospective"
+      },
+      {
+        "authors": "Rothuizen J, Bunch SE, Charles JA, et al.",
+        "year": 2006,
+        "title": "WSAVA Standards for Clinical and Histological Diagnosis of Canine and Feline Liver Diseases",
+        "journal": "Elsevier",
+        "isbn": "978-0-7020-2709-1",
+        "type": "consensus"
       }
     ],
     "criteria": {
-      "hct_low": {"threshold": "<25% (cat) / <37% (dog)", "source": "Webster 2019", "mechanism": "Decreased EPO, chronic GI blood loss, hemolysis, bone marrow suppression"},
-      "alt_high": {"threshold": ">128 U/L (cat) / >125 U/L (dog)", "source": "Webster 2019", "mechanism": "Hepatocyte necrosis → cytoplasmic enzyme leakage"},
-      "albumin_low": {"threshold": "<2.5 g/dL", "source": "Toulza 2006", "mechanism": "Decreased hepatic synthetic function"},
-      "bilirubin_high": {"threshold": ">0.5 mg/dL (cat) / >0.4 mg/dL (dog)", "source": "Webster 2019", "mechanism": "Impaired conjugation + hemolysis + cholestasis"},
-      "hr_high": {"threshold": "Tachycardia", "source": "Webster 2019", "mechanism": "Compensatory for anemia → reduced oxygen-carrying capacity"}
+      "hct_low": {
+        "threshold": "<25% (cat) / <37% (dog)",
+        "source": "Webster 2019",
+        "mechanism": "Decreased EPO, chronic GI blood loss, hemolysis, bone marrow suppression"
+      },
+      "alt_high": {
+        "threshold": ">128 U/L (cat) / >125 U/L (dog)",
+        "source": "Webster 2019",
+        "mechanism": "Hepatocyte necrosis → cytoplasmic enzyme leakage"
+      },
+      "albumin_low": {
+        "threshold": "<2.5 g/dL",
+        "source": "Toulza 2006",
+        "mechanism": "Decreased hepatic synthetic function"
+      },
+      "bilirubin_high": {
+        "threshold": ">0.5 mg/dL (cat) / >0.4 mg/dL (dog)",
+        "source": "Webster 2019",
+        "mechanism": "Impaired conjugation + hemolysis + cholestasis"
+      },
+      "hr_high": {
+        "threshold": "Tachycardia",
+        "source": "Webster 2019",
+        "mechanism": "Compensatory for anemia → reduced oxygen-carrying capacity"
+      },
+      "albumin_low_severe": {
+        "threshold": "<2.0 g/dL",
+        "source": "Webster 2019",
+        "mechanism": "Severe hepatic synthetic failure -> hypoalbuminemia -> ascites/edema"
+      },
+      "bilirubin_high_severe": {
+        "threshold": ">5.0 mg/dL",
+        "source": "Center 2005",
+        "mechanism": "Hepatocyte dysfunction + intrahepatic cholestasis + hemolysis"
+      }
+    },
+    "hepatic_encephalopathy_grading": {
+      "grade_1": "Mild behavioral changes: confusion, staring, head pressing",
+      "grade_2": "Moderate: disorientation, circling, ataxia, salivation",
+      "grade_3": "Severe: recumbency, stupor, seizures",
+      "grade_4": "Coma",
+      "precipitating_factors": [
+        "GI hemorrhage",
+        "high-protein diet",
+        "constipation",
+        "infection",
+        "hypokalemia",
+        "alkalosis"
+      ],
+      "source": "Rothuizen 2006; Center 2015"
+    },
+    "prognostic_indicators": {
+      "albumin_below_2.0": {
+        "survival": "Poor prognosis if sustained",
+        "source": "Webster 2019"
+      },
+      "bilirubin_above_10": {
+        "survival": "Poor prognosis in hepatic lipidosis (cat)",
+        "source": "Center 2005"
+      },
+      "ammonia_above_100": {
+        "survival": "Guarded; risk of severe HE",
+        "source": "Rothuizen 2006"
+      },
+      "coagulopathy_present": {
+        "survival": "Guarded to poor; indicates synthetic failure",
+        "source": "Toulza 2006"
+      }
     }
   }
 }
