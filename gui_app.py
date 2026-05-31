@@ -226,6 +226,12 @@ def api_new_game():
     disease = create_disease(disease_name)
     vc.attach_disease(disease)
 
+    # Warmup: 让疾病 ODE 预先进展一段时间，模拟"动物已病了一阵才来就诊"
+    # 这样初始生命体征反映疾病状态，而非理想健康值
+    # 注意：不能太长，疾病 ODE 设计用于短时间游戏（6-12 actions）
+    _WARMUP_MINUTES = 0.5
+    vc.simulate(_WARMUP_MINUTES)
+
     # 创建游戏状态
     species = animal.get("species", "犬")
     difficulty = case.get("difficulty", 2)

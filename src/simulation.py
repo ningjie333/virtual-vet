@@ -844,6 +844,12 @@ class VirtualCreature:
             for cmd in commands:
                 self.apply_factor(cmd)
 
+            # 生理 clamp：防止疾病累积效应把参数推到非生理范围
+            # 心率：犬 40-250，猫 140-300
+            self.heart.heart_rate = max(40.0, min(250.0, self.heart.heart_rate))
+            # MAP：30-200 mmHg
+            self.heart.mean_arterial_pressure = max(30.0, min(200.0, self.heart.mean_arterial_pressure))
+
             # 重新读取被疾病修改后的器官状态（用于后续器官健康追踪和历史记录）
             heart_state["heart_rate_bpm"] = self.heart.heart_rate
             heart_state["MAP_mmHg"] = self.heart.mean_arterial_pressure
