@@ -285,6 +285,174 @@
         "紧急腹部超声确认有无腹腔积液",
         "注意血常规和乳酸评估失血程度"
       ]
+    },
+    {
+      "id": "case_013",
+      "title": "消瘦多食伴心悸",
+      "difficulty": 2,
+      "difficulty_label": "★★☆",
+      "animal": {
+        "species": "猫",
+        "breed": "家猫（短毛）",
+        "name": "咪咪",
+        "age": "13岁",
+        "weight_kg": 3.2,
+        "sex": "雌性绝育"
+      },
+      "chief_complaint": "近3个月体重明显下降，食欲反而增加，近日出现呼吸急促、躁动不安",
+      "history": "3个月来食欲明显增加但体重从4.5kg降至3.2kg。近2周主人发现猫咪烦躁不安、夜间嚎叫频繁。近3天出现运动后呼吸急促，偶尔干呕。既往无重大疾病史。室内饲养，已绝育。",
+      "disease": "hyperthyroidism",
+      "disease_onset_s": 0,
+      "time_limit_actions": 10,
+      "starting_hints": [
+        "注意检查颈部是否有肿块",
+        "老年猫消瘦伴食欲增加需考虑内分泌疾病",
+        "心率偏快时应关注甲状腺功能"
+      ]
+    },
+    {
+      "id": "case_014",
+      "title": "反复呕吐伴急性虚脱",
+      "difficulty": 2,
+      "difficulty_label": "★★☆",
+      "animal": {
+        "species": "犬",
+        "breed": "金毛寻回犬",
+        "name": "Lucky",
+        "age": "6岁",
+        "weight_kg": 24.0,
+        "sex": "雌性绝育"
+      },
+      "chief_complaint": "近2个月间歇性呕吐、食欲减退，今日突发后肢无力、无法站立",
+      "history": "2个月来反复出现食欲减退和间歇性呕吐，曾在外院按胃肠炎治疗，症状反复。近1周精神明显变差，饮水减少。今晨突发后肢无力、步态不稳，随后无法站立。主人注意到近2天尿量明显减少。已免疫和驱虫。",
+      "disease": "hypoadrenocorticism",
+      "disease_onset_s": 0,
+      "time_limit_actions": 9,
+      "starting_hints": [
+        "注意电解质结果，特别是Na/K比值",
+        "年轻至中年犬反复呕吐伴虚脱应考虑肾上腺皮质功能减退",
+        "注意心电图是否有高尖T波（高钾表现）"
+      ]
+    },
+    {
+      "id": "case_015",
+      "title": "术后高热伴精神沉郁",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "犬",
+        "breed": "拉布拉多犬",
+        "name": "大黄",
+        "age": "10岁",
+        "weight_kg": 28.0,
+        "sex": "雄性"
+      },
+      "chief_complaint": "牙科手术后第3天出现高热、精神极度沉郁、不愿进食",
+      "history": "10天前因严重牙周病在当地动物医院接受全口洁牙及多颗牙齿拔除术。术后给予口服抗生素（阿莫西林克拉维酸钾），但主人自行于第4天停药。术后第7天开始食欲下降，第8天出现发热（40.2°C），精神逐渐变差。既往有轻度二尖瓣关闭不全病史。免疫和驱虫按时完成。",
+      "disease": "sepsis",
+      "disease_onset_s": 0,
+      "time_limit_actions": 8,
+      "starting_hints": [
+        "术后发热伴精神沉郁需高度怀疑感染性并发症",
+        "注意检查血培养和感染灶定位",
+        "关注乳酸和凝血功能，警惕脓毒症进展"
+      ]
+    },
+    {
+      "id": "case_016",
+      "title": "突发后肢瘫痪",
+      "difficulty": 2,
+      "difficulty_label": "★★☆",
+      "animal": {
+        "species": "犬",
+        "breed": "腊肠犬",
+        "name": "香肠",
+        "age": "6岁",
+        "weight_kg": 8.5,
+        "sex": "雄性"
+      },
+      "chief_complaint": "今晨突然出现后肢不能站立，触摸背部明显疼痛",
+      "history": "昨晚主人发现狗狗上下沙发时动作犹豫，今天早晨突然出现后肢无力、无法站立。触摸胸腰段脊柱时发出痛苦尖叫。发病前2天曾有排便困难。既往无外伤史。平时活泼好动，喜欢跳跃。2年前曾有过一次短暂的背部疼痛，休息后自行好转。",
+      "disease": "ivdd",
+      "disease_onset_s": 0,
+      "time_limit_actions": 8,
+      "starting_hints": [
+        "腊肠犬是椎间盘疾病的高发品种",
+        "注意评估深痛感觉是否存在",
+        "建议进行MRI检查确定病变位置和程度"
+      ]
+    },
+    {
+      "id": "case_017",
+      "title": "发热伴颈部疼痛",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "犬",
+        "breed": "比格犬",
+        "name": "小猎",
+        "age": "2岁",
+        "weight_kg": 12.0,
+        "sex": "雄性"
+      },
+      "chief_complaint": "3天前开始发热，不愿走动，触碰颈部时痛苦尖叫",
+      "history": "3天前无明显诱因出现精神变差、食欲下降。主人发现狗狗不愿低头吃食，触碰颈部或头部时会痛苦尖叫。昨天开始发热（39.8°C），今天体温升至40.1°C。行走时步态僵硬，颈部保持伸直位。近1周无外伤史、无疫苗接种史。已完成常规免疫和驱虫。",
+      "disease": "meningitis",
+      "disease_onset_s": 0,
+      "time_limit_actions": 9,
+      "starting_hints": [
+        "年轻犬发热伴颈部疼痛应考虑脑膜炎",
+        "需要进行脑脊液分析以明确诊断",
+        "注意排除感染性病因"
+      ]
+    },
+    {
+      "id": "case_018",
+      "title": "消瘦多饮伴精神萎靡",
+      "difficulty": 2,
+      "difficulty_label": "★★☆",
+      "animal": {
+        "species": "猫",
+        "breed": "英国短毛猫",
+        "name": "蓝蓝",
+        "age": "15岁",
+        "weight_kg": 3.8,
+        "sex": "雄性绝育"
+      },
+      "chief_complaint": "近2个月体重下降、饮水量明显增加，近1周精神变差、不愿活动",
+      "history": "2个月来主人发现饮水量从平时约150mL/天增至约400mL/天，同时排尿次数明显增多。食欲逐渐下降，体重从4.8kg降至3.8kg。近1周精神明显变差，大部分时间蜷缩在角落不愿活动。偶尔呕吐，为白色泡沫状液体。3年前体检时发现肌酐轻度升高（165 μmol/L），当时未做特殊处理。室内饲养，已绝育。",
+      "disease": "ckd_anemia",
+      "disease_onset_s": 0,
+      "time_limit_actions": 10,
+      "starting_hints": [
+        "老年猫多饮多尿伴消瘦应优先检查肾功能",
+        "注意评估贫血程度和类型",
+        "IRIS分期有助于指导治疗方案"
+      ]
+    },
+    {
+      "id": "case_019",
+      "title": "厌食呕吐伴皮肤黄染",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "猫",
+        "breed": "美国短毛猫",
+        "name": "橘子",
+        "age": "10岁",
+        "weight_kg": 5.5,
+        "sex": "雄性绝育"
+      },
+      "chief_complaint": "近10天完全拒食，呕吐频繁，近3天发现牙龈和耳朵内侧发黄",
+      "history": "10天前开始食欲明显下降，从少量进食逐渐发展为完全拒食。呕吐频繁，初为胃内容物，后为黄色黏液。近3天主人发现牙龈、耳廓内侧和眼结膜明显黄染。发病前体重6.8kg（BCS 6/9），近期因主人出差由邻居代为照顾，期间可能长期未进食。无既往肝胆疾病史。室内饲养。",
+      "disease": "hepatic_anemia",
+      "disease_onset_s": 0,
+      "time_limit_actions": 10,
+      "starting_hints": [
+        "肥胖猫长期厌食后出现黄疸应高度怀疑肝脏脂肪沉积症",
+        "注意肝酶和胆红素的变化趋势",
+        "肝脏细针穿刺细胞学检查可快速确诊"
+      ]
     }
   ]
 }

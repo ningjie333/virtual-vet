@@ -169,6 +169,105 @@
       }
     }
   },
+  "hyperthyroidism": {
+    "name": "抗甲状腺药物治疗（甲亢）",
+    "name_en": "Antithyroid Therapy (Hyperthyroidism)",
+    "description": "甲巯咪唑抑制甲状腺激素合成，配合对症支持",
+    "correct_for": "hyperthyroidism",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "methimazole", "dose_mg_kg": 0.5}
+        ]
+      }
+    }
+  },
+  "hypoadrenocorticism": {
+    "name": "补液+糖皮质激素替代（艾迪森）",
+    "name_en": "Fluid & Glucocorticoid Replacement (Addison's)",
+    "description": "快速补液纠正脱水和电解质紊乱，糖皮质激素替代治疗",
+    "correct_for": "hypoadrenocorticism",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 300},
+          {"drug_name": "dexamethasone", "dose_mg_kg": 0.1}
+        ]
+      }
+    }
+  },
+  "sepsis": {
+    "name": "液体复苏+广谱抗生素（脓毒症）",
+    "name_en": "Fluid Resuscitation & Antibiotics (Sepsis)",
+    "description": "积极液体复苏恢复灌注，广谱抗生素控制感染",
+    "correct_for": "sepsis",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 400}
+        ]
+      }
+    }
+  },
+  "ivdd": {
+    "name": "镇痛消炎（椎间盘疾病）",
+    "name_en": "Analgesia & Anti-inflammatory (IVDD)",
+    "description": "镇痛消炎控制疼痛，限制活动，严重者需手术减压",
+    "correct_for": "ivdd",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "meloxicam", "dose_mg_kg": 0.1}
+        ]
+      }
+    }
+  },
+  "meningitis": {
+    "name": "抗炎+支持治疗（脑膜炎）",
+    "name_en": "Anti-inflammatory & Supportive (Meningitis)",
+    "description": "糖皮质激素抗炎治疗，配合支持护理",
+    "correct_for": "meningitis",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 200}
+        ]
+      }
+    }
+  },
+  "ckd_anemia": {
+    "name": "促红素+补铁+液体支持（CKD贫血）",
+    "name_en": "EPO & Iron & Fluid Support (CKD Anemia)",
+    "description": "促红细胞生成素纠正贫血，补铁+液体支持改善肾灌注",
+    "correct_for": "ckd_anemia",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 200}
+        ]
+      }
+    }
+  },
+  "hepatic_anemia": {
+    "name": "保肝+输血支持（肝病贫血）",
+    "name_en": "Hepatoprotective & Transfusion Support (Hepatic Anemia)",
+    "description": "保肝治疗+营养支持+必要时输血纠正贫血",
+    "correct_for": "hepatic_anemia",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 250}
+        ]
+      }
+    }
+  },
   "supportive_care": {
     "name": "支持治疗",
     "name_en": "Supportive Care",
