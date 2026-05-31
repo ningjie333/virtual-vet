@@ -140,6 +140,35 @@
       }
     }
   },
+  "hepatic_failure_coagulopathy": {
+    "name": "维生素K+输液支持（肝衰凝血障碍）",
+    "name_en": "Vitamin K & Fluid Support (Hepatic Coagulopathy)",
+    "description": "维生素K1止血+输液支持改善循环，纠正凝血功能障碍",
+    "correct_for": "hepatic_failure_coagulopathy",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "vitamin_k", "dose_mg_kg": 0.5},
+          {"drug_name": "fluid_bolus", "volume_ml": 300}
+        ]
+      }
+    }
+  },
+  "splenic_rupture": {
+    "name": "紧急输液扩容（脾破裂）",
+    "name_en": "Emergency Fluid Resuscitation (Splenic Rupture)",
+    "description": "紧急输液扩容纠正休克，配血准备手术",
+    "correct_for": "splenic_rupture",
+    "on_apply": {
+      "type": "administer_drug_protocol",
+      "params": {
+        "drugs": [
+          {"drug_name": "fluid_bolus", "volume_ml": 500}
+        ]
+      }
+    }
+  },
   "supportive_care": {
     "name": "支持治疗",
     "name_en": "Supportive Care",

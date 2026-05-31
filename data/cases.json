@@ -237,6 +237,54 @@
         "需要凝血功能检查（PT/aPTT/D-二聚体）",
         "寻找潜在诱因（感染/肿瘤）"
       ]
+    },
+    {
+      "id": "case_011",
+      "title": "黄疸与皮下出血",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "犬",
+        "breed": "约克夏梗",
+        "name": "小花",
+        "age": "8岁",
+        "weight_kg": 3.5,
+        "sex": "雌性"
+      },
+      "chief_complaint": "近2周食欲下降，今日发现牙龈苍白、皮肤多处出血点",
+      "history": "2周前开始食欲逐渐下降，精神沉郁。主人发现牙龈颜色苍白，腹部皮肤出现多处小出血点。昨日排黑色软便。曾长期服用关节保健品。无已知毒物接触史。",
+      "disease": "hepatic_failure_coagulopathy",
+      "disease_onset_s": 0,
+      "time_limit_actions": 9,
+      "starting_hints": [
+        "出血倾向+低白蛋白提示肝功能异常",
+        "需要凝血功能检查（PT/aPTT）",
+        "维生素K试验可帮助区分肝衰竭与灭鼠药中毒"
+      ]
+    },
+    {
+      "id": "case_012",
+      "title": "突发腹围增大与虚弱",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "犬",
+        "breed": "德国牧羊犬",
+        "name": "黑狼",
+        "age": "10岁",
+        "weight_kg": 35.0,
+        "sex": "雄性已绝育"
+      },
+      "chief_complaint": "今日突发腹围增大，后肢无力，黏膜苍白",
+      "history": "今晨散步时突然出现后肢无力，随后精神迅速变差。主人发现腹部明显膨大，牙龈颜色极白。既往体健，近期食欲正常。3天前体检发现脾脏可疑肿大，建议复查超声。",
+      "disease": "splenic_rupture",
+      "disease_onset_s": 0,
+      "time_limit_actions": 6,
+      "starting_hints": [
+        "突发虚弱+腹部膨大+黏膜苍白提示腹腔内出血",
+        "紧急腹部超声确认有无腹腔积液",
+        "注意血常规和乳酸评估失血程度"
+      ]
     }
   ]
 }

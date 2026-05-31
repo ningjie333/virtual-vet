@@ -405,5 +405,219 @@
       "median_survival_surgery_only": "~66 days",
       "median_survival_surgery_chemo": "~142 days"
     }
+  },
+  "hyperthyroidism": {
+    "guidelines": [
+      {
+        "authors": "Peterson ME",
+        "year": 2012,
+        "title": "Hyperthyroidism in cats: what's causing this epidemic of thyroid disease?",
+        "journal": "J Am Vet Med Assoc",
+        "pmid": "23113439",
+        "type": "review"
+      },
+      {
+        "authors": "Carney HC, Ward CR, Bailey SJ, et al.",
+        "year": 2016,
+        "title": "2016 AAFP Guidelines for the Management of Feline Hyperthyroidism",
+        "journal": "J Feline Med Surg",
+        "doi": "10.1177/1098612X16643252",
+        "type": "consensus"
+      }
+    ],
+    "criteria": {
+      "T3_high": {"threshold": ">100 ng/dL", "source": "Peterson 2012", "mechanism": "Autonomous thyroid hormone secretion from adenomatous tissue"},
+      "hr_high": {"threshold": ">220 bpm (cat)", "source": "Carney 2016", "mechanism": "T3-mediated β-adrenergic sensitization → increased chronotropy"},
+      "temp_high": {"threshold": ">39.5°C", "source": "Peterson 2012", "mechanism": "T3 increases basal metabolic rate → hyperthermia"},
+      "weight_loss": {"threshold": "Despite polyphagia", "source": "Carney 2016", "mechanism": "Hypermetabolic state exceeds caloric intake"},
+      "map_high": {"threshold": "Systolic >160 mmHg", "source": "Carney 2016", "mechanism": "T3 increases cardiac output and decreases SVR"}
+    },
+    "epidemiology": {
+      "prevalence": "~10% of cats >10 years",
+      "risk_factors": ["Indoor cats", "Canned food diet", "Goitrogen exposure"],
+      "source": "Peterson 2012"
+    }
+  },
+  "hypoadrenocorticism": {
+    "guidelines": [
+      {
+        "authors": "Melian C, Peterson ME",
+        "year": 1996,
+        "title": "Diagnosis and treatment of naturally occurring hypoadrenocorticism in 42 dogs",
+        "journal": "J Small Anim Pract",
+        "pmid": "8683878",
+        "type": "retrospective"
+      },
+      {
+        "authors": "Klein SC, Peterson ME",
+        "year": 2010,
+        "title": "Canine hypoadrenocorticism: part I and II",
+        "journal": "Can Vet J",
+        "pmid": "20300468",
+        "type": "review"
+      }
+    ],
+    "criteria": {
+      "hr_low": {"threshold": "<60 bpm (bradycardia)", "source": "Klein 2010", "mechanism": "Hyperkalemia → cardiac conduction depression"},
+      "map_low": {"threshold": "Hypotension", "source": "Melian 1996", "mechanism": "Cortisol deficiency → loss of vascular tone + hypovolemia"},
+      "potassium_high": {"threshold": ">5.5 mEq/L", "source": "Klein 2010", "mechanism": "Aldosterone deficiency → impaired renal K+ excretion"},
+      "sodium_low": {"threshold": "<140 mEq/L", "source": "Melian 1996", "mechanism": "Aldosterone deficiency → renal sodium wasting"},
+      "weakness": {"threshold": "Lethargy/collapse", "source": "Klein 2010", "mechanism": "Cortisol deficiency → hypoglycemia + electrolyte imbalance"},
+      "dehydration": {"threshold": "Despite normal drinking", "source": "Melian 1996", "mechanism": "Sodium wasting → osmotic diuresis → dehydration"}
+    },
+    "na_k_ratio": {
+      "diagnostic": "<27:1 highly suggestive",
+      "source": "Klein 2010",
+      "mechanism": "Simultaneous hyponatremia + hyperkalemia from mineralocorticoid deficiency"
+    }
+  },
+  "sepsis": {
+    "guidelines": [
+      {
+        "authors": "Singer M, Deutschman CS, Seymour CW, et al.",
+        "year": 2016,
+        "title": "The Third International Consensus Definitions for Sepsis and Septic Shock (Sepsis-3)",
+        "journal": "JAMA",
+        "doi": "10.1001/jama.2016.0287",
+        "type": "consensus"
+      },
+      {
+        "authors": "Sharp CR, Kerl ME",
+        "year": 2009,
+        "title": "Sepsis in dogs and cats: a review",
+        "journal": "J Vet Emerg Crit Care",
+        "doi": "10.1111/j.1476-4431.2009.00415.x",
+        "type": "review"
+      }
+    ],
+    "criteria": {
+      "hr_high": {"threshold": "Tachycardia", "source": "Sharp 2009", "mechanism": "Distributive shock → compensatory sympathetic activation"},
+      "map_low": {"threshold": "<90 mmHg (MAP)", "source": "Singer 2016", "mechanism": "Vasodilation from cytokine storm → distributive shock"},
+      "temp_high": {"threshold": ">39.7°C", "source": "Sharp 2009", "mechanism": "Pyrogen release → hypothalamic set-point elevation"},
+      "wbc_high": {"threshold": ">16,000/μL or <4,000/μL", "source": "Singer 2016", "mechanism": "Systemic inflammatory response"},
+      "perfusion_poor": {"threshold": "CRT >2s, mottled skin", "source": "Sharp 2009", "mechanism": "Microcirculatory dysfunction from capillary leak"},
+      "petechiae": {"threshold": "Visible", "source": "Sharp 2009", "mechanism": "DIC secondary to sepsis"}
+    },
+    "qSOFA_veterinary": {
+      "criteria": ["Altered mentation", "Tachypnea", "Hypotension"],
+      "source": "Adapted from Singer 2016"
+    }
+  },
+  "ivdd": {
+    "guidelines": [
+      {
+        "authors": "De Risio L, Thomas WB, Sharp NJ",
+        "year": 2000,
+        "title": "Degenerative lumbosacral stenosis",
+        "journal": "Vet Clin North Am Small Anim Pract",
+        "pmid": "11033875",
+        "type": "review"
+      },
+      {
+        "authors": "Levine JM, Levine GJ, Johnson SI, et al.",
+        "year": 2007,
+        "title": "Evaluation of the success of medical management for presumptive thoracolumbar intervertebral disc herniation in dogs",
+        "journal": "Vet Surg",
+        "doi": "10.1111/j.1532-950X.2007.00308.x",
+        "type": "retrospective"
+      }
+    ],
+    "criteria": {
+      "pain_mobility": {"threshold": "Reluctance to move, cervical/thoracolumbar pain", "source": "Levine 2007", "mechanism": "Disc extrusion/protrusion → spinal cord compression + meningeal inflammation"},
+      "hr_high": {"threshold": "Tachycardia", "source": "De Risio 2000", "mechanism": "Pain-mediated sympathetic activation"},
+      "temp_high": {"threshold": "Mild fever possible", "source": "De Risio 2000", "mechanism": "Pain stress response (not infection)"},
+      "weakness": {"threshold": "Paresis to paralysis", "source": "Levine 2007", "mechanism": "Spinal cord compression → upper motor neuron deficits"}
+    },
+    "neurological_grades": {
+      "grade_1": "Pain only",
+      "grade_2": "Ambulatory paresis",
+      "grade_3": "Non-ambulatory paresis",
+      "grade_4": "Paralysis with deep pain",
+      "grade_5": "Paralysis without deep pain",
+      "source": "De Risio 2000"
+    }
+  },
+  "meningitis": {
+    "guidelines": [
+      {
+        "authors": "Tipold A",
+        "year": 1995,
+        "title": "Diagnosis of inflammatory and infectious diseases of the central nervous system in dogs",
+        "journal": "Vet Clin North Am Small Anim Pract",
+        "pmid": "7544567",
+        "type": "review"
+      },
+      {
+        "authors": "Griffin JF, Levine JM, Levine GJ, et al.",
+        "year": 2008,
+        "title": "Meningoencephalitis in dogs: a retrospective study",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/j.1939-1676.2008.0197.x",
+        "type": "retrospective"
+      }
+    ],
+    "criteria": {
+      "altered_consciousness": {"threshold": "Depression to stupor", "source": "Griffin 2008", "mechanism": "CNS inflammation → cerebral dysfunction"},
+      "seizure": {"threshold": "Focal or generalized", "source": "Tipold 1995", "mechanism": "Cortical irritation from inflammation/edema"},
+      "hr_high": {"threshold": "Tachycardia", "source": "Griffin 2008", "mechanism": "Pain, fever, and autonomic dysfunction"},
+      "temp_high": {"threshold": ">39.5°C", "source": "Tipold 1995", "mechanism": "Infectious/inflammatory pyrogen release"},
+      "neck_pain": {"threshold": "Cervical rigidity", "source": "Griffin 2008", "mechanism": "Meningeal inflammation → nuchal rigidity"}
+    }
+  },
+  "ckd_anemia": {
+    "guidelines": [
+      {
+        "authors": "International Renal Interest Society (IRIS)",
+        "year": 2024,
+        "title": "IRIS Staging of CKD (Modified 2024)",
+        "journal": "IRIS Board",
+        "url": "https://www.iris-kidney.com/guidelines/staging.html",
+        "type": "consensus"
+      },
+      {
+        "authors": "Chalhoub S, Langston CE, Farrelly J",
+        "year": 2011,
+        "title": "The use of darbepoetin to stimulate erythropoiesis in anemia of CKD in cats",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/j.1939-1676.2011.00837.x",
+        "type": "clinical_trial"
+      }
+    ],
+    "criteria": {
+      "hct_low": {"threshold": "<25% (cat) / <37% (dog)", "source": "IRIS 2024", "mechanism": "Decreased EPO production from damaged nephrons"},
+      "cr_high": {"threshold": ">1.6 mg/dL (cat) / >1.4 mg/dL (dog)", "source": "IRIS 2024", "mechanism": "Nephron loss → decreased GFR → creatinine retention"},
+      "bun_high": {"threshold": ">28.6 mg/dL (cat) / >28.6 mg/dL (dog)", "source": "IRIS 2024", "mechanism": "Decreased GFR → nitrogenous waste retention"},
+      "potassium_high": {"threshold": ">5.5 mEq/L", "source": "IRIS 2024", "mechanism": "Decreased renal K+ excretion in advanced CKD"},
+      "ph_low": {"threshold": "<7.35", "source": "IRIS 2024", "mechanism": "Decreased renal HCO3- reabsorption → metabolic acidosis"},
+      "gfr_low": {"threshold": "<25% of normal", "source": "IRIS 2024", "mechanism": "Nephron loss → reduced filtration capacity"},
+      "map_high": {"threshold": "Systolic >160 mmHg", "source": "IRIS 2024", "mechanism": "Sodium retention + RAAS activation → renal hypertension"}
+    }
+  },
+  "hepatic_anemia": {
+    "guidelines": [
+      {
+        "authors": "Webster CRL, Center SA",
+        "year": 2019,
+        "title": "Hepatic lipidosis: update on mechanisms and treatment",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/jvim.15472",
+        "type": "review"
+      },
+      {
+        "authors": "Toulza O, Center SA, Brooks MB, et al.",
+        "year": 2006,
+        "title": "Evaluation of protein C and antithrombin activities in dogs with hepatic disease",
+        "journal": "J Vet Intern Med",
+        "doi": "10.1111/j.1939-1676.2006.tb02908.x",
+        "type": "retrospective"
+      }
+    ],
+    "criteria": {
+      "hct_low": {"threshold": "<25% (cat) / <37% (dog)", "source": "Webster 2019", "mechanism": "Decreased EPO, chronic GI blood loss, hemolysis, bone marrow suppression"},
+      "alt_high": {"threshold": ">128 U/L (cat) / >125 U/L (dog)", "source": "Webster 2019", "mechanism": "Hepatocyte necrosis → cytoplasmic enzyme leakage"},
+      "albumin_low": {"threshold": "<2.5 g/dL", "source": "Toulza 2006", "mechanism": "Decreased hepatic synthetic function"},
+      "bilirubin_high": {"threshold": ">0.5 mg/dL (cat) / >0.4 mg/dL (dog)", "source": "Webster 2019", "mechanism": "Impaired conjugation + hemolysis + cholestasis"},
+      "hr_high": {"threshold": "Tachycardia", "source": "Webster 2019", "mechanism": "Compensatory for anemia → reduced oxygen-carrying capacity"}
+    }
   }
 }
