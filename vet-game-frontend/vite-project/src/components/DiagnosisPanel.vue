@@ -57,6 +57,15 @@ const diseaseNameMap: Record<string, string> = {
   diabetic_ketoacidosis: "糖尿病酮症酸中毒",
   pericardial_effusion: "心包积液/心脏填塞",
   disseminated_intravascular_coagulation: "弥散性血管内凝血",
+  hepatic_failure_coagulopathy: "肝功能衰竭伴凝血障碍",
+  splenic_rupture: "脾脏破裂",
+  hyperthyroidism: "甲状腺功能亢进",
+  hypoadrenocorticism: "肾上腺皮质功能减退",
+  sepsis: "脓毒症",
+  ivdd: "椎间盘疾病",
+  meningitis: "脑膜炎/脑炎",
+  ckd_anemia: "慢性肾病贫血",
+  hepatic_anemia: "肝病贫血",
 };
 
 async function refreshDiagnosis() {
