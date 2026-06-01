@@ -18,12 +18,15 @@ const activeOrgan = ref("heart");
 
 // ── 疾病模拟状态 ──
 interface DiseaseInfo { id: string; display: string; severities: string[] }
+interface OrganParam { value: number; label_zh: string; unit: string }
+type OrgansData = Record<string, Record<string, OrganParam>>;
 const diseases = ref<DiseaseInfo[]>([]);
 const selectedDisease = ref("");
 const selectedSeverity = ref("moderate");
 const diseaseWarmup = ref(2);
 const diseaseLoading = ref(false);
-const diseaseResult = ref<{ healthy: Record<string, number>; disease: Record<string, number> } | null>(null);
+const diseaseResult = ref<{ healthy: { organs: OrgansData }; disease: { organs: OrgansData } } | null>(null);
+const diseaseView = ref<"disease" | "healthy">("disease");
 
 // ── 品种数据 ──
 interface BreedInfo {
@@ -81,8 +84,8 @@ const lifePhaseLabel = computed(() => {
 });
 
 const organTabs = computed(() => {
-  if (!result.value?.organs) return [];
-  return Object.keys(result.value.organs);
+  if (activeOrgans.value) return Object.keys(activeOrgans.value);
+  return [];
 });
 
 const organLabels: Record<string, string> = {
@@ -170,6 +173,24 @@ function getOrganParamCount(organ: string): number {
   return result.value?.organs?.[organ] ? Object.keys(result.value.organs[organ]).length : 0;
 }
 
+// 当前显示的器官数据（健康 or 疾病）
+const activeOrgans = computed((): OrgansData | null => {
+  if (diseaseResult.value) {
+    return diseaseView.value === "disease"
+      ? diseaseResult.value.disease.organs
+      : diseaseResult.value.healthy.organs;
+  }
+  if (result.value?.organs) {
+    // 将原有格式转换为统一格式
+    const converted: OrgansData = {};
+    for (const [organ, params] of Object.entries(result.value.organs as Record<string, Record<string, { value: number; label_zh: string; unit: string }>>)) {
+      converted[organ] = params;
+    }
+    return converted;
+  }
+  return null;
+});
+
 async function simulateDisease() {
   if (!selectedDisease.value) return;
   diseaseLoading.value = true;
@@ -181,7 +202,8 @@ async function simulateDisease() {
       severity: selectedSeverity.value,
       warmup_minutes: diseaseWarmup.value,
     });
-    diseaseResult.value = data;
+    diseaseResult.value = data as unknown as { healthy: { organs: OrgansData }; disease: { organs: OrgansData } };
+    diseaseView.value = "disease";
   } catch (e) {
     console.error("Disease simulation error:", e);
   } finally {
@@ -327,27 +349,6 @@ function onDiseaseChange() {
             </button>
           </div>
 
-          <!-- 疾病对比结果 -->
-          <div v-if="diseaseResult" class="disease-comparison">
-            <div class="comparison-header">
-              <span class="comp-label">指标</span>
-              <span class="comp-label healthy">健康</span>
-              <span class="comp-label disease">{{ getDiseaseDisplay(selectedDisease) }}</span>
-              <span class="comp-label delta">变化</span>
-            </div>
-            <div v-for="(val, key) in diseaseResult.disease" :key="key" class="comparison-row">
-              <span class="comp-key">{{ key }}</span>
-              <span class="comp-val healthy">{{ diseaseResult.healthy[key] }}</span>
-              <span class="comp-val disease">{{ val }}</span>
-              <span :class="['comp-val', 'delta', {
-                up: val > diseaseResult.healthy[key],
-                down: val < diseaseResult.healthy[key]
-              }]">
-                {{ val > diseaseResult.healthy[key] ? '↑' : val < diseaseResult.healthy[key] ? '↓' : '—' }}
-                {{ Math.abs(val - diseaseResult.healthy[key]).toFixed(1) }}
-              </span>
-            </div>
-          </div>
         </div>
 
         <!-- 统计信息 -->
@@ -397,18 +398,28 @@ function onDiseaseChange() {
 
       <!-- 右侧参数面板 -->
       <div class="debug-right-panel">
-        <template v-if="result">
+        <template v-if="activeOrgans">
+          <!-- 健康/疾病切换 -->
+          <div v-if="diseaseResult" class="view-toggle">
+            <button :class="['toggle-btn', { active: diseaseView === 'healthy' }]" @click="diseaseView = 'healthy'">
+              🟢 健康
+            </button>
+            <button :class="['toggle-btn', 'disease', { active: diseaseView === 'disease' }]" @click="diseaseView = 'disease'">
+              🔴 {{ getDiseaseDisplay(selectedDisease) }}
+            </button>
+          </div>
+
           <!-- 器官标签页 -->
           <div class="organ-tabs">
             <button
-              v-for="organ in organTabs"
+              v-for="organ in Object.keys(activeOrgans!)"
               :key="organ"
               :class="['organ-tab', { active: activeOrgan === organ }]"
               :style="{ borderColor: organColors[organ] }"
               @click="activeOrgan = organ"
             >
               {{ organLabels[organ] || organ }}
-              <span class="param-count">{{ getOrganParamCount(organ) }}</span>
+              <span class="param-count">{{ Object.keys(activeOrgans![organ] || {}).length }}</span>
             </button>
           </div>
 
@@ -421,11 +432,13 @@ function onDiseaseChange() {
                   <th>英文名</th>
                   <th>值</th>
                   <th>单位</th>
+                  <th v-if="diseaseResult">健康值</th>
+                  <th v-if="diseaseResult">变化</th>
                 </tr>
               </thead>
               <tbody>
                 <tr
-                  v-for="(info, param) in result.organs[activeOrgan]"
+                  v-for="(info, param) in activeOrgans![activeOrgan]"
                   :key="param"
                   :style="{ borderLeftColor: organColors[activeOrgan] }"
                 >
@@ -433,6 +446,16 @@ function onDiseaseChange() {
                   <td class="param-key">{{ param }}</td>
                   <td class="param-value">{{ formatValue(info.value) }}</td>
                   <td class="param-unit">{{ info.unit }}</td>
+                  <td v-if="diseaseResult" class="param-value healthy-ref">
+                    {{ formatValue(diseaseResult.healthy.organs[activeOrgan]?.[param as string]?.value ?? info.value) }}
+                  </td>
+                  <td v-if="diseaseResult" :class="['param-delta', {
+                    up: info.value > (diseaseResult.healthy.organs[activeOrgan]?.[param as string]?.value ?? info.value),
+                    down: info.value < (diseaseResult.healthy.organs[activeOrgan]?.[param as string]?.value ?? info.value)
+                  }]">
+                    {{ info.value > (diseaseResult.healthy.organs[activeOrgan]?.[param as string]?.value ?? info.value) ? '↑' :
+                       info.value < (diseaseResult.healthy.organs[activeOrgan]?.[param as string]?.value ?? info.value) ? '↓' : '—' }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -951,4 +974,49 @@ function onDiseaseChange() {
 .comp-val.delta { color: var(--text-dim); }
 .comp-val.delta.up { color: #EF5350; }
 .comp-val.delta.down { color: #42A5F5; }
+
+/* ── 健康/疾病切换 ── */
+.view-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-void);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.toggle-btn.active {
+  background: #2E7D32;
+  border-color: #4CAF50;
+  color: #fff;
+}
+.toggle-btn.disease.active {
+  background: #C62828;
+  border-color: #EF5350;
+  color: #fff;
+}
+
+/* ── 参数表格 delta 列 ── */
+.param-delta {
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  min-width: 30px;
+}
+.param-delta.up { color: #EF5350; }
+.param-delta.down { color: #42A5F5; }
+.healthy-ref {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+}
 </style>

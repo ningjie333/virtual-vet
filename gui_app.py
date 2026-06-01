@@ -787,40 +787,70 @@ def api_debug_disease_params():
     from src.simulation import VirtualCreature
     from src.diseases import create_disease
 
-    # 健康基线
-    vc_healthy = VirtualCreature(body_weight_kg=weight_kg, species=species)
-    vc_healthy.simulate(0.1)
-    healthy_vitals = {
-        "HR": round(vc_healthy.heart.heart_rate, 1),
-        "MAP": round(vc_healthy.heart.mean_arterial_pressure, 1),
-        "RR": round(vc_healthy.lung.respiratory_rate, 1),
-        "SpO2": round(vc_healthy.blood.arterial_saturation * 100, 1),
-        "Temp": round(vc_healthy.blood.core_temperature_C, 1),
-        "pH": round(vc_healthy.blood.arterial_pH, 3),
-        "GFR": round(vc_healthy.kidney.GFR, 1),
-    }
+    from src.debug_params import compute_debug_params
 
-    # 带疾病
+    # 健康基线（完整器官参数）
+    species_cn = {"canine": "犬", "feline": "猫", "equine": "马"}.get(species, "犬")
+    healthy_raw = compute_debug_params(species=species, breed="mixed", age_days=1095, weight_kg=weight_kg)
+    healthy_organs = healthy_raw.get("organs", {})
+
+    # 带疾病（完整器官参数）
     vc_disease = VirtualCreature(body_weight_kg=weight_kg, species=species)
     disease = create_disease(disease_name, severity=severity)
     vc_disease.attach_disease(disease)
     vc_disease.simulate(warmup_minutes)
-    disease_vitals = {
-        "HR": round(vc_disease.heart.heart_rate, 1),
-        "MAP": round(vc_disease.heart.mean_arterial_pressure, 1),
-        "RR": round(vc_disease.lung.respiratory_rate, 1),
-        "SpO2": round(vc_disease.blood.arterial_saturation * 100, 1),
-        "Temp": round(vc_disease.blood.core_temperature_C, 1),
-        "pH": round(vc_disease.blood.arterial_pH, 3),
-        "GFR": round(vc_disease.kidney.GFR, 1),
-    }
+
+    # 从疾病引擎提取全部器官参数（与 compute_debug_params 同格式）
+    def _extract_organ_params(vc):
+        organs = {}
+        # heart（参数名与 debug_params 一致）
+        organs["heart"] = {
+            "heart_rate": {"value": vc.heart.heart_rate, "label_zh": "心率", "unit": "bpm"},
+            "stroke_volume": {"value": vc.heart.stroke_volume, "label_zh": "每搏输出量", "unit": "mL"},
+            "cardiac_output": {"value": vc.heart.cardiac_output, "label_zh": "心输出量", "unit": "mL/min"},
+            "mean_arterial_pressure": {"value": vc.heart.mean_arterial_pressure, "label_zh": "平均动脉压", "unit": "mmHg"},
+            "SVR": {"value": vc.heart.SVR, "label_zh": "体循环血管阻力", "unit": "mmHg·s/mL"},
+            "central_venous_pressure": {"value": vc.heart.central_venous_pressure, "label_zh": "中心静脉压", "unit": "mmHg"},
+        }
+        # lung
+        organs["lung"] = {
+            "respiratory_rate": {"value": vc.lung.respiratory_rate, "label_zh": "呼吸频率", "unit": "/min"},
+            "tidal_volume": {"value": vc.lung.tidal_volume, "label_zh": "潮气量", "unit": "mL"},
+        }
+        # blood
+        organs["blood"] = {
+            "arterial_pH": {"value": vc.blood.arterial_pH, "label_zh": "动脉血pH", "unit": ""},
+            "arterial_PO2_mmHg": {"value": vc.blood.arterial_PO2_mmHg, "label_zh": "动脉氧分压", "unit": "mmHg"},
+            "arterial_PCO2_mmHg": {"value": vc.blood.arterial_PCO2_mmHg, "label_zh": "动脉CO2分压", "unit": "mmHg"},
+            "arterial_saturation": {"value": vc.blood.arterial_saturation * 100, "label_zh": "血氧饱和度", "unit": "%"},
+            "potassium_mEq_L": {"value": vc.blood.potassium_mEq_L, "label_zh": "血钾", "unit": "mEq/L"},
+            "sodium_mEq_L": {"value": vc.blood.sodium_mEq_L, "label_zh": "血钠", "unit": "mEq/L"},
+            "glucose_mmol_L": {"value": vc.blood.glucose_mmol_L, "label_zh": "血糖", "unit": "mmol/L"},
+            "bun_mg_dL": {"value": vc.blood.bun_mg_dL, "label_zh": "血尿素氮", "unit": "mg/dL"},
+            "creatinine_mg_dL": {"value": vc.blood.creatinine_mg_dL, "label_zh": "血肌酐", "unit": "mg/dL"},
+            "lactate_mmol_L": {"value": vc.blood.lactate_mmol_L, "label_zh": "血乳酸", "unit": "mmol/L"},
+            "core_temperature_C": {"value": vc.blood.core_temperature_C, "label_zh": "核心体温", "unit": "°C"},
+        }
+        # kidney
+        organs["kidney"] = {
+            "GFR": {"value": vc.kidney.GFR, "label_zh": "肾小球滤过率", "unit": "mL/min"},
+            "urine_output": {"value": vc.kidney.urine_output, "label_zh": "尿量", "unit": "mL/min"},
+        }
+        # fluid
+        organs["fluid"] = {
+            "vascular_volume_ml": {"value": vc.fluid.vascular_volume_ml, "label_zh": "血管内容量", "unit": "mL"},
+            "isf_volume_ml": {"value": vc.fluid.isf_volume_ml, "label_zh": "间质液容量", "unit": "mL"},
+        }
+        return organs
+
+    disease_organs = _extract_organ_params(vc_disease)
 
     return jsonify({
         "input": {"species": species, "weight_kg": weight_kg,
                   "disease": disease_name, "severity": severity,
                   "warmup_minutes": warmup_minutes},
-        "healthy": healthy_vitals,
-        "disease": disease_vitals,
+        "healthy": {"organs": healthy_organs},
+        "disease": {"organs": disease_organs},
     })
 
 
