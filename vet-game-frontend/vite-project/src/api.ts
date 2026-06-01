@@ -126,4 +126,12 @@ export const debugApi = {
   getSpecies: (): Promise<Record<string, Record<string, { display: string; weight_kg: { min: number; max: number; default: number }; size_category: string }>>> => request("GET", "/debug/species"),
 
   getParams: (params: { species: string; breed: string; age_days: number; weight_kg?: number }): Promise<Record<string, unknown>> => request("POST", "/debug/params", params),
+
+  getDiseases: (): Promise<{ id: string; display: string; severities: string[] }[]> => request("GET", "/debug/diseases"),
+
+  getDiseaseParams: (params: { species: string; weight_kg: number; disease: string; severity: string; warmup_minutes: number }): Promise<{
+    input: Record<string, unknown>;
+    healthy: Record<string, number>;
+    disease: Record<string, number>;
+  }> => request("POST", "/debug/disease-params", params),
 };

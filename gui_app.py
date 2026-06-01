@@ -747,6 +747,83 @@ def api_debug_params():
     return jsonify(result)
 
 
+@app.route("/api/debug/diseases", methods=["GET"])
+def api_debug_diseases():
+    """返回可用疾病列表和严重度选项。"""
+    with open(os.path.join(DATA_DIR, "ode_diseases.json"), encoding="utf-8") as f:
+        ode = json.load(f)
+    _DISEASE_NAMES = _load_json("diseases.json")["disease_names"]
+    diseases = []
+    for name, d in ode.items():
+        if name.startswith("_"):
+            continue
+        diseases.append({
+            "id": name,
+            "display": _DISEASE_NAMES.get(name, name),
+            "severities": list(d.get("severity_presets", {}).keys()),
+        })
+    return jsonify(diseases)
+
+
+@app.route("/api/debug/disease-params", methods=["POST"])
+def api_debug_disease_params():
+    """
+    计算带疾病影响的生理参数（健康 vs 疾病对比）。
+
+    POST body: {
+        "species": "canine", "weight_kg": 30.0,
+        "disease": "pneumonia", "severity": "moderate", "warmup_minutes": 2
+    }
+    """
+    data = request.get_json(force=True) or {}
+    species_map = {"犬": "canine", "猫": "feline", "马": "equine",
+                   "canine": "canine", "feline": "feline", "equine": "equine"}
+    species = species_map.get(data.get("species", "犬"), "canine")
+    weight_kg = float(data.get("weight_kg", 20.0))
+    disease_name = data.get("disease", "pneumonia")
+    severity = data.get("severity", "moderate")
+    warmup_minutes = float(data.get("warmup_minutes", 2))
+
+    from src.simulation import VirtualCreature
+    from src.diseases import create_disease
+
+    # 健康基线
+    vc_healthy = VirtualCreature(body_weight_kg=weight_kg, species=species)
+    vc_healthy.simulate(0.1)
+    healthy_vitals = {
+        "HR": round(vc_healthy.heart.heart_rate, 1),
+        "MAP": round(vc_healthy.heart.mean_arterial_pressure, 1),
+        "RR": round(vc_healthy.lung.respiratory_rate, 1),
+        "SpO2": round(vc_healthy.blood.arterial_saturation * 100, 1),
+        "Temp": round(vc_healthy.blood.core_temperature_C, 1),
+        "pH": round(vc_healthy.blood.arterial_pH, 3),
+        "GFR": round(vc_healthy.kidney.GFR, 1),
+    }
+
+    # 带疾病
+    vc_disease = VirtualCreature(body_weight_kg=weight_kg, species=species)
+    disease = create_disease(disease_name, severity=severity)
+    vc_disease.attach_disease(disease)
+    vc_disease.simulate(warmup_minutes)
+    disease_vitals = {
+        "HR": round(vc_disease.heart.heart_rate, 1),
+        "MAP": round(vc_disease.heart.mean_arterial_pressure, 1),
+        "RR": round(vc_disease.lung.respiratory_rate, 1),
+        "SpO2": round(vc_disease.blood.arterial_saturation * 100, 1),
+        "Temp": round(vc_disease.blood.core_temperature_C, 1),
+        "pH": round(vc_disease.blood.arterial_pH, 3),
+        "GFR": round(vc_disease.kidney.GFR, 1),
+    }
+
+    return jsonify({
+        "input": {"species": species, "weight_kg": weight_kg,
+                  "disease": disease_name, "severity": severity,
+                  "warmup_minutes": warmup_minutes},
+        "healthy": healthy_vitals,
+        "disease": disease_vitals,
+    })
+
+
 # ============================================================
 # 启动
 # ============================================================

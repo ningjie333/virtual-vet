@@ -16,6 +16,15 @@ const loading = ref(false);
 const result = ref<DebugParamsResponse | null>(null);
 const activeOrgan = ref("heart");
 
+// ── 疾病模拟状态 ──
+interface DiseaseInfo { id: string; display: string; severities: string[] }
+const diseases = ref<DiseaseInfo[]>([]);
+const selectedDisease = ref("");
+const selectedSeverity = ref("moderate");
+const diseaseWarmup = ref(2);
+const diseaseLoading = ref(false);
+const diseaseResult = ref<{ healthy: Record<string, number>; disease: Record<string, number> } | null>(null);
+
 // ── 品种数据 ──
 interface BreedInfo {
   display: string;
@@ -30,6 +39,11 @@ const speciesData = ref<SpeciesData>({});
 onMounted(async () => {
   speciesData.value = await debugApi.getSpecies();
   updateWeightFromBreed();
+  diseases.value = await debugApi.getDiseases();
+  if (diseases.value.length > 0) {
+    selectedDisease.value = diseases.value[0].id;
+    selectedSeverity.value = diseases.value[0].severities[1] || diseases.value[0].severities[0] || "moderate";
+  }
 });
 
 // ── 计算属性 ──
@@ -155,6 +169,40 @@ function formatValue(val: number): string {
 function getOrganParamCount(organ: string): number {
   return result.value?.organs?.[organ] ? Object.keys(result.value.organs[organ]).length : 0;
 }
+
+async function simulateDisease() {
+  if (!selectedDisease.value) return;
+  diseaseLoading.value = true;
+  try {
+    const data = await debugApi.getDiseaseParams({
+      species: species.value === "canine" ? "犬" : species.value === "feline" ? "猫" : "马",
+      weight_kg: weightKg.value,
+      disease: selectedDisease.value,
+      severity: selectedSeverity.value,
+      warmup_minutes: diseaseWarmup.value,
+    });
+    diseaseResult.value = data;
+  } catch (e) {
+    console.error("Disease simulation error:", e);
+  } finally {
+    diseaseLoading.value = false;
+  }
+}
+
+function getDiseaseDisplay(id: string): string {
+  return diseases.value.find(d => d.id === id)?.display || id;
+}
+
+function getSeverities(id: string): string[] {
+  return diseases.value.find(d => d.id === id)?.severities || ["moderate"];
+}
+
+function onDiseaseChange() {
+  const sevs = getSeverities(selectedDisease.value);
+  if (!sevs.includes(selectedSeverity.value)) {
+    selectedSeverity.value = sevs[1] || sevs[0] || "moderate";
+  }
+}
 </script>
 
 <template>
@@ -239,6 +287,67 @@ function getOrganParamCount(organ: string): number {
             {{ loading ? "计算中..." : "计算参数" }}
           </button>
           <button class="btn btn-ghost" @click="resetParams">重置</button>
+        </div>
+
+        <!-- 疾病模拟 -->
+        <div class="debug-disease-section">
+          <div class="panel-ttl">🦠 疾病模拟</div>
+
+          <div class="debug-field">
+            <label class="debug-label">疾病</label>
+            <select v-model="selectedDisease" @change="onDiseaseChange" class="debug-select">
+              <option v-for="d in diseases" :key="d.id" :value="d.id">
+                {{ d.display }}
+              </option>
+            </select>
+          </div>
+
+          <div class="debug-field">
+            <label class="debug-label">严重度</label>
+            <div class="radio-group">
+              <button
+                v-for="s in getSeverities(selectedDisease)"
+                :key="s"
+                :class="['radio-btn', { active: selectedSeverity === s }]"
+                @click="selectedSeverity = s"
+              >
+                {{ s === 'mild' ? '轻度' : s === 'moderate' ? '中度' : '重度' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="debug-field">
+            <label class="debug-label">Warmup (分钟)</label>
+            <input v-model.number="diseaseWarmup" type="number" :min="0.1" :max="60" :step="0.5" class="debug-input" />
+          </div>
+
+          <div class="debug-actions">
+            <button class="btn btn-primary" @click="simulateDisease" :disabled="diseaseLoading">
+              {{ diseaseLoading ? "模拟中..." : "模拟疾病" }}
+            </button>
+          </div>
+
+          <!-- 疾病对比结果 -->
+          <div v-if="diseaseResult" class="disease-comparison">
+            <div class="comparison-header">
+              <span class="comp-label">指标</span>
+              <span class="comp-label healthy">健康</span>
+              <span class="comp-label disease">{{ getDiseaseDisplay(selectedDisease) }}</span>
+              <span class="comp-label delta">变化</span>
+            </div>
+            <div v-for="(val, key) in diseaseResult.disease" :key="key" class="comparison-row">
+              <span class="comp-key">{{ key }}</span>
+              <span class="comp-val healthy">{{ diseaseResult.healthy[key] }}</span>
+              <span class="comp-val disease">{{ val }}</span>
+              <span :class="['comp-val', 'delta', {
+                up: val > diseaseResult.healthy[key],
+                down: val < diseaseResult.healthy[key]
+              }]">
+                {{ val > diseaseResult.healthy[key] ? '↑' : val < diseaseResult.healthy[key] ? '↓' : '—' }}
+                {{ Math.abs(val - diseaseResult.healthy[key]).toFixed(1) }}
+              </span>
+            </div>
+          </div>
         </div>
 
         <!-- 统计信息 -->
@@ -789,4 +898,57 @@ function getOrganParamCount(organ: string): number {
   border-color: var(--border-hi);
   color: var(--text);
 }
+
+/* ── 疾病模拟 ── */
+.debug-disease-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.disease-comparison {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+}
+
+.comparison-header {
+  display: grid;
+  grid-template-columns: 70px 1fr 1fr 1fr;
+  gap: 4px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.comp-label {
+  text-align: right;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.comp-label.healthy { color: #66BB6A; }
+.comp-label.disease { color: #EF5350; }
+
+.comparison-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 1fr 1fr;
+  gap: 4px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.comp-key {
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.comp-val {
+  text-align: right;
+}
+.comp-val.healthy { color: #66BB6A; }
+.comp-val.disease { color: #FFB74D; }
+.comp-val.delta { color: var(--text-dim); }
+.comp-val.delta.up { color: #EF5350; }
+.comp-val.delta.down { color: #42A5F5; }
 </style>
