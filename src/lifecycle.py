@@ -157,6 +157,7 @@ class LifecycleEngine:
     ):
         self.mode = mode
         self.species = species
+        self.size_category = size_category  # 存储用于 size-specific 衰退
 
         if mode == LifecycleMode.BYPASS:
             # 旧轨：使用旧的 growth/decline 逻辑（向后兼容）
@@ -366,7 +367,7 @@ class LifecycleEngine:
             return
         for organ, cfg in self._profile.organs.items():
             mat = cfg.maturation.evaluate(self._state.age_days)
-            dec = cfg.decline.evaluate(self._state.age_days)
+            dec = cfg.decline.evaluate(self._state.age_days, size_category=self.size_category)
             factor = mat * dec
             attrs = self._NEW_TRACK_TARGETS.get(organ, [])
             for attr_name in attrs:
@@ -393,7 +394,7 @@ class LifecycleEngine:
         cfg = self._profile.organs.get("heart")
         if cfg is None:
             return
-        factor = cfg.maturation.evaluate(self._state.age_days) * cfg.decline.evaluate(self._state.age_days)
+        factor = cfg.maturation.evaluate(self._state.age_days) * cfg.decline.evaluate(self._state.age_days, size_category=self.size_category)
         key = "heart.contractility_factor"
         if key in self._original_baselines:
             current = creature.heart.contractility_factor
@@ -422,10 +423,23 @@ class LifecycleEngine:
         """新轨：从 profile 计算 organ_function/organ_reserve。"""
         if self._profile is None:
             return
+        # 器官储备阈值：低于此值器官失代偿
+        # 肾/肝储备较大（0.5），心/肺储备较小（0.3）
+        # 生理学：肾有大量功能性肾单位，肝有再生能力
+        reserve_thresholds = {
+            "kidney": 0.5,
+            "liver": 0.5,
+            "heart": 0.4,
+            "lung": 0.4,
+            "immune": 0.3,
+        }
         for organ, cfg in self._profile.organs.items():
-            func = cfg.maturation.evaluate(self._state.age_days) * cfg.decline.evaluate(self._state.age_days)
+            mat = cfg.maturation.evaluate(self._state.age_days)
+            dec = cfg.decline.evaluate(self._state.age_days, size_category=self.size_category)
+            func = mat * dec
             self._state.organ_function[organ] = round(func, 6)
-            self._state.organ_reserve[organ] = round(max(0.0, func - 0.3), 6)
+            threshold = reserve_thresholds.get(organ, 0.3)
+            self._state.organ_reserve[organ] = round(max(0.0, func - threshold), 6)
 
     # ── 序列化（向后兼容）─────────────────────────────────
 

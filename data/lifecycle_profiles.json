@@ -59,8 +59,15 @@
           },
           "decline": {
             "curve": "gompertz",
+            "onset_days_by_size": {
+              "small": 1460,
+              "medium": 1825,
+              "large": 730,
+              "giant": 540
+            },
             "onset_days": 1825,
-            "rate_per_day": 3.0e-5
+            "rate_per_day": 3.0e-5,
+            "_size_note": "胸腺输出(sj-TREC)在大型犬 2y(730d)开始衰退，小型犬 4y(1460d)。巨型犬更早(1.5y)。Holder 2017 PMID 27824893。"
           },
           "adult_reference": 1.0
         },
@@ -162,7 +169,8 @@
       "cardiac": {
         "HR_puppy_bpm": 120,
         "HR_adult_bpm": 85,
-        "HR_senior_bpm": 90,
+        "HR_senior_bpm": 80,
+        "HR_note": "健康老年犬静息心率下降（迷走张力增加），不是升高。原 90 bpm 是代偿性，健康模型应为 80 bpm。",
         "description": "Resting HR. Adult values: Chetbrol 2025 PMID 41030684. Puppy HR: Pereira 2024 PMID 39682383."
       },
       "immune": {

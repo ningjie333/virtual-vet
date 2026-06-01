@@ -110,6 +110,8 @@ class DeclineConfig:
     # gompertz
     onset_days: float | None = None
     rate_per_day: float | None = None
+    # size-dependent onset (覆盖 onset_days)
+    onset_days_by_size: dict[str, float] | None = None
     # linear
     min_factor: float | None = None
 
@@ -119,14 +121,20 @@ class DeclineConfig:
             curve=d.get("curve", "constant"),
             onset_days=d.get("onset_days"),
             rate_per_day=d.get("rate_per_day"),
+            onset_days_by_size=d.get("onset_days_by_size"),
             min_factor=d.get("min_factor"),
         )
 
-    def evaluate(self, age_days: float) -> float:
+    def evaluate(self, age_days: float, size_category: str | None = None) -> float:
+        # 优先使用 size-specific onset_days
+        if self.onset_days_by_size and size_category:
+            onset = self.onset_days_by_size.get(size_category, self.onset_days or 0.0)
+        else:
+            onset = self.onset_days or 0.0
         return decline_curve(
             self.curve,
             age_days,
-            onset_days=self.onset_days or 0.0,
+            onset_days=onset,
             rate_per_day=self.rate_per_day or 0.0,
             min_factor=self.min_factor or 0.3,
         )
@@ -183,19 +191,25 @@ class LifecycleSpeciesProfile:
             adult_references=d.get("adult_references", {}),
         )
 
-    def get_organ_function(self, organ: str, age_days: float) -> float:
+    def get_organ_function(self, organ: str, age_days: float, size_category: str | None = None) -> float:
         """
         综合发育×衰退 = 当前器官功能因子（0~1）。
 
         1.0 = 完全功能（成年基准）
         <1.0 = 发育未完成 或 衰老衰退
+
+        Args:
+            organ: 器官名
+            age_days: 年龄（天）
+            size_category: 品种大小（small/medium/large/giant），用于 size-specific 衰退
         """
         cfg = self.organs.get(organ)
         if cfg is None:
             return 1.0  # 未配置的器官：默认完全功能
 
+        size = size_category or self.size_category
         mat = cfg.maturation.evaluate(age_days)
-        dec = cfg.decline.evaluate(age_days)
+        dec = cfg.decline.evaluate(age_days, size_category=size)
         return mat * dec
 
 
