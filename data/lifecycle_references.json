@@ -233,5 +233,21 @@
       },
       "applies_to": ["equine"]
     }
+  ],
+
+  "epo": [
+    {
+      "pmid": 3768502,
+      "author": "Nefedov 1986 (cited as Caiado in some sources)",
+      "year": 1986,
+      "journal": "Bull Exp Biol Med",
+      "title": "Canine liver perfusion - hepatic EPO production",
+      "species": "canine",
+      "key_findings": {
+        "liver_to_kidney_EPO_ratio": 2.5,
+        "conclusion": "成年犬肝脏 EPO 产量是肾脏的 2.5 倍。犬类肝脏终生是主要 EPO 来源（与人类不同）。"
+      },
+      "applies_to": ["hematology.EPO_source"]
+    }
   ]
 }
