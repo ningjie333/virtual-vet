@@ -187,6 +187,7 @@ class LifecycleEngine:
         )
         self._original_baselines: dict[str, float] = {}
         self._update_phase_new()
+        self._sync_organ_function_new()
 
     # ── 旧 API（向后兼容）─────────────────────────────────────────
 
@@ -226,22 +227,37 @@ class LifecycleEngine:
         return max(0.0, self.organ_multiplier(organ) - self._params.end_life_function)
 
     def is_dead(self) -> bool:
-        return self._state.phase == LifecyclePhase.DEAD
+        """检查是否死亡（兼容旧轨和新轨）。"""
+        if self.mode == LifecycleMode.BYPASS:
+            return self._state.phase == LifecyclePhase.DEAD
+        return self._state.phase == LifePhase.DEAD
 
     def death_check(self) -> str | None:
-        """旧接口：死亡检测。"""
-        if self.mode != LifecycleMode.BYPASS:
+        """
+        死亡检测。
+
+        旧轨：基于 decline_multiplier < end_life_function
+        新轨：基于年龄超过极老年阈值（geriatric_age_days × 1.5）
+        """
+        if self.mode == LifecycleMode.BYPASS:
+            if self._decline_multiplier() < self._params.end_life_function:
+                self._state.phase = LifecyclePhase.DEAD
+                slowest = min(
+                    self._state.organ_function,
+                    key=self._state.organ_function.get,
+                )
+                self._state.death_cause = f"{slowest}_senescence"
+                return self._state.death_cause
             return None
-        if self._decline_multiplier() < self._params.end_life_function:
-            self._state.phase = LifecyclePhase.DEAD
-            # 找最慢器官
-            slowest = min(
-                self._state.organ_function,
-                key=self._state.organ_function.get,
-            )
-            self._state.death_cause = f"{slowest}_senescence"
-            return self._state.death_cause
-        return None
+        else:
+            # 死亡阈值：极老年（小型犬 18y，中型犬 13.5y，大型犬 10.5y） × 1.5
+            # 即小型犬 ~27y、中型犬 ~20y、大型犬 ~16y 才会触发年龄死亡
+            # 实际上小型犬寿命可达 18-20 岁，15 岁的狗仍有临床意义
+            if self._state.age_days > self._geriatric_days * 2.0:
+                self._state.phase = LifePhase.DEAD
+                self._state.death_cause = "advanced_age"
+                return self._state.death_cause
+            return None
 
     def advance_time(self, delta_days: float) -> None:
         if self.mode == LifecycleMode.BYPASS:
@@ -250,6 +266,7 @@ class LifecycleEngine:
         else:
             self._state.age_days += delta_days
             self._update_phase_new()
+            self._sync_organ_function_new()
 
     def _sync_organ_function(self) -> None:
         """旧：同步器官状态。"""
@@ -278,23 +295,49 @@ class LifecycleEngine:
         else:
             self._state.phase = LifecyclePhase.NEONATAL
 
+    # 新轨 TARGETS：器官名 → 属性名列表
+    _NEW_TRACK_TARGETS = {
+        "kidney": ["GFR"],
+        "liver": ["metabolic_activity", "detox_capacity", "cyp450_activity"],
+        "heart": ["contractility_factor"],
+        "lung": ["diffusion_coefficient"],
+    }
+
     def capture_baselines(self, creature) -> None:
-        """新接口：在引擎初始化后捕获器官基准值。"""
-        from simulation import _PARAM_PATHS, FactorCommand
-        for organ, params in self._ORGAN_PARAMS.items():
-            for target, attr_name in params:
-                key = f"{organ}.{attr_name}"
-                if key in self._original_baselines:
-                    continue
-                path = _PARAM_PATHS.get(target)
-                if path is None:
-                    logger.debug("Lifecycle: %s not in _PARAM_PATHS", target)
-                    continue
-                mod_name, _ = path
-                self._original_baselines[key] = getattr(
-                    getattr(creature, mod_name), attr_name
-                )
-                logger.debug("captured %s = %.4f", key, self._original_baselines[key])
+        """
+        捕获器官基准值（在引擎初始化后调用一次）。
+
+        旧轨和新轨都使用此方法。基准值存储在 _original_baselines 中，
+        后续 apply/apply_age_factors 基于基准值计算，避免重复乘法。
+        """
+        if self.mode == LifecycleMode.BYPASS:
+            # 旧轨：从 _ORGAN_PARAMS 捕获
+            for organ, params in self._ORGAN_PARAMS.items():
+                for target, attr_name in params:
+                    key = f"{organ}.{attr_name}"
+                    if key in self._original_baselines:
+                        continue
+                    if not hasattr(creature, organ):
+                        continue
+                    mod = getattr(creature, organ)
+                    if not hasattr(mod, attr_name):
+                        continue
+                    self._original_baselines[key] = getattr(mod, attr_name)
+                    logger.debug("captured [bypass] %s = %.4f", key, self._original_baselines[key])
+        else:
+            # 新轨：从 _NEW_TRACK_TARGETS 捕获
+            for organ, attrs in self._NEW_TRACK_TARGETS.items():
+                for attr_name in attrs:
+                    key = f"{organ}.{attr_name}"
+                    if key in self._original_baselines:
+                        continue
+                    if not hasattr(creature, organ):
+                        continue
+                    mod = getattr(creature, organ)
+                    if not hasattr(mod, attr_name):
+                        continue
+                    self._original_baselines[key] = getattr(mod, attr_name)
+                    logger.debug("captured [new_track] %s = %.4f", key, self._original_baselines[key])
 
     def apply_age_factors(self, creature) -> None:
         """新接口：应用生命阶段因子到引擎（在 tox/pharma/coupling 之前调用）。"""
@@ -313,27 +356,48 @@ class LifecycleEngine:
             self.apply(creature)
 
     def apply(self, creature) -> None:
-        """新轨：将 profile 配置的发育/衰退因子应用到引擎。"""
+        """
+        新轨：将 profile 配置的发育/衰退因子应用到引擎。
+
+        关键：使用 _original_baselines（捕获一次的基准值）而不是当前值，
+        避免每次 step() 重复乘法导致指数发散。
+        """
         if self._profile is None:
             return
         for organ, cfg in self._profile.organs.items():
             mat = cfg.maturation.evaluate(self._state.age_days)
             dec = cfg.decline.evaluate(self._state.age_days)
             factor = mat * dec
-            TARGETS = {
-                "kidney": "GFR",
-                "liver": "metabolic_activity",
-            }
-            attr = TARGETS.get(organ)
-            if not attr:
-                continue
-            if not hasattr(creature, organ):
-                continue
-            mod = getattr(creature, organ)
-            if not hasattr(mod, attr):
-                continue
-            baseline = getattr(mod, attr)
-            setattr(mod, attr, baseline * factor)
+            attrs = self._NEW_TRACK_TARGETS.get(organ, [])
+            for attr_name in attrs:
+                key = f"{organ}.{attr_name}"
+                original = self._original_baselines.get(key)
+                if original is None:
+                    continue
+                if not hasattr(creature, organ):
+                    continue
+                mod = getattr(creature, organ)
+                if not hasattr(mod, attr_name):
+                    continue
+                setattr(mod, attr_name, original * factor)
+
+    def apply_age_factors_post_tox(self, creature) -> None:
+        """
+        在毒理学之后应用生命周期因子（仅对 contractility_factor）。
+
+        毒理学直接设置 contractility_factor，会覆盖生命周期效果。
+        此方法在毒理学之后调用，将生命周期因子乘以当前值。
+        """
+        if self._profile is None:
+            return
+        cfg = self._profile.organs.get("heart")
+        if cfg is None:
+            return
+        factor = cfg.maturation.evaluate(self._state.age_days) * cfg.decline.evaluate(self._state.age_days)
+        key = "heart.contractility_factor"
+        if key in self._original_baselines:
+            current = creature.heart.contractility_factor
+            creature.heart.contractility_factor = current * factor
 
     # ── 新轨内部方法 ──────────────────────────────────────────
 
@@ -353,6 +417,15 @@ class LifecycleEngine:
             self._state.phase = LifePhase.SENIOR
         else:
             self._state.phase = LifePhase.GERIATRIC
+
+    def _sync_organ_function_new(self) -> None:
+        """新轨：从 profile 计算 organ_function/organ_reserve。"""
+        if self._profile is None:
+            return
+        for organ, cfg in self._profile.organs.items():
+            func = cfg.maturation.evaluate(self._state.age_days) * cfg.decline.evaluate(self._state.age_days)
+            self._state.organ_function[organ] = round(func, 6)
+            self._state.organ_reserve[organ] = round(max(0.0, func - 0.3), 6)
 
     # ── 序列化（向后兼容）─────────────────────────────────
 

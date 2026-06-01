@@ -116,7 +116,9 @@ class TestLifecycleProfileLoader:
     def test_canine_has_liver_config(self):
         profile = LifecycleProfileLoader.get("canine")
         assert "liver" in profile.organs
-        assert profile.organs["liver"].maturation.curve == "sigmoid_three_phase"
+        # Changed from sigmoid_three_phase to sigmoid for overall liver function
+        # (sigmoid_three_phase only for CYP450-specific curves)
+        assert profile.organs["liver"].maturation.curve == "sigmoid"
 
 
 class TestLifecycleSpeciesProfile:
@@ -243,6 +245,7 @@ class TestLifecycleApplyV2:
             initial_age_days=4000.0,  # ~11 years
         )
         creature = DummyCreature()
+        eng.capture_baselines(creature)
         initial_gfr = creature.kidney.GFR
         eng.apply(creature)
         assert creature.kidney.GFR < initial_gfr  # Reduced by decline
@@ -257,6 +260,7 @@ class TestLifecycleApplyV2:
             profile=profile,
             initial_age_days=1.0,
         )
+        eng1.capture_baselines(creature)
         eng1.apply(creature)
         gfr_1day = creature.kidney.GFR
 
@@ -267,6 +271,7 @@ class TestLifecycleApplyV2:
             profile=profile,
             initial_age_days=84.0,
         )
+        eng2.capture_baselines(creature)
         eng2.apply(creature)
         gfr_84days = creature.kidney.GFR
 

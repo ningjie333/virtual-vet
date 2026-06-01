@@ -129,7 +129,7 @@ export const debugApi = {
 
   getDiseases: (): Promise<{ id: string; display: string; severities: string[] }[]> => request("GET", "/debug/diseases"),
 
-  getDiseaseParams: (params: { species: string; weight_kg: number; disease: string; severity: string; warmup_minutes: number }): Promise<{
+  getDiseaseParams: (params: { species: string; weight_kg: number; age_days?: number; lifecycle_mode?: string; disease: string; severity: string; warmup_minutes: number }): Promise<{
     input: Record<string, unknown>;
     healthy: Record<string, number>;
     disease: Record<string, number>;

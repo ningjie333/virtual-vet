@@ -22,7 +22,7 @@ from neuro import NeuroModule
 from immune import ImmuneModule
 from coagulation import CoagulationModule
 from lymphatic import LymphaticModule
-from lifecycle import LifecycleEngine
+from lifecycle import LifecycleEngine, LifecycleMode
 from src.organs.coupling import CouplingEngine, OrganContext, PhysiologicalSignal
 from parameters import (
     DT_SECONDS, SIMULATION_STEP_MS, T_MAX_MINUTES,
@@ -284,6 +284,7 @@ class VirtualCreature:
         age_days: float = DEFAULT_AGE_DAYS,
         dt: float = None,
         solver: str = "euler",
+        lifecycle_mode: str = "bypass",
     ):
         self.w = body_weight_kg
         self.species = species
@@ -383,7 +384,13 @@ class VirtualCreature:
         self._cumulative_blood_loss_ml: float = 0.0  # 累积失血量（每次 rhs 调用累加）
 
         # ── 生命周期引擎（驱动生长/衰老/死亡）──────────────────────────
-        self.lifecycle = LifecycleEngine(species=species, initial_age_days=age_days)
+        self.lifecycle = LifecycleEngine(
+            species=species,
+            initial_age_days=age_days,
+            mode=LifecycleMode(lifecycle_mode),
+        )
+        # 捕获基准值（必须在 step() 之前调用）
+        self.lifecycle.capture_baselines(self)
 
         # 仿真时间
         self.current_time_s = 0.0
@@ -704,6 +711,11 @@ class VirtualCreature:
         tox_state = self.toxicology.compute(dt)
         self.heart.contractility_factor = tox_state["contractility_factor"]
         svr_factor = tox_state["svr_factor"]
+
+        # Step 1.1: 在毒理学之后重新应用生命周期因子
+        # 毒理学会覆盖 contractility_factor，需要将生命周期因子乘回去
+        if not self.lifecycle.is_dead():
+            self.lifecycle.apply_age_factors_post_tox(self)
 
         # Step 1.5: 药理学（治疗药物 PK/PD 效应）
         # 药物通过 FactorCommand → apply_factor() 统一写入（与疾病模块同路径）

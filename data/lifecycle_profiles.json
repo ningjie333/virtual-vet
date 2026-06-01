@@ -28,18 +28,17 @@
         },
         "liver": {
           "maturation": {
-            "curve": "sigmoid_three_phase",
-            "k_rise": 0.15,
-            "k_fall": 0.06,
-            "peak_days": 42,
-            "peak_value": 1.0
+            "curve": "sigmoid",
+            "k": 0.08,
+            "midpoint_days": 42
           },
           "decline": {
             "curve": "gompertz",
             "onset_days": 3650,
             "rate_per_day": 2.0e-5
           },
-          "adult_reference": 1.0
+          "adult_reference": 1.0,
+          "_note": "sigmoid_three_phase 仅适用于 CYP450（峰值后回落）。整体肝功能用标准 sigmoid（单调递增至成年）。"
         },
         "heart": {
           "maturation": {
@@ -64,6 +63,19 @@
             "rate_per_day": 3.0e-5
           },
           "adult_reference": 1.0
+        },
+        "lung": {
+          "maturation": {
+            "curve": "linear_saturate",
+            "max_days": 84
+          },
+          "decline": {
+            "curve": "gompertz",
+            "onset_days": 3285,
+            "rate_per_day": 1.0e-5
+          },
+          "adult_reference": 1.0,
+          "_decline_note": "DLCO随年龄下降(Vc介导)。P(A-a)O2从10.5mmHg(成年)增至18.75mmHg(老年)。"
         },
         "respiratory": {
           "maturation": {
@@ -176,7 +188,7 @@
           "adult_reference": 100.0
         },
         "liver": {
-          "maturation": {"curve": "sigmoid_three_phase", "k_rise": 0.15, "k_fall": 0.06, "peak_days": 42, "peak_value": 1.0},
+          "maturation": {"curve": "sigmoid", "k": 0.08, "midpoint_days": 42},
           "decline": {"curve": "gompertz", "onset_days": 4000, "rate_per_day": 1.0e-5},
           "adult_reference": 1.0
         },

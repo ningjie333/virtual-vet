@@ -7,6 +7,7 @@
 import sys, os
 import json
 import logging
+import re
 
 # 添加 src 到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
@@ -155,6 +156,62 @@ def _get_time_budget(difficulty: int) -> int:
     return {1: TIME_BUDGET_EASY, 2: TIME_BUDGET_NORMAL, 3: TIME_BUDGET_HARD}.get(difficulty, TIME_BUDGET_NORMAL)
 
 
+def _parse_age_days(age_str: str, species: str = "canine") -> float:
+    """
+    解析病例的年龄字符串为天数。
+
+    支持格式:
+      - "3岁" → 3 * 365 = 1095 天
+      - "7岁" → 7 * 365 = 2555 天
+      - "0.5岁" → 0.5 * 365 = 182.5 天
+      - "" / None → 1095 天（默认成年犬 3 岁）
+
+    Args:
+        age_str: 中文年龄字符串，如 "3岁"
+        species: 物种（用于物种特异性成年期，但简单按 365 天/年换算）
+
+    Returns:
+        年龄（天）
+    """
+    if not age_str:
+        return 1095.0
+    match = re.search(r"(\d+(?:\.\d+)?)", str(age_str))
+    if not match:
+        return 1095.0
+    years = float(match.group(1))
+    return years * 365.0
+
+
+def _lifecycle_mode_for_age(age_days: float, species: str = "canine") -> str:
+    """
+    根据年龄和物种选择合适的生命周期模式。
+
+    - 年轻动物（<成年期）: bypass（避免发育曲线干扰游戏基线）
+    - 成年动物: bypass（基线无变化）
+    - 老年动物（>品种老年起始）: senescence（应用衰退因子）
+
+    Returns:
+        "bypass" | "senescence" | "full"
+    """
+    # 物种成年期（天）—— 约等于 maturity_age_days * 1.5
+    maturity_thresholds = {
+        "canine": 365,    # 犬 1 岁进入成年
+        "feline": 365,    # 猫 1 岁进入成年
+        "equine": 1095,   # 马 3 岁进入成年
+    }
+    # 物种老年起始（天）
+    geriatric_thresholds = {
+        "canine": 2555,   # 犬 7 岁（中大型犬）
+        "feline": 3650,   # 猫 10 岁
+        "equine": 7300,   # 马 20 岁
+    }
+    species_key = species.lower() if species else "canine"
+    geriatric = geriatric_thresholds.get(species_key, 2555)
+    if age_days > geriatric:
+        return "senescence"
+    return "bypass"
+
+
 # ============================================================
 # 路由 — 页面
 # ============================================================
@@ -217,9 +274,23 @@ def api_new_game():
 
     animal = case["animal"]
     weight_kg = animal["weight_kg"]
+    species_str = animal.get("species", "犬")
+    species_map = {"犬": "canine", "猫": "feline", "马": "equine",
+                   "canine": "canine", "feline": "feline", "equine": "equine"}
+    species_en = species_map.get(species_str, "canine")
 
-    # 创建虚拟生物
-    vc = VirtualCreature(body_weight_kg=weight_kg)
+    # 解析病例年龄 → 天数；根据年龄选择生命周期模式
+    age_str = animal.get("age", "3岁")
+    age_days = _parse_age_days(age_str, species_str)
+    lifecycle_mode = _lifecycle_mode_for_age(age_days, species_en)
+
+    # 创建虚拟生物（带入病例年龄 + 合适的生命周期模式）
+    vc = VirtualCreature(
+        body_weight_kg=weight_kg,
+        species=species_en,
+        age_days=age_days,
+        lifecycle_mode=lifecycle_mode,
+    )
 
     # 注入疾病
     disease_name = case["disease"]
@@ -771,7 +842,8 @@ def api_debug_disease_params():
     计算带疾病影响的生理参数（健康 vs 疾病对比）。
 
     POST body: {
-        "species": "canine", "weight_kg": 30.0,
+        "species": "canine", "weight_kg": 30.0, "age_days": 1095,
+        "lifecycle_mode": "bypass",
         "disease": "pneumonia", "severity": "moderate", "warmup_minutes": 2
     }
     """
@@ -780,6 +852,8 @@ def api_debug_disease_params():
                    "canine": "canine", "feline": "feline", "equine": "equine"}
     species = species_map.get(data.get("species", "犬"), "canine")
     weight_kg = float(data.get("weight_kg", 20.0))
+    age_days = float(data.get("age_days", 1095.0))
+    lifecycle_mode = data.get("lifecycle_mode", "bypass")
     disease_name = data.get("disease", "pneumonia")
     severity = data.get("severity", "moderate")
     warmup_minutes = float(data.get("warmup_minutes", 2))
@@ -791,11 +865,12 @@ def api_debug_disease_params():
 
     # 健康基线（完整器官参数）
     species_cn = {"canine": "犬", "feline": "猫", "equine": "马"}.get(species, "犬")
-    healthy_raw = compute_debug_params(species=species, breed="mixed", age_days=1095, weight_kg=weight_kg)
+    healthy_raw = compute_debug_params(species=species, breed="mixed", age_days=age_days, weight_kg=weight_kg)
     healthy_organs = healthy_raw.get("organs", {})
 
     # 带疾病（完整器官参数）
-    vc_disease = VirtualCreature(body_weight_kg=weight_kg, species=species)
+    vc_disease = VirtualCreature(body_weight_kg=weight_kg, species=species,
+                                  age_days=age_days, lifecycle_mode=lifecycle_mode)
     disease = create_disease(disease_name, severity=severity)
     vc_disease.attach_disease(disease)
     vc_disease.simulate(warmup_minutes)

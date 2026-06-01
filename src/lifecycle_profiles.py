@@ -53,6 +53,7 @@ class LifePhase(Enum):
     ADULT = "adult"             # 成年（器官功能完全成熟）
     SENIOR = "senior"           # 老年（开始衰退）
     GERIATRIC = "geriatric"     # 高龄（严重衰退）
+    DEAD = "dead"               # 死亡
 
 
 # ── 配置数据结构 ──────────────────────────────────────────────────────────
