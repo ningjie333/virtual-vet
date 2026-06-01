@@ -72,13 +72,20 @@ class OrganHealthTracker:
         lung_state: dict,
         kidney_state: dict,
         liver_state: dict | None = None,
+        heart_state_pre: dict | None = None,
+        lung_state_pre: dict | None = None,
     ):
-        MAP = heart_state["MAP_mmHg"]
-        PaO2 = lung_state["arterial_PO2"]
-        HR = heart_state["heart_rate_bpm"]
+        # 使用 pre-degradation 值判断 stress，避免 organ_factor × MAP 反馈振荡
+        # heart_state_pre / lung_state_pre 是器官健康因子应用前的原始值，
+        # 避免因 organ_factor 降低 MAP → 触发更多 stress → 进一步降低 organ_factor 的自激振荡
+        MAP_raw = (heart_state_pre or heart_state)["MAP_mmHg"]
+        PaO2_raw = (lung_state_pre or lung_state)["arterial_PO2"]
+        HR_raw = (heart_state_pre or heart_state)["heart_rate_bpm"]
 
         # --- 心脏衰竭条件 ---
-        heart_under_stress = (MAP < 65) or (HR > 160)
+        # HR > 160 during fever is compensatory (baroreceptor reflex) — not cardiac failure.
+        # Real stress requires either MAP < 65 (hypoperfusion) or HR > 200 (severe pathology).
+        heart_under_stress = (MAP_raw < 65) or (HR_raw > 200)
         if heart_under_stress:
             self._heart_exposure += dt
             excess = max(0, self._heart_exposure - self._heart_threshold)
@@ -90,7 +97,7 @@ class OrganHealthTracker:
             self._heart_exposure = max(0, self._heart_exposure - dt * 2.0)
 
         # --- 肺衰竭条件 ---
-        lung_under_stress = (PaO2 < 65)
+        lung_under_stress = (PaO2_raw < 65)
         if lung_under_stress:
             self._lung_exposure += dt
             excess = max(0, self._lung_exposure - self._lung_threshold)
@@ -102,7 +109,7 @@ class OrganHealthTracker:
             self._lung_exposure = max(0, self._lung_exposure - dt * 2.0)
 
         # --- 肾衰竭条件 ---
-        if MAP < 65:
+        if MAP_raw < 65:
             self._kidney_exposure += dt
             excess = max(0, self._kidney_exposure - self._kidney_threshold)
             if excess > 0:
@@ -118,7 +125,7 @@ class OrganHealthTracker:
         # 触发：MAP < 65 (低灌注) 或 代谢活性严重下降
         if liver_state is not None:
             metabolic_activity = liver_state.get("metabolic_activity", 1.0)
-            liver_under_stress = (MAP < 65) or (metabolic_activity < 0.3)
+            liver_under_stress = (MAP_raw < 65) or (metabolic_activity < 0.3)
             if liver_under_stress:
                 self._liver_exposure += dt
                 excess = max(0, self._liver_exposure - self._liver_threshold)

@@ -823,11 +823,27 @@ class VirtualCreature:
             self.apply_factor(cmd)
 
         # Step 5: 器官衰竭追踪
-        # 根据当前危险条件更新各器官健康状态
-        self.organ_health.track(dt, heart_state, lung_state, kidney_state, liver_state)
+        # 保存 pre-degradation 值用于 stress 判断，避免 feedback 振荡
+        heart_state_pre = {
+            "MAP_mmHg": heart_state["MAP_mmHg"],
+            "heart_rate_bpm": heart_state["heart_rate_bpm"],
+        }
+        lung_state_pre = dict(lung_state)
+
+        # 器官健康因子应用前的心肺原始状态（用于 stress 检测）
+        # 在 Step 5.5 疾病模块之前捕获，确保疾病和耦合的影响不干扰 organ_health
+        self.organ_health.track(
+            dt, heart_state, lung_state, kidney_state, liver_state,
+            heart_state_pre=heart_state_pre,
+            lung_state_pre=lung_state_pre,
+        )
+
+        # 保存原始 MAP 用于后续 step 的 organ_health 追踪
+        _orig_MAP = heart_state["MAP_mmHg"]
+        _orig_CO = heart_state["cardiac_output_ml_min"]
+        _orig_PaO2 = lung_state["arterial_PO2"]
 
         # 健康因子永久降低器官输出（不可逆）
-        # 同时修改返回 dict 和模块内部状态，确保损伤有累积效应
         if self.organ_health.heart_factor < 1.0:
             heart_state["cardiac_output_ml_min"] *= self.organ_health.heart_factor
             heart_state["MAP_mmHg"] *= self.organ_health.heart_factor

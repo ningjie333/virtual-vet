@@ -97,7 +97,10 @@ def match_diseases(reports: list[dict], known_clues: list[str] = None) -> list[d
         matched = [c for c in disease_clues if c in known_clues]
         missed = [c for c in disease_clues if c not in known_clues]
         total = len(disease_clues)
-        confidence = len(matched) / total if total > 0 else 0.0
+        # Jaccard: |matched| / |union| = |matched| / (|matched| + |missed|)
+        # Resolves bias: diseases with fewer clues are no longer unfairly penalized
+        union = len(matched) + len(missed)
+        confidence = len(matched) / union if union > 0 else 0.0
 
         matches.append({
             "disease": disease_name,
