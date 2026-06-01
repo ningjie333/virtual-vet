@@ -358,7 +358,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "max(-20.0, min(15.0, 15.0 * contractility_loss if contractility_loss < 0.5 else 7.5 - 30.0 * (contractility_loss - 0.5)))"
+        "fn": "0.05 * (100 - engine['heart']['heart_rate_bpm'])"
       },
       {
         "target": "heart.CVP",

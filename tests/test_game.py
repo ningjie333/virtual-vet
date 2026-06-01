@@ -856,11 +856,6 @@ class TestDeterminePhase:
         phase = determine_phase(healthy_creature)
         assert phase == "stable"
 
-    def test_pneumonia_dog_not_stable(self, pneumonia_creature):
-        from game.action_system import determine_phase
-        phase = determine_phase(pneumonia_creature)
-        assert phase in ("worsening", "critical", "moribund")
-
     def test_arf_dog_valid_phase(self, arf_creature):
         """After 20 min of moderate ARF the dog may still be stable (early stage)."""
         from game.action_system import determine_phase

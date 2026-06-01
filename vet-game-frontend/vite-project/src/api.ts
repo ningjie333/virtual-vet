@@ -1,4 +1,4 @@
-import type { Case, Report, Vitals, GameState, TreatmentResult, GameOverData, DiagnosisResponse, DiseaseReference, DrugEntry, AdministerDrugResponse } from "./types";
+import type { Case, Report, Vitals, GameState, TreatmentResult, GameOverData, DiagnosisResponse, DrugEntry, AdministerDrugResponse } from "./types";
 
 const BASE = "/api";
 
@@ -101,9 +101,6 @@ export const api = {
   getDiagnosis: (sessionId: string): Promise<DiagnosisResponse> =>
     request("GET", `/diagnosis?session_id=${sessionId}`),
 
-  getDiseaseReferences: (diseaseName: string): Promise<DiseaseReference> =>
-    request("GET", `/disease-references/${diseaseName}`),
-
   getDrugs: (): Promise<Record<string, { name: string; half_life_h: number; description: string }>> =>
     request("GET", "/drugs"),
 
@@ -113,11 +110,6 @@ export const api = {
       drug_name: drug.drug_name,
       ...(drug.volume_ml !== undefined ? { volume_ml: drug.volume_ml } : { dose_mg_kg: drug.dose_mg_kg }),
     }),
-
-  getSessionReplay: (sessionId: string): Promise<{
-    session: Record<string, unknown>;
-    actions: Record<string, unknown>[];
-  }> => request("GET", "/sessions/" + sessionId + "/replay"),
 };
 
 // ── 调试器 API ──────────────────────────────────────────────────────────────
