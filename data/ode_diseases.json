@@ -25,7 +25,7 @@
     },
     "state_variables": {
       "alveolar_exudate": {
-        "initial": 0.0,
+        "initial": 0.2222,
         "clamp": [
           0,
           1
@@ -161,7 +161,7 @@
     },
     "state_variables": {
       "nephron_damage": {
-        "initial": 0.05,
+        "initial": 0.2801,
         "clamp": [
           0,
           1
@@ -300,7 +300,7 @@
     },
     "state_variables": {
       "myocardial_fibrosis": {
-        "initial": 0.05,
+        "initial": 0.1758,
         "clamp": [
           0,
           1
@@ -445,7 +445,7 @@
     },
     "state_variables": {
       "cellular_toxicity": {
-        "initial": 0.05,
+        "initial": 0.2899,
         "clamp": [
           0,
           1
@@ -593,7 +593,7 @@
     },
     "state_variables": {
       "gastric_distension": {
-        "initial": 0.1,
+        "initial": 0.2962,
         "clamp": [
           0,
           1
@@ -763,7 +763,7 @@
     },
     "state_variables": {
       "antibody_activity": {
-        "initial": 0.05,
+        "initial": 0.2801,
         "clamp": [
           0,
           1
@@ -919,7 +919,7 @@
     },
     "state_variables": {
       "urethral_blockage": {
-        "initial": 0.1,
+        "initial": 0.2825,
         "clamp": [
           0,
           1
@@ -1091,7 +1091,7 @@
     },
     "state_variables": {
       "hyperglycemia": {
-        "initial": 0.1,
+        "initial": 0.19,
         "clamp": [
           0,
           1
@@ -1265,7 +1265,7 @@
     },
     "state_variables": {
       "pericardial_volume": {
-        "initial": 0.05,
+        "initial": 0.2825,
         "clamp": [
           0,
           1
@@ -1412,7 +1412,7 @@
     },
     "state_variables": {
       "microthrombus_formation": {
-        "initial": 0.05,
+        "initial": 0.2801,
         "clamp": [
           0,
           1
@@ -1579,7 +1579,7 @@
     },
     "state_variables": {
       "thyroid_nodule": {
-        "initial": 0.05,
+        "initial": 0.19,
         "clamp": [
           0,
           1
@@ -1709,7 +1709,7 @@
     },
     "state_variables": {
       "adrenal_atrophy": {
-        "initial": 0.05,
+        "initial": 0.2825,
         "clamp": [
           0,
           1
@@ -1840,7 +1840,7 @@
     },
     "state_variables": {
       "bacteremia": {
-        "initial": 0.01,
+        "initial": 0.2924,
         "clamp": [
           0,
           1
@@ -1970,7 +1970,7 @@
     },
     "state_variables": {
       "disc_herniation": {
-        "initial": 0.05,
+        "initial": 0.2899,
         "clamp": [
           0,
           1
@@ -2064,7 +2064,7 @@
     },
     "state_variables": {
       "cns_inflammation": {
-        "initial": 0.01,
+        "initial": 0.2899,
         "clamp": [
           0,
           1
@@ -2185,7 +2185,7 @@
     },
     "state_variables": {
       "hepatic_necrosis": {
-        "initial": 0.05,
+        "initial": 0.2849,
         "clamp": [
           0,
           1
@@ -2325,7 +2325,7 @@
     },
     "state_variables": {
       "splenic_hemorrhage": {
-        "initial": 0.1,
+        "initial": 0.2874,
         "clamp": [
           0,
           1
@@ -2462,7 +2462,7 @@
     },
     "state_variables": {
       "nephron_loss": {
-        "initial": 0.05,
+        "initial": 0.1916,
         "clamp": [
           0,
           1
@@ -2656,7 +2656,7 @@
     },
     "state_variables": {
       "hepatic_dysfunction": {
-        "initial": 0.05,
+        "initial": 0.19,
         "clamp": [
           0,
           1
