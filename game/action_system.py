@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from src.simulation import VirtualCreature
-from src.parameters import base_cardiac_output_ml_min, ARTERIAL_SATURATION_NORMAL
+from src.parameters import base_cardiac_output_ml_min, ARTERIAL_SATURATION_NORMAL, LUNG_DIFFUSION_COEFFICIENT
 from src.exam_registry import get_exam_registry
 from game.time_manager import (
     is_night_time,
@@ -199,6 +199,41 @@ def determine_phase(engine: VirtualCreature) -> str:
         _score(hr, "HR"),
         _score(ph, "pH"),
     )
+
+    # A-a 梯度评分：肺扩散能力受损的真实指标（SpO2 在 Hill 曲线平坦区会掩盖损伤）
+    dc = engine.lung.diffusion_coefficient
+    aa_gradient = 10.0 + (1.0 - dc / LUNG_DIFFUSION_COEFFICIENT) * 30.0
+    if aa_gradient >= 45:
+        aa_score = 3
+    elif aa_gradient >= 35:
+        aa_score = 2
+    elif aa_gradient >= 25:
+        aa_score = 1
+    else:
+        aa_score = 0
+
+    # 疾病状态变量评分：直接衡量器官损伤程度
+    disease_score = 0
+    if engine.disease and engine.disease.active:
+        sv = engine.disease._state_vars
+        _DAMAGE_VARS = {
+            "alveolar_exudate": (0.5, 0.75, 0.9),
+            "tissue_hypoxia": (0.4, 0.6, 0.85),
+            "renal_injury": (0.3, 0.6, 0.85),
+            "myocardial_depression": (0.3, 0.6, 0.85),
+            "nephron_damage": (0.3, 0.6, 0.85),
+            "gfr_decline": (0.3, 0.6, 0.85),
+        }
+        for var_name, (w, c, m) in _DAMAGE_VARS.items():
+            val = sv.get(var_name, 0.0)
+            if val >= m:
+                disease_score = max(disease_score, 3)
+            elif val >= c:
+                disease_score = max(disease_score, 2)
+            elif val >= w:
+                disease_score = max(disease_score, 1)
+
+    threshold_score = max(threshold_score, aa_score, disease_score)
 
     if do2 <= _DO2_MORIB:
         do2_score = 3

@@ -54,7 +54,7 @@
       },
       {
         "clue_id": "SpO2_low",
-        "condition": "state.Spo2 < thresholds.spo2_low_moderate"
+        "condition": "state.SpO2 < thresholds.spo2_low_moderate"
       }
     ],
     "findings_rules": {

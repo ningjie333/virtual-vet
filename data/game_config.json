@@ -33,7 +33,7 @@
       "low_moribund": 40,
       "low_critical": 50,
       "low_worsening": 60,
-      "high_worsening": 160,
+      "high_worsening": 140,
       "high_critical": 180,
       "high_moribund": 200
     },

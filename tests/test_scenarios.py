@@ -445,9 +445,9 @@ class TestEndToEndWorkflows:
                 break
         assert state is not None, "Failed to generate a pneumonia case in 50 seeds"
 
-        # Examine: blood_gas + chest_xray + auscultation
+        # Examine: blood_gas + chest_xray + auscultation + ultrasound
         reports = []
-        for tt in ("blood_gas", "chest_xray", "auscultation"):
+        for tt in ("blood_gas", "chest_xray", "auscultation", "ultrasound"):
             reports.append(translate(tt, state.engine))
 
         # Extract clues

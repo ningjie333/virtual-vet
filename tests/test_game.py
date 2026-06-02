@@ -1124,7 +1124,7 @@ class TestRoundTrip:
         from game.diagnosis_engine import extract_clues, match_diseases
 
         reports = []
-        for tt in ("physical", "blood_gas", "auscultation", "chest_xray"):
+        for tt in ("physical", "blood_gas", "auscultation", "chest_xray", "ultrasound"):
             reports.append(translate(tt, pneumonia_creature))
 
         clues = extract_clues(reports)

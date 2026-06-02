@@ -501,7 +501,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "max(-15.0, min(10.0, 10.0 * cellular_toxicity if cellular_toxicity < 0.4 else 4.0 - 20.0 * (cellular_toxicity - 0.4)))"
+        "fn": "max(-15.0, min(10.0, 0.05 * (86.7 - engine['heart']['heart_rate_bpm'])))"
       },
       {
         "target": "kidney._disease_gfr_multiplier",
