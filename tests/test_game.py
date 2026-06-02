@@ -50,11 +50,11 @@ def pneumonia_creature():
 
 @pytest.fixture
 def arf_creature():
-    """20kg dog with moderate ARF simulated 60 min."""
+    """20kg dog with severe ARF simulated 60 min."""
     from src.simulation import VirtualCreature
     from src.diseases import create_disease
     e = VirtualCreature(body_weight_kg=20.0)
-    d = create_disease("acute_renal_failure", severity="moderate")
+    d = create_disease("acute_renal_failure", severity="severe")
     e.attach_disease(d)
     e.simulate(60.0)
     return e
