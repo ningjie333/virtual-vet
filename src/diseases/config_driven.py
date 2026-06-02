@@ -255,12 +255,11 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
         elif "moderate" in presets:
             self._params.update(presets["moderate"])
 
-        # 时间缩放：引擎速率 → 游戏速率（统一 14x）
-        # 所有 ODE 速率常数和 tau 除以该系数，使疾病进展速度与游戏时间匹配
-        _TIME_SCALE = 14.0
-        for key in list(self._params.keys()):
-            if key.endswith("_rate"):
-                self._params[key] /= _TIME_SCALE
+        # NOTE: _TIME_SCALE=14 已删除。
+        # 原设计意图：让"1 游戏分钟 = 14 真实分钟"的疾病进展。
+        # 问题：游戏层需求污染了引擎层。引擎应按真实生理速率运行，
+        #        游戏层负责时间映射。
+        # 引用：BioGears/HumMod 等主流引擎均按真实时间运行，不缩放。
 
         # 初始化状态变量
         self._state_vars: dict[str, float] = {}
@@ -287,11 +286,6 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
                     raw_params["K"] = self._params[kk]
             raw_params["_clamp_lo"] = lo
             raw_params["_clamp_hi"] = hi
-            # 缩放时间常数（tau）和种子增量（seed_boost）
-            if "tau" in raw_params:
-                raw_params["tau"] /= _TIME_SCALE
-            if "seed_boost" in raw_params:
-                raw_params["seed_boost"] /= _TIME_SCALE
             # 预编译所有表达式字符串为 code 对象，加速重复求值
             for _expr_key in ("fn", "derivative_fn", "target_fn", "seed_boost_fn"):
                 if _expr_key in raw_params and isinstance(raw_params[_expr_key], str):

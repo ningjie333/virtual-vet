@@ -6,19 +6,19 @@
     "severity_presets": {
       "mild": {
         "bacterial_seed": 0.1,
-        "growth_rate": 0.02,
+        "growth_rate": 0.001429,
         "exudate_K": 0.4,
         "immune_clearance": 0.015
       },
       "moderate": {
         "bacterial_seed": 0.3,
-        "growth_rate": 0.035,
+        "growth_rate": 0.0025,
         "exudate_K": 0.7,
         "immune_clearance": 0.01
       },
       "severe": {
         "bacterial_seed": 0.6,
-        "growth_rate": 0.05,
+        "growth_rate": 0.003571,
         "exudate_K": 0.95,
         "immune_clearance": 0.005
       }
@@ -147,15 +147,15 @@
     "display_name": "急性肾衰竭",
     "severity_presets": {
       "mild": {
-        "damage_rate": 0.005,
+        "damage_rate": 0.000357,
         "damage_K": 0.4
       },
       "moderate": {
-        "damage_rate": 0.008,
+        "damage_rate": 0.000571,
         "damage_K": 1.0
       },
       "severe": {
-        "damage_rate": 0.02,
+        "damage_rate": 0.001429,
         "damage_K": 0.95
       }
     },
@@ -286,15 +286,15 @@
     "display_name": "扩张型心肌病（DCM）",
     "severity_presets": {
       "mild": {
-        "fibrosis_rate": 0.003,
+        "fibrosis_rate": 0.000214,
         "fibrosis_K": 0.4
       },
       "moderate": {
-        "fibrosis_rate": 0.006,
+        "fibrosis_rate": 0.000429,
         "fibrosis_K": 0.75
       },
       "severe": {
-        "fibrosis_rate": 0.012,
+        "fibrosis_rate": 0.000857,
         "fibrosis_K": 0.95
       }
     },
@@ -431,15 +431,15 @@
     "display_name": "磷化锌/磷化铝灭鼠药中毒",
     "severity_presets": {
       "mild": {
-        "toxicity_rate": 0.004,
+        "toxicity_rate": 0.000286,
         "toxicity_K": 0.4
       },
       "moderate": {
-        "toxicity_rate": 0.008,
+        "toxicity_rate": 0.000571,
         "toxicity_K": 0.7
       },
       "severe": {
-        "toxicity_rate": 0.015,
+        "toxicity_rate": 0.001071,
         "toxicity_K": 0.9
       }
     },
@@ -576,19 +576,19 @@
     "display_name": "胃扩张扭转（GDV）",
     "severity_presets": {
       "mild": {
-        "distension_rate": 0.003,
+        "distension_rate": 0.000214,
         "distension_K": 0.4,
-        "ischemia_rate": 0.002
+        "ischemia_rate": 0.000143
       },
       "moderate": {
-        "distension_rate": 0.006,
+        "distension_rate": 0.000429,
         "distension_K": 0.75,
-        "ischemia_rate": 0.005
+        "ischemia_rate": 0.000357
       },
       "severe": {
-        "distension_rate": 0.012,
+        "distension_rate": 0.000857,
         "distension_K": 0.95,
-        "ischemia_rate": 0.01
+        "ischemia_rate": 0.000714
       }
     },
     "state_variables": {
@@ -749,15 +749,15 @@
     "display_name": "免疫介导性溶血性贫血（IMHA）",
     "severity_presets": {
       "mild": {
-        "destruction_rate": 0.004,
+        "destruction_rate": 0.000286,
         "destruction_K": 0.3
       },
       "moderate": {
-        "destruction_rate": 0.008,
+        "destruction_rate": 0.000571,
         "destruction_K": 0.6
       },
       "severe": {
-        "destruction_rate": 0.015,
+        "destruction_rate": 0.001071,
         "destruction_K": 0.9
       }
     },
@@ -905,15 +905,15 @@
     "display_name": "尿道梗阻",
     "severity_presets": {
       "mild": {
-        "obstruction_rate": 0.003,
+        "obstruction_rate": 0.000214,
         "obstruction_K": 0.4
       },
       "moderate": {
-        "obstruction_rate": 0.007,
+        "obstruction_rate": 0.0005,
         "obstruction_K": 0.75
       },
       "severe": {
-        "obstruction_rate": 0.012,
+        "obstruction_rate": 0.000857,
         "obstruction_K": 0.95
       }
     },
@@ -1074,19 +1074,19 @@
     "display_name": "糖尿病酮症酸中毒（DKA）",
     "severity_presets": {
       "mild": {
-        "hyperglycemia_rate": 0.003,
-        "ketone_rate": 0.004,
-        "dehydration_rate": 0.002
+        "hyperglycemia_rate": 0.000214,
+        "ketone_rate": 0.000286,
+        "dehydration_rate": 0.000143
       },
       "moderate": {
-        "hyperglycemia_rate": 0.006,
-        "ketone_rate": 0.007,
-        "dehydration_rate": 0.004
+        "hyperglycemia_rate": 0.000429,
+        "ketone_rate": 0.0005,
+        "dehydration_rate": 0.000286
       },
       "severe": {
-        "hyperglycemia_rate": 0.012,
-        "ketone_rate": 0.012,
-        "dehydration_rate": 0.008
+        "hyperglycemia_rate": 0.000857,
+        "ketone_rate": 0.000857,
+        "dehydration_rate": 0.000571
       }
     },
     "state_variables": {
@@ -1251,15 +1251,15 @@
     "display_name": "心包积液/心脏填塞",
     "severity_presets": {
       "mild": {
-        "effusion_rate": 0.003,
+        "effusion_rate": 0.000214,
         "effusion_K": 0.35
       },
       "moderate": {
-        "effusion_rate": 0.007,
+        "effusion_rate": 0.0005,
         "effusion_K": 0.65
       },
       "severe": {
-        "effusion_rate": 0.015,
+        "effusion_rate": 0.001071,
         "effusion_K": 0.9
       }
     },
@@ -1395,19 +1395,19 @@
     "display_name": "弥散性血管内凝血（DIC）",
     "severity_presets": {
       "mild": {
-        "coagulation_rate": 0.004,
+        "coagulation_rate": 0.000286,
         "coagulation_K": 0.35,
-        "consumption_rate": 0.003
+        "consumption_rate": 0.000214
       },
       "moderate": {
-        "coagulation_rate": 0.008,
+        "coagulation_rate": 0.000571,
         "coagulation_K": 0.65,
-        "consumption_rate": 0.006
+        "consumption_rate": 0.000429
       },
       "severe": {
-        "coagulation_rate": 0.015,
+        "coagulation_rate": 0.001071,
         "coagulation_K": 0.9,
-        "consumption_rate": 0.012
+        "consumption_rate": 0.000857
       }
     },
     "state_variables": {
@@ -1565,15 +1565,15 @@
     "display_name": "甲状腺功能亢进",
     "severity_presets": {
       "mild": {
-        "nodule_rate": 0.003,
+        "nodule_rate": 0.000214,
         "T3_K": 0.5
       },
       "moderate": {
-        "nodule_rate": 0.006,
+        "nodule_rate": 0.000429,
         "T3_K": 0.75
       },
       "severe": {
-        "nodule_rate": 0.012,
+        "nodule_rate": 0.000857,
         "T3_K": 0.95
       }
     },
@@ -1695,15 +1695,15 @@
     "display_name": "肾上腺皮质功能减退（艾迪森氏病）",
     "severity_presets": {
       "mild": {
-        "atrophy_rate": 0.003,
+        "atrophy_rate": 0.000214,
         "atrophy_K": 0.3
       },
       "moderate": {
-        "atrophy_rate": 0.007,
+        "atrophy_rate": 0.0005,
         "atrophy_K": 0.6
       },
       "severe": {
-        "atrophy_rate": 0.015,
+        "atrophy_rate": 0.001071,
         "atrophy_K": 0.9
       }
     },
@@ -1828,12 +1828,12 @@
     "display_name": "脓毒症（细菌感染）",
     "severity_presets": {
       "moderate": {
-        "bacteremia_rate": 0.003,
+        "bacteremia_rate": 0.000214,
         "bacteremia_K": 0.7,
         "toxin_factor": 0.5
       },
       "severe": {
-        "bacteremia_rate": 0.007,
+        "bacteremia_rate": 0.0005,
         "bacteremia_K": 0.9,
         "toxin_factor": 1.0
       }
@@ -1956,15 +1956,15 @@
     "display_name": "椎间盘疾病（疼痛）",
     "severity_presets": {
       "mild": {
-        "disc_herniation_rate": 0.002,
+        "disc_herniation_rate": 0.000143,
         "disc_herniation_K": 0.4
       },
       "moderate": {
-        "disc_herniation_rate": 0.004,
+        "disc_herniation_rate": 0.000286,
         "disc_herniation_K": 0.75
       },
       "severe": {
-        "disc_herniation_rate": 0.007,
+        "disc_herniation_rate": 0.0005,
         "disc_herniation_K": 0.9
       }
     },
@@ -2054,11 +2054,11 @@
     "display_name": "脑膜炎/脑炎",
     "severity_presets": {
       "moderate": {
-        "inflammation_rate": 0.004,
+        "inflammation_rate": 0.000286,
         "inflammation_K": 0.7
       },
       "severe": {
-        "inflammation_rate": 0.008,
+        "inflammation_rate": 0.000571,
         "inflammation_K": 0.9
       }
     },
@@ -2171,15 +2171,15 @@
     "display_name": "肝功能衰竭伴凝血障碍",
     "severity_presets": {
       "mild": {
-        "necrosis_rate": 0.003,
+        "necrosis_rate": 0.000214,
         "necrosis_K": 0.4
       },
       "moderate": {
-        "necrosis_rate": 0.006,
+        "necrosis_rate": 0.000429,
         "necrosis_K": 0.7
       },
       "severe": {
-        "necrosis_rate": 0.012,
+        "necrosis_rate": 0.000857,
         "necrosis_K": 0.95
       }
     },
@@ -2311,15 +2311,15 @@
     "display_name": "脾脏破裂/急性失血",
     "severity_presets": {
       "mild": {
-        "rupture_rate": 0.01,
+        "rupture_rate": 0.000714,
         "rupture_K": 0.3
       },
       "moderate": {
-        "rupture_rate": 0.02,
+        "rupture_rate": 0.001429,
         "rupture_K": 0.6
       },
       "severe": {
-        "rupture_rate": 0.04,
+        "rupture_rate": 0.002857,
         "rupture_K": 0.9
       }
     },
@@ -2448,15 +2448,15 @@
     "display_name": "慢性肾病贫血（CKD Anemia）",
     "severity_presets": {
       "mild": {
-        "damage_rate": 0.002,
+        "damage_rate": 0.000143,
         "damage_K": 0.3
       },
       "moderate": {
-        "damage_rate": 0.005,
+        "damage_rate": 0.000357,
         "damage_K": 0.6
       },
       "severe": {
-        "damage_rate": 0.01,
+        "damage_rate": 0.000714,
         "damage_K": 0.9
       }
     },
@@ -2642,15 +2642,15 @@
     "display_name": "肝病贫血（Hepatic Anemia）",
     "severity_presets": {
       "mild": {
-        "dysfunction_rate": 0.003,
+        "dysfunction_rate": 0.000214,
         "dysfunction_K": 0.3
       },
       "moderate": {
-        "dysfunction_rate": 0.006,
+        "dysfunction_rate": 0.000429,
         "dysfunction_K": 0.6
       },
       "severe": {
-        "dysfunction_rate": 0.012,
+        "dysfunction_rate": 0.000857,
         "dysfunction_K": 0.9
       }
     },
