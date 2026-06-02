@@ -79,15 +79,15 @@
         "fn": "max(0.1, 1.0 - alveolar_exudate * 0.9)"
       },
       {
-        "target": "heart.heart_rate",
-        "op": "add",
-        "fn": "fever_state * 20.0"
-      },
-      {
         "target": "heart.SVR",
         "op": "multiply",
         "fn": "max(0.5, 1.0 - 0.5 * min(max(tissue_hypoxia - 0.6, 0.0) / 0.4, 1.0))",
         "condition": "tissue_hypoxia > 0.6"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "0.05 * (100 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -227,7 +227,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "-15.0 * (potassium_shift / 3.0) if potassium_shift > 1.5 else (5.0 if gfr_decline > 0.5 else 0.0)"
+        "fn": "0.05 * (86.7 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -356,11 +356,6 @@
         "fn": "max(0.2, 1.0 - contractility_loss * 0.8)"
       },
       {
-        "target": "heart.heart_rate",
-        "op": "add",
-        "fn": "0.05 * (100 - engine['heart']['heart_rate_bpm'])"
-      },
-      {
         "target": "heart.CVP",
         "op": "add",
         "fn": "fluid_retention * 10.0"
@@ -374,6 +369,11 @@
         "target": "kidney.GFR",
         "op": "multiply",
         "fn": "max(0.3, min(1.0, engine['heart']['cardiac_output_ml_min'] / 1700.0 + 0.2))"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "0.05 * (100 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -499,11 +499,6 @@
         "fn": "max(0.25, 1.0 - myocardial_depression * 0.75)"
       },
       {
-        "target": "heart.heart_rate",
-        "op": "add",
-        "fn": "max(-15.0, min(10.0, 0.05 * (86.7 - engine['heart']['heart_rate_bpm'])))"
-      },
-      {
         "target": "kidney._disease_gfr_multiplier",
         "op": "set",
         "fn": "max(0.2, 1.0 - renal_injury)"
@@ -517,6 +512,11 @@
         "target": "blood.temperature",
         "op": "set",
         "fn": "(38.5 + cellular_toxicity * 1.5) if cellular_toxicity < 0.5 else (38.5 + 0.75 - 2.0 * (cellular_toxicity - 0.5))"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "0.05 * (86.7 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -657,11 +657,6 @@
     },
     "outputs": [
       {
-        "target": "heart.heart_rate",
-        "op": "add",
-        "fn": "max(-10.0, min(50.0, systemic_shock * 50.0 + arrhythmia_severity * 20.0))"
-      },
-      {
         "target": "heart.SVR",
         "op": "multiply",
         "fn": "max(0.3, 1.0 - systemic_shock * 0.7)"
@@ -685,6 +680,11 @@
         "target": "blood.temperature",
         "op": "set",
         "fn": "38.5 - systemic_shock * 1.5"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "0.05 * (140 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -831,7 +831,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "compensatory_tachycardia * 40.0"
+        "fn": "0.05 * (130 - engine['heart']['heart_rate_bpm'])"
       },
       {
         "target": "blood.bilirubin_mg_dL",
@@ -1005,7 +1005,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "-20.0 * (hyperkalemia / 4.0) if hyperkalemia > 1.5 else (10.0 if post_renal_azotemia > 0.3 else 0.0)"
+        "fn": "0.05 * (86.7 - engine['heart']['heart_rate_bpm'])"
       },
       {
         "target": "blood.BUN",
@@ -1181,7 +1181,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "dehydration * 15.0 - kussmaul_respiration * 5.0"
+        "fn": "0.05 * (110 - engine['heart']['heart_rate_bpm'])"
       },
       {
         "target": "blood.ketone_mmol_L",
@@ -1329,14 +1329,14 @@
         "fn": "venous_congestion * 12.0"
       },
       {
-        "target": "heart.heart_rate",
-        "op": "add",
-        "fn": "tamponade_severity * 35.0"
-      },
-      {
         "target": "lung.diffusion_coefficient",
         "op": "multiply",
         "fn": "max(0.6, 1.0 - tamponade_severity * 0.25)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "0.05 * (130 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -1478,11 +1478,6 @@
         "fn": "max(10.0, 300.0 * (1.0 - coagulation_consumption * 0.9))"
       },
       {
-        "target": "heart.heart_rate",
-        "op": "add",
-        "fn": "shock_from_dIC * 30.0 + hemorrhage_risk * 15.0"
-      },
-      {
         "target": "heart.SVR",
         "op": "multiply",
         "fn": "max(0.3, 1.0 - shock_from_dIC * 0.6)"
@@ -1501,6 +1496,11 @@
         "target": "lung.diffusion_coefficient",
         "op": "multiply",
         "fn": "max(0.4, 1.0 - organ_ischemia * 0.4)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "0.05 * (130 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -1631,7 +1631,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "tachycardia * 55.0"
+        "fn": "0.05 * (150 - engine['heart']['heart_rate_bpm'])"
       },
       {
         "target": "blood.temperature",
@@ -1773,7 +1773,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "-15.0 * cortisol_deficiency"
+        "fn": "0.05 * (86.7 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -2005,7 +2005,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "pain_level * 2.5"
+        "fn": "0.05 * (95 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -2116,7 +2116,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "seizure_activity * 30.0 - consciousness_loss * 15.0"
+        "fn": "0.05 * (110 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -2370,11 +2370,6 @@
         "fn": "max(0.4, 1.0 - splenic_hemorrhage * 0.55)"
       },
       {
-        "target": "heart.heart_rate",
-        "op": "add",
-        "fn": "compensatory_tachycardia * 50.0"
-      },
-      {
         "target": "heart.SVR",
         "op": "multiply",
         "fn": "min(1.5, 1.0 + hypovolemic_shock * 0.5)"
@@ -2393,6 +2388,11 @@
         "target": "blood.splenic_reserve_mL",
         "op": "set",
         "fn": "max(0.0, 75.0 - splenic_hemorrhage * 75.0)"
+      },
+      {
+        "target": "heart.heart_rate",
+        "op": "add",
+        "fn": "0.05 * (140 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -2456,14 +2456,17 @@
         "damage_K": 0.6
       },
       "severe": {
-        "damage_rate": 0.010,
+        "damage_rate": 0.01,
         "damage_K": 0.9
       }
     },
     "state_variables": {
       "nephron_loss": {
         "initial": 0.05,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "logistic",
         "params": {
           "rate_key": "damage_rate",
@@ -2474,13 +2477,19 @@
       },
       "eop_deficiency": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "algebraic",
         "fn": "max(0.0, min(1.0, (nephron_loss - 0.4) / 0.5))"
       },
       "gi_blood_loss": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "first_order_lag",
         "params": {
           "tau": 1200.0,
@@ -2489,7 +2498,10 @@
       },
       "pth_elevation": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "first_order_lag",
         "params": {
           "tau": 1800.0,
@@ -2498,7 +2510,10 @@
       },
       "inflammation": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "first_order_lag",
         "params": {
           "tau": 900.0,
@@ -2507,7 +2522,10 @@
       },
       "iron_loss": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "first_order_lag",
         "params": {
           "tau": 2400.0,
@@ -2516,7 +2534,10 @@
       },
       "anemia_severity": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "algebraic",
         "fn": "min(1.0, eop_deficiency * 0.4 + gi_blood_loss * 0.2 + pth_elevation * 0.15 + inflammation * 0.1 + iron_loss * 0.15)"
       }
@@ -2550,7 +2571,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "anemia_severity * 25.0"
+        "fn": "0.05 * (95 - engine['heart']['heart_rate_bpm'])"
       },
       {
         "target": "kidney.GFR",
@@ -2582,9 +2603,21 @@
         }
       ],
       "labels": {
-        "category": ["nephrology", "hematology"],
-        "organ_systems": ["kidney", "blood", "bone_marrow"],
-        "symptoms": ["pale_mucous_membranes", "lethargy", "polyuria", "polydipsia"]
+        "category": [
+          "nephrology",
+          "hematology"
+        ],
+        "organ_systems": [
+          "kidney",
+          "blood",
+          "bone_marrow"
+        ],
+        "symptoms": [
+          "pale_mucous_membranes",
+          "lethargy",
+          "polyuria",
+          "polydipsia"
+        ]
       },
       "equations": {
         "nephron_loss": {
@@ -2624,7 +2657,10 @@
     "state_variables": {
       "hepatic_dysfunction": {
         "initial": 0.05,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "logistic",
         "params": {
           "rate_key": "dysfunction_rate",
@@ -2635,7 +2671,10 @@
       },
       "hepcidin_elevation": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "first_order_lag",
         "params": {
           "tau": 600.0,
@@ -2644,13 +2683,19 @@
       },
       "iron_deficiency": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "algebraic",
         "fn": "min(1.0, hepcidin_elevation * 1.2)"
       },
       "hemolysis": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "first_order_lag",
         "params": {
           "tau": 900.0,
@@ -2659,7 +2704,10 @@
       },
       "gi_bleeding": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "first_order_lag",
         "params": {
           "tau": 600.0,
@@ -2668,7 +2716,10 @@
       },
       "anemia_severity": {
         "initial": 0.0,
-        "clamp": [0, 1],
+        "clamp": [
+          0,
+          1
+        ],
         "ode_type": "algebraic",
         "fn": "min(1.0, iron_deficiency * 0.45 + hemolysis * 0.3 + gi_bleeding * 0.25)"
       }
@@ -2697,7 +2748,7 @@
       {
         "target": "heart.heart_rate",
         "op": "add",
-        "fn": "anemia_severity * 20.0"
+        "fn": "0.05 * (95 - engine['heart']['heart_rate_bpm'])"
       }
     ],
     "meta": {
@@ -2724,9 +2775,21 @@
         }
       ],
       "labels": {
-        "category": ["hepatology", "hematology"],
-        "organ_systems": ["liver", "blood", "spleen"],
-        "symptoms": ["pale_mucous_membranes", "jaundice", "ascites", "hepatic_encephalopathy"]
+        "category": [
+          "hepatology",
+          "hematology"
+        ],
+        "organ_systems": [
+          "liver",
+          "blood",
+          "spleen"
+        ],
+        "symptoms": [
+          "pale_mucous_membranes",
+          "jaundice",
+          "ascites",
+          "hepatic_encephalopathy"
+        ]
       },
       "equations": {
         "hepatic_dysfunction": {

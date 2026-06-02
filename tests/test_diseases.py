@@ -24,7 +24,11 @@ from src.simulation import VirtualCreature, FactorCommand
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-DUMMY_ENGINE_STATE = {"heart": {}, "lung": {}, "kidney": {}}
+DUMMY_ENGINE_STATE = {
+    "heart": {"heart_rate_bpm": 85.0, "MAP_mmHg": 100.0, "cardiac_output_ml_min": 1700.0},
+    "lung": {"arterial_PO2": 95.0},
+    "kidney": {"GFR_ml_min": 50.0},
+}
 
 
 def run_compute_n_steps(module, n_steps, dt=0.1):
@@ -85,18 +89,15 @@ class TestPneumonia:
         later_diffusion = _find_cmd_value(later_cmds, "lung.diffusion_coefficient")
         assert later_diffusion < initial_diffusion
 
-    def test_pneumonia_hr_offset_increases(self):
-        """heart_rate add value should increase as fever develops (severe preset)."""
-        # Use severe preset: growth_rate > immune_clearance, so bacterial_load grows
-        # and drives fever_state → HR offset. Moderate preset has immune_clearance >
-        # growth_rate, so bacteria are cleared and fever doesn't develop.
+    def test_pneumonia_hr_offset_is_error_driven(self):
+        """heart_rate add should be error-driven (converges toward target)."""
         pm = create_disease("pneumonia", severity="severe")
         pm.activate(current_time_s=0.0)
-        initial_hr_offset = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "heart.heart_rate")
-        assert initial_hr_offset is not None
-        run_compute_n_steps(pm, 36000)  # 600 s (time-scaled)
-        later_hr_offset = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "heart.heart_rate")
-        assert later_hr_offset > initial_hr_offset
+        hr_offset = _find_cmd_value(pm.compute(0.1, DUMMY_ENGINE_STATE), "heart.heart_rate")
+        assert hr_offset is not None
+        # Error-driven formula: 0.05 * (target - current_HR)
+        # With DUMMY HR=85 and target=100: offset ≈ 0.05 * 15 = 0.75
+        assert hr_offset > 0.0
 
     def test_pneumonia_hypoxia_increases(self):
         """tissue_hypoxia should increase over time."""
@@ -209,21 +210,14 @@ class TestAcuteRenalFailure:
         run_compute_n_steps(severe, 36000)
         assert severe.nephron_damage > mild.nephron_damage
 
-    def test_arf_hr_bradycardia(self):
-        """When potassium_shift > 1.5, heart_rate add value should be negative (bradycardia)."""
-        arf = create_disease("acute_renal_failure",severity="severe")
+    def test_arf_hr_offset_is_error_driven(self):
+        """ARF heart_rate add should be error-driven (target=baseline, pulls HR toward 86.7)."""
+        arf = create_disease("acute_renal_failure", severity="severe")
         arf.activate(current_time_s=0.0)
-        # Run enough steps for potassium to accumulate past 1.5
-        run_compute_n_steps(arf, 180000)  # 3000 s (50 min) -- generous time
-        if arf.potassium_shift > 1.5:
-            hr_value = _find_cmd_value(arf.compute(0.1, DUMMY_ENGINE_STATE), "heart.heart_rate")
-            assert hr_value is not None
-            assert hr_value < 0.0
-        else:
-            pytest.skip(
-                f"potassium_shift only reached {arf.potassium_shift:.3f} "
-                f"after 3000s; tau may be too slow for this test"
-            )
+        hr_value = _find_cmd_value(arf.compute(0.1, DUMMY_ENGINE_STATE), "heart.heart_rate")
+        assert hr_value is not None
+        # Error-driven: 0.05 * (86.7 - 85.0) ≈ 0.085 (positive, pulling toward target)
+        assert hr_value > 0.0
 
     def test_arf_inactive_returns_empty(self):
         """Inactive disease should return empty list from compute()."""
