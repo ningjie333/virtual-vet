@@ -25,6 +25,14 @@ _DISEASE_CLUES: dict[str, list[str]] = _DISEASE_DATA["clues"]
 CLUE_DESCRIPTIONS: dict[str, str] = _DISEASE_DATA["clue_descriptions"]
 _CLUE_TO_TEST: dict[str, str] = _DISEASE_DATA["clue_to_test"]
 
+# 线索特异性权重：出现在越少疾病中的线索权重越高
+# weight = 1.0 / freq，freq=1 时权重最高（唯一线索）
+_clue_freq: dict[str, int] = {}
+for _clue_list in _DISEASE_CLUES.values():
+    for _c in _clue_list:
+        _clue_freq[_c] = _clue_freq.get(_c, 0) + 1
+_CLUE_SPECIFICITY: dict[str, float] = {c: 1.0 / f for c, f in _clue_freq.items()}
+
 # ── 从 data/disease_references.json 加载文献引用 ──
 _REF_PATH = os.path.join(_DATA_DIR, "disease_references.json")
 if os.path.exists(_REF_PATH):
@@ -71,36 +79,43 @@ def match_diseases(reports: list[dict], known_clues: list[str] = None) -> list[d
     """
     根据已有检查报告匹配可能的疾病，计算置信度。
 
+    使用加权匹配：每个线索按特异性加权（出现在越少疾病中的线索权重越高）。
+    这解决了纯 Jaccard 的问题——总线索多的疾病不再被不公平惩罚。
+
     Args:
         reports: translate() 返回的检查报告列表
         known_clues: 已发现的线索 ID 列表（为 None 时自动从 reports 提取）
 
     Returns:
-        按 confidence 降序排列的匹配结果列表:
-        [
-            {
-                "disease": "pneumonia",
-                "confidence": 0.75,
-                "matched_clues": ["PaO2_low", "crackles", ...],
-                "missed_clues": ["PaCO2_high", ...],
-                "matched_count": 6,
-                "total_clues": 8,
-            },
-            ...
-        ]
+        按 confidence 降序排列的匹配结果列表
     """
     if known_clues is None:
         known_clues = extract_clues(reports)
 
+    # 计算每个线索的特异性权重：出现在越少疾病中 → 权重越高
+    clue_set = set(known_clues)
+
     matches = []
     for disease_name, disease_clues in _DISEASE_CLUES.items():
-        matched = [c for c in disease_clues if c in known_clues]
-        missed = [c for c in disease_clues if c not in known_clues]
+        matched = [c for c in disease_clues if c in clue_set]
+        missed = [c for c in disease_clues if c not in clue_set]
         total = len(disease_clues)
-        # Jaccard: |matched| / |union| = |matched| / (|matched| + |missed|)
-        # Resolves bias: diseases with fewer clues are no longer unfairly penalized
-        union = len(matched) + len(missed)
-        confidence = len(matched) / union if union > 0 else 0.0
+        n_matched = len(matched)
+
+        # 两种得分取较大值：
+        # 1. 特异性得分：匹配线索按特异性加权 / 总线索特异性权重
+        #    奖励匹配高特异性线索（如 PaO2_low 只出现在肺炎）
+        # 2. 加权 Jaccard：匹配权重 / (匹配权重 + 未匹配权重)
+        #    奖励匹配更多线索（未匹配线索也参与分母）
+        matched_weight = sum(_CLUE_SPECIFICITY.get(c, 1.0) for c in matched)
+        total_weight = sum(_CLUE_SPECIFICITY.get(c, 1.0) for c in disease_clues)
+        missed_weight = sum(_CLUE_SPECIFICITY.get(c, 1.0) for c in missed)
+        specificity_score = matched_weight / total_weight if total_weight > 0 else 0.0
+        # 覆盖度加成：匹配越多线索，置信度越高
+        # 特异性得分 × (1 + n_matched)，奖励匹配更多线索
+        # 上限 1.0
+        coverage_bonus = 1.0 + n_matched
+        confidence = min(1.0, specificity_score * coverage_bonus)
 
         matches.append({
             "disease": disease_name,
