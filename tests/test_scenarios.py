@@ -345,7 +345,7 @@ class TestDeterminePhase:
         e = VirtualCreature(body_weight_kg=20.0)
         d = create_disease("pneumonia", severity="severe")
         e.attach_disease(d)
-        e.simulate(60.0)  # 1 hour simulation to get disease to progress significantly
+        e.simulate(30.0)  # 初始值已校准，30min 足够达到 critical
         phase = determine_phase(e)
         assert phase in ("critical", "moribund")
 
@@ -357,7 +357,7 @@ class TestDeterminePhase:
         e = VirtualCreature(body_weight_kg=20.0)
         d = create_disease("pneumonia", severity="severe")
         e.attach_disease(d)
-        e.simulate(120.0)  # 2 hours — disease should be very progressed
+        e.simulate(30.0)  # 初始值已校准，30min 足够达到 moribund
         phase = determine_phase(e)
         assert phase in ("critical", "moribund")
 
@@ -477,8 +477,8 @@ class TestEndToEndWorkflows:
                 break
         assert state is not None, "Failed to generate an ARF case in 50 seeds"
 
-        # Simulate further for ARF signs to develop (5-30 min pre-visit may not be enough)
-        state.engine.simulate(60.0)
+        # Simulate further for ARF signs to develop (初始值已校准，10min 足够)
+        state.engine.simulate(10.0)
 
         # Examine: blood_biochem + ultrasound
         reports = []
