@@ -87,16 +87,16 @@ class TestOxygenSaturationCurve:
         assert 0.95 <= sat <= 0.99, f"Sat at PO2=95: {sat}, expected ~0.97"
 
     def test_low_PO2(self, lung):
-        """PO2=40 should give saturation ~0.73-0.78 (mixed venous).
+        """PO2=40 should give saturation ~0.68-0.72 (mixed venous, 犬 P50=30).
 
-        With P50=26.6, n=2.8, PO2=40 yields ~0.758 via Hill equation.
+        With P50=30, n=2.8, PO2=40 yields ~0.69 via Hill equation.
         """
         sat = lung._oxygen_saturation_curve(40)
-        assert 0.73 <= sat <= 0.78, f"Sat at PO2=40: {sat}, expected 0.73-0.78"
+        assert 0.66 <= sat <= 0.74, f"Sat at PO2=40: {sat}, expected 0.66-0.74"
 
     def test_P50(self, lung):
-        """PO2=26.6 (P50) should give saturation ≈ 0.50."""
-        sat = lung._oxygen_saturation_curve(26.6)
+        """PO2=30 (犬 P50) should give saturation ≈ 0.50."""
+        sat = lung._oxygen_saturation_curve(30)
         assert 0.48 <= sat <= 0.52, f"Sat at P50: {sat}, expected ~0.50"
 
     def test_clamped(self, lung):

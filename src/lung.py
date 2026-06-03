@@ -133,7 +133,8 @@ class LungModule:
         self.CO2_production = VCO2
 
         # ── 5. 动脉血气（代数） ──────────────────────────────────────────────
-        aa_gradient = 10.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 30.0
+        # A-a 梯度上限提到 60 mmHg 以表达 ARDS 级低氧（McCaffree 1978）
+        aa_gradient = 10.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 50.0
         a_PO2 = max(40.0, min(110.0, alveolar_PO2 - aa_gradient))
         a_PCO2 = max(15.0, min(80.0, alveolar_PCO2))
         self.blood.arterial_PO2_mmHg = a_PO2
@@ -143,9 +144,14 @@ class LungModule:
         self.blood.arterial_saturation = self._oxygen_saturation_curve(a_PO2)
 
         # ── 7. pH（代数） ─────────────────────────────────────────────────────
-        HCO3 = HCO3_EXTRACELLULAR_MEQ_L
+        # 优先用 blood.HCO3（疾病可设置），否则用常数
+        HCO3 = getattr(self.blood, 'HCO3', HCO3_EXTRACELLULAR_MEQ_L)
+        if HCO3 < 1.0:  # 防止除零/异常值
+            HCO3 = HCO3_EXTRACELLULAR_MEQ_L
         pH = 6.1 + math.log10(HCO3 / (0.03 * a_PCO2)) if a_PCO2 > 0 else 7.4
         self.blood.arterial_pH = max(7.0, min(7.8, pH))
+        # 文献：Henderson-Hasselbalp 方程，pKa=6.1, CO2 溶解系数 0.03
+        # 本地文献：Batzel 2009 心血管调节系统识别
 
         # ── 8. VdP 振荡器推进（获取目标 RR/TV） ──────────────────────────────
         self._vdp.update(pco2=a_PCO2, po2=a_PO2, ph=self.blood.arterial_pH)
@@ -293,7 +299,7 @@ class LungModule:
 
         # Step 4: 血气分压更新
         # A-a gradient 随扩散能力下降而增大（正常 10，严重障碍时可达 40）
-        aa_gradient = 10.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 30.0
+        aa_gradient = 10.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 50.0
         a_PO2 = self.alveolar_PO2 - aa_gradient
         a_PCO2 = self.alveolar_PCO2        # 动脉 PCO2 ≈ 肺泡 PCO2
 
@@ -336,9 +342,10 @@ class LungModule:
     def _oxygen_saturation_curve(self, PO2_mmHg: float) -> float:
         """
         氧解离曲线（Hill 方程近似）
-        P50 ≈ 26.6 mmHg（犬）
+        P50 ≈ 30 mmHg（犬，文献 29-31；人类 26-27）
+        犬血氧亲和力略低于人，曲线右移
         """
-        P50 = 26.6  # mmHg
+        P50 = 30.0  # mmHg
         n = 2.8     # Hill 系数
         sat = PO2_mmHg**n / (P50**n + PO2_mmHg**n)
         return max(0.0, min(1.0, sat))
@@ -350,7 +357,9 @@ class LungModule:
         简化：假设 [HCO3-] = 24 mEq/L
         """
         PCO2 = self.blood.arterial_PCO2_mmHg
-        HCO3 = HCO3_EXTRACELLULAR_MEQ_L  # 引用 parameters.py（真实情况由肾脏调节）
+        HCO3 = getattr(self.blood, 'HCO3', HCO3_EXTRACELLULAR_MEQ_L)
+        if HCO3 < 1.0:
+            HCO3 = HCO3_EXTRACELLULAR_MEQ_L
         pH = 6.1 + math.log10(HCO3 / (0.03 * PCO2)) if PCO2 > 0 else 7.4
         self.blood.arterial_pH = max(7.0, min(7.8, pH))
 

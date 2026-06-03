@@ -162,18 +162,20 @@ class HeartModule:
         # ── 4. 压力感受器反馈: dHR/dt, dSVR/dt ──────────────────────────────
         error = (self.MAP_target - raw_MAP) / self.MAP_target
 
-        # 交感/副交感 baroreflex (τ_symp=2s, τ_para=5s)
-        # dS/dt = (target - S) / τ  (一阶低通，物理时间常数，不依赖 dt)
+        # 交感/副交感 baroreflex：副交感主导（迷走神经反射快且强）
+        # τ_para=1s（迷走快），τ_symp=5s（交感慢）
+        # 增益：副交感 40 > 交感 15（Ursino 1998 心血管模型）
         sym_target = self._clamp(SYMPATHETIC_BASELINE + 0.7 * max(0.0, error), 0.0, 1.0)
         para_target = self._clamp(0.7 - 0.5 * error, 0.0, 1.0)
-        tau_symp = 2.0   # 交感响应时间常数 (s)
-        tau_para = 5.0   # 副交感响应时间常数 (s)
+        tau_symp = 5.0   # 交感响应时间常数 (s)（β1 受体较慢）
+        tau_para = 1.0   # 副交感响应时间常数 (s)（迷走神经最快 0.5-1s）
         d_sym = (sym_target - self.sympathetic) / tau_symp
         d_para = (para_target - self.parasympathetic) / tau_para
 
         # dHR/dt: HR rate in beats/s per second (units: 1/s)
-        HR_para = -self.parasympathetic * 15.0 * max(0.0, -error)
-        HR_symp = self.sympathetic * 50.0 * max(0.0, error)
+        # 副交感主导：增益 40 > 交感 15（Ursino 1998, Am J Physiol）
+        HR_para = -self.parasympathetic * 40.0 * max(0.0, -error)
+        HR_symp = self.sympathetic * 15.0 * max(0.0, error)
         dHR = (HR_para + HR_symp)  # 已经是 1/s 单位
         # K⁺ 毒性
         k_factor = self._potassium_cardiac_effect(self.blood.potassium_mEq_L)
@@ -352,24 +354,26 @@ class HeartModule:
         """
         error = (self.MAP_target - MAP) / self.MAP_target
 
-        # 交感/副交感 baroreflex (τ_symp=2s, τ_para=5s)
+        # 交感/副交感 baroreflex：副交感主导（迷走神经快且强）
         # 与 derivatives() 的公式一致：dS/dt = (target - S) / τ
         sym_target = self._clamp(SYMPATHETIC_BASELINE + 0.7 * max(0.0, error), 0.0, 1.0)
         para_target = self._clamp(0.7 - 0.5 * error, 0.0, 1.0)
-        tau_symp = 2.0
-        tau_para = 5.0
+        tau_symp = 5.0   # 交感慢
+        tau_para = 1.0   # 副交感快
         self.sympathetic += (sym_target - self.sympathetic) / tau_symp * dt
         self.parasympathetic += (para_target - self.parasympathetic) / tau_para * dt
 
         # HR 计算：副交感在MAP偏高时减速，交感在MAP偏低时加速
-        # 与 derivatives() 一致：dHR/dt = (HR_para + HR_symp) * k_factor (单位 1/s)
-        HR_para = -self.parasympathetic * 15.0 * max(0.0, -error)
-        HR_symp = self.sympathetic * 50.0 * max(0.0, error)
+        # 副交感主导：增益 40 > 交感 15（Ursino 1998）
+        HR_para = -self.parasympathetic * 40.0 * max(0.0, -error)
+        HR_symp = self.sympathetic * 15.0 * max(0.0, error)
         # Chemoreceptor 直连：chemo_drive → HR 升速（bpm/s），量纲正确 × dt
         # 最大约 15 bpm/s，与 Tucker 1984 数据一致（PaO₂=29 时 HR +8 bpm over ~10s）
         chemo_HR = chemoreceptor_drive * 15.0
         HR_delta = (HR_para + HR_symp + chemo_HR) * dt
-        self.heart_rate = max(60.0, min(self.HR_max, self.heart_rate + HR_delta))
+        # 统一与 simulation.py:877 的 clamp 范围（40-250），
+        # 允许高钾性心动过缓（K⁺ 7+ 时 HR 可降至 40-50）
+        self.heart_rate = max(40.0, min(self.HR_max, self.heart_rate + HR_delta))
 
         # ── HH 电生理耦合 ──────────────────────────────────────────────
         # 推进电生理计算器（接收当前心率和 [K⁺]）

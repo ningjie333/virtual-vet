@@ -95,12 +95,12 @@ class TestExtremePhysiologicalValues:
             f"HR {result['heart_rate_bpm']} exceeds HR_max {v.heart.HR_max}"
 
     def test_extreme_bradycardia(self):
-        """Set heart.heart_rate=30, run compute() -- should clamp to 60."""
+        """Set heart.heart_rate=30, run compute() -- should clamp to 40 (允许高钾性心动过缓)."""
         v = VirtualCreature(20.0)
         v.heart.heart_rate = 30.0
         result = v.heart.compute(dt=0.1, svr_factor=1.0)
-        assert result["heart_rate_bpm"] >= 60.0, \
-            f"HR {result['heart_rate_bpm']} is below floor of 60"
+        assert result["heart_rate_bpm"] >= 40.0, \
+            f"HR {result['heart_rate_bpm']} is below floor of 40"
 
 
 # ===========================================================================
