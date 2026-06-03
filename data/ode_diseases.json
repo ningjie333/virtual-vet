@@ -228,6 +228,11 @@
         "target": "heart.heart_rate",
         "op": "add",
         "fn": "0.05 * (86.7 - engine['heart']['heart_rate_bpm'])"
+      },
+      {
+        "target": "heart.contractility_factor",
+        "op": "multiply",
+        "fn": "max(0.5, 1.0 - 0.3 * potassium_shift)"
       }
     ],
     "meta": {
@@ -842,6 +847,11 @@
         "target": "lung.diffusion_coefficient",
         "op": "multiply",
         "fn": "max(0.5, 1.0 - hypoxia_from_anemia * 0.3)"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "max(0.5, 1.0 - 0.5 * antibody_activity)"
       }
     ],
     "meta": {
@@ -1011,6 +1021,11 @@
         "target": "blood.BUN",
         "op": "set",
         "fn": "max(7.0, 7.0 + post_renal_azotemia * 60.0)"
+      },
+      {
+        "target": "heart.contractility_factor",
+        "op": "multiply",
+        "fn": "max(0.5, 1.0 - 0.3 * hyperkalemia)"
       }
     ],
     "meta": {
@@ -1187,6 +1202,11 @@
         "target": "blood.ketone_mmol_L",
         "op": "set",
         "fn": "max(0.0, ketone_accumulation * 6.0)"
+      },
+      {
+        "target": "heart.contractility_factor",
+        "op": "multiply",
+        "fn": "max(0.7, 1.0 - 0.2 * anion_gap_acidosis)"
       }
     ],
     "meta": {
@@ -1642,6 +1662,16 @@
         "target": "gut.motility",
         "op": "multiply",
         "fn": "1.0 + T3_excess * 0.4"
+      },
+      {
+        "target": "heart.contractility_factor",
+        "op": "multiply",
+        "fn": "min(1.5, 1.0 + 0.3 * T3_excess)"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "max(0.5, 1.0 - 0.3 * T3_excess)"
       }
     ],
     "meta": {
@@ -1774,6 +1804,11 @@
         "target": "heart.heart_rate",
         "op": "add",
         "fn": "0.05 * (86.7 - engine['heart']['heart_rate_bpm'])"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "max(0.5, 1.0 - 0.4 * cortisol_deficiency)"
       }
     ],
     "meta": {
@@ -2006,6 +2041,11 @@
         "target": "heart.heart_rate",
         "op": "add",
         "fn": "0.05 * (95 - engine['heart']['heart_rate_bpm'])"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "min(1.5, 1.0 + 0.2 * pain_level)"
       }
     ],
     "meta": {
@@ -2117,6 +2157,11 @@
         "target": "heart.heart_rate",
         "op": "add",
         "fn": "0.05 * (110 - engine['heart']['heart_rate_bpm'])"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "min(1.5, 1.0 + 0.3 * seizure_activity - 0.3 * consciousness_loss)"
       }
     ],
     "meta": {
@@ -2577,6 +2622,11 @@
         "target": "kidney.GFR",
         "op": "multiply",
         "fn": "max(0.05, 1.0 - nephron_loss * 0.95)"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "max(0.5, 1.0 - 0.5 * anemia_severity)"
       }
     ],
     "meta": {
@@ -2749,6 +2799,11 @@
         "target": "heart.heart_rate",
         "op": "add",
         "fn": "0.05 * (95 - engine['heart']['heart_rate_bpm'])"
+      },
+      {
+        "target": "heart.SVR",
+        "op": "multiply",
+        "fn": "max(0.5, 1.0 - 0.5 * anemia_severity)"
       }
     ],
     "meta": {
