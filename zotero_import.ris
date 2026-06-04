@@ -1,0 +1,765 @@
+TY  - JOUR
+TI  - [VirtualVet] _internal.cocaine_params
+AB  - Liu et al. 1993. Cardiovascular effects of cocaine in dogs: a modeling study. J Am Coll Cardiol 21:260-268.
+AN  - PMID:8491156
+N1  - Notes: Dose 3 mg/kg IV produces transient cardiac depression (5-10 min τ) and sustained peripheral vasoconstriction (30 min τ). SVR peaks at 2x baseline. ESPVR max drop 19%. LD50 ≈ 60 mg/kg.
+KW  - _internal.cocaine_params
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.ALP
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine ALP 7-115 U/L.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 50 U/L from midpoint. Iowa State 20-150 U/L.
+KW  - blood.ALP
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.ALT
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine ALT 17-95 U/L.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 50 U/L from midpoint of 17-95 range. Iowa State 24-90 U/L.
+KW  - blood.ALT
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.ALT
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — ALT increased in hepatocellular injury.
+N1  - Notes: Baseline 50 U/L from midpoint of 17-95 range. Iowa State 24-90 U/L.
+KW  - blood.ALT
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.AST
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine AST 18-56 U/L.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 35 U/L from midpoint of 18-56 range.
+KW  - blood.AST
+ER  - 
+
+TY  - JOUR
+TI  - [VirtualVet] blood.BUN
+AB  - Restutto et al. 2018. Reference intervals for BUN and creatinine in client-owned dogs. Vet Clin Pathol.
+AN  - PMID:30284231
+N1  - Notes: Baseline 20 mg/dL from midpoint of normal range.
+KW  - blood.BUN
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.BUN
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal BUN 10-28 mg/dL in dogs.
+N1  - Notes: Baseline 20 mg/dL from midpoint of normal range.
+KW  - blood.BUN
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.GGT
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine GGT 0-8 U/L.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 4 U/L.
+KW  - blood.GGT
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.HCO3
+AB  - Iowa State University Veterinary Pathology Reference Intervals — Canine HCO3 17-24 mEq/L.
+UR  - https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals
+N1  - Notes: Baseline 20 mEq/L from midpoint.
+KW  - blood.HCO3
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.PLT
+AB  - Merck Veterinary Manual — Canine platelet count 200,000-600,000/µL (200-600 ×10^9/L).
+UR  - https://www.merckvetmanual.com/multimedia/table/hematology-complete-blood-count-reference-ranges
+N1  - Notes: Baseline 400,000/µL.
+KW  - blood.PLT
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.PT_sec
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Prothrombin time (PT) reflects extrinsic and common pathway factors (I, II, V, VII, X). Normal 10-15 sec.
+N1  - Notes: Baseline 12 sec. Same value as coag.PT_sec.
+KW  - blood.PT_sec
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.albumin
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Normal canine serum albumin 2.6-4.0 g/dL.
+N1  - Notes: Baseline 3.3 g/dL from midpoint. Half-life ~8 days in dogs — too slow for acute simulation.
+KW  - blood.albumin
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.amino_acids
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 44 — Plasma amino acid concentrations regulated by liver and kidney.
+N1  - Notes: Baseline modeled as fraction of normal hepatic metabolic activity.
+KW  - blood.amino_acids
+ER  - 
+
+TY  - JOUR
+TI  - [VirtualVet] blood.ammonia
+AB  - Inferred blood ammonia reference range for dogs using POC analyzer. Animals 2025;12(6):596. PMID:12197803.
+UR  - https://www.mdpi.com/2306-7381/12/6/596
+AN  - PMID:12197803
+N1  - Notes: Baseline < 30 µmol/L. Dogs with BA > 30 µg/dL suggestive of liver disease.
+KW  - blood.ammonia
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.arterial_PCO2_mmHg
+AB  - Iowa State University Veterinary Pathology Reference Intervals — Canine arterial pCO2 29-42 mmHg.
+UR  - https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals
+N1  - Notes: Baseline 38 mmHg from midpoint. IDEXX 29-42 mmHg.
+KW  - blood.arterial_PCO2_mmHg
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.arterial_PCO2_mmHg
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 30 — Normal PaCO2 40 mmHg.
+N1  - Notes: Baseline 38 mmHg from midpoint. IDEXX 29-42 mmHg.
+KW  - blood.arterial_PCO2_mmHg
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.arterial_PO2_mmHg
+AB  - Iowa State University Veterinary Pathology Reference Intervals — Canine arterial pO2 85-95 mmHg.
+UR  - https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals
+N1  - Notes: Baseline 90 mmHg from midpoint. IDEXX PaO2 not reported (blood gas).
+KW  - blood.arterial_PO2_mmHg
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.arterial_PO2_mmHg
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 40 — Normal PaO2 95 mmHg at sea level.
+N1  - Notes: Baseline 90 mmHg from midpoint. IDEXX PaO2 not reported (blood gas).
+KW  - blood.arterial_PO2_mmHg
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.bile_acids
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Fasting bile acids < 25 µmol/L in dogs.
+N1  - Notes: Baseline 10 µmol/L.
+KW  - blood.bile_acids
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.bilirubin_mg_dL
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine total bilirubin 0-0.2 mg/dL.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 0.1 mg/dL. Iowa State same range 0-0.2 mg/dL.
+KW  - blood.bilirubin_mg_dL
+ER  - 
+
+TY  - JOUR
+TI  - [VirtualVet] blood.creatinine
+AB  - Restutto et al. 2018. Reference intervals for creatinine in client-owned dogs. Vet Clin Pathol.
+AN  - PMID:30284231
+N1  - Notes: Alias for blood.creatinine_mg_dL. Baseline 1.0 mg/dL.
+KW  - blood.creatinine
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.creatinine
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal canine creatinine 0.5-1.6 mg/dL.
+N1  - Notes: Alias for blood.creatinine_mg_dL. Baseline 1.0 mg/dL.
+KW  - blood.creatinine
+ER  - 
+
+TY  - JOUR
+TI  - [VirtualVet] blood.creatinine_mg_dL
+AB  - Restutto et al. 2018. Reference intervals for creatinine in client-owned dogs. Vet Clin Pathol.
+AN  - PMID:30284231
+N1  - Notes: Baseline 1.0 mg/dL from midpoint. Cornell 0.6-1.4 mg/dL.
+KW  - blood.creatinine_mg_dL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.creatinine_mg_dL
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal canine creatinine 0.5-1.6 mg/dL.
+N1  - Notes: Baseline 1.0 mg/dL from midpoint. Cornell 0.6-1.4 mg/dL.
+KW  - blood.creatinine_mg_dL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.fatty_acids
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine NEFA 0.13-1.25 mEq/L.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 0.5 mEq/L.
+KW  - blood.fatty_acids
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.glucose
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine glucose 68-104 mg/dL.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 85 mg/dL from midpoint. IDEXX adult 74-143 mg/dL.
+KW  - blood.glucose
+ER  - 
+
+TY  - JOUR
+TI  - [VirtualVet] blood.ketone_mmol_L
+AB  - Bresciani et al. 2014. Accuracy of capillary blood 3-beta-hydroxybutyrate for canine diabetic ketoacidosis. J Vet Sci 15(2):309-316. PMID:24675829.
+UR  - https://pmc.ncbi.nlm.nih.gov/articles/PMC4087234/
+AN  - PMID:24675829
+N1  - Notes: Baseline 0.2 mmol/L (well below DKA threshold of 3.8 mmol/L).
+KW  - blood.ketone_mmol_L
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.lactate
+AB  - IDEXX Catalyst Reference Ranges — Canine adult lactate 0.50-2.50 mmol/L.
+UR  - https://www.idexx.com/files/catalyst-species-reference-ranges.pdf
+N1  - Notes: Baseline 1.0 mmol/L from midpoint.
+KW  - blood.lactate
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.pH
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 30 — Normal arterial pH 7.35-7.45 in mammals.
+N1  - Notes: Baseline 7.4 from midpoint of normal range.
+KW  - blood.pH
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.pH
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Canine arterial pH 7.36-7.44.
+N1  - Notes: Baseline 7.4 from midpoint of normal range.
+KW  - blood.pH
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.potassium
+AB  - Iowa State University Veterinary Pathology Reference Intervals — Canine K 3.9-5.3 mEq/L.
+UR  - https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals
+N1  - Notes: Baseline 4.5 mEq/L from midpoint of 3.9-5.3 range.
+KW  - blood.potassium
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.potassium
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine K 4.1-5.4 mEq/L.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 4.5 mEq/L from midpoint of 3.9-5.3 range.
+KW  - blood.potassium
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.red_cell_volume_ml
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Hematocrit ≈ 45% in dogs (PCV 37-55%).
+N1  - Notes: Baseline ≈ 45% × blood volume. PCV 37-55% normal range.
+KW  - blood.red_cell_volume_ml
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.sodium_mEq_L
+AB  - Iowa State University Veterinary Pathology Reference Intervals — Canine Na 141-151 mEq/L.
+UR  - https://vetmed.iastate.edu/vpath/services/diagnostic-services/clinical-pathology-diagnostic-and-research-services/testing-and-fees/reference-intervals
+N1  - Notes: Baseline 145 mEq/L from midpoint. IDEXX adult canine 144-160 mmol/L.
+KW  - blood.sodium_mEq_L
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.sodium_mEq_L
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine Na 143-150 mEq/L.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 145 mEq/L from midpoint. IDEXX adult canine 144-160 mmol/L.
+KW  - blood.sodium_mEq_L
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.splenic_reserve_mL
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Spleen acts as blood reservoir, releasing RBCs and plasma in stress.
+N1  - Notes: Alias for lymph.splenic_reserve_ml.
+KW  - blood.splenic_reserve_mL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] blood.temperature
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Normal canine body temperature 38.0-39.2°C.
+N1  - Notes: Baseline 38.5°C.
+KW  - blood.temperature
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] coag.PT_sec
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Normal PT 10-15 sec in dogs.
+N1  - Notes: Baseline 12 sec from midpoint of normal range.
+KW  - coag.PT_sec
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] coag.aPTT_sec
+AB  - IDEXX Catalyst Reference Ranges — Canine adult aPTT 14-24 sec.
+UR  - https://www.idexx.com/files/catalyst-species-reference-ranges.pdf
+N1  - Notes: Baseline 19 sec from midpoint. Nelson & Couto Ch37 aPTT normal range.
+KW  - coag.aPTT_sec
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] coag.coagulation_state
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Balanced coagulation depends on pro- and anti-coagulant factors.
+N1  - Notes: Baseline 1.0 (balanced). Elevated in DIC, low in liver failure.
+KW  - coag.coagulation_state
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] coag.factor_VII
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 36 — Factor VII shortest half-life (~6h) of coagulation factors, synthesized by liver.
+N1  - Notes: Baseline 1.0 (100% activity). Used in liver_coag coupling PT formula.
+KW  - coag.factor_VII
+ER  - 
+
+TY  - JOUR
+TI  - [VirtualVet] coag.fibrinogen_mg_dL
+AB  - Stokol et al. 2000. Evaluation of coagulation in dogs with liver disease. J Vet Intern Med.
+AN  - PMID:12479367
+N1  - Notes: Baseline 300 mg/dL from midpoint. liver_metabolic_activity coupling: at MA=1.0, fibrinogen=300; at MA=0.5, fibrinogen=150.
+KW  - coag.fibrinogen_mg_dL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] coag.fibrinogen_mg_dL
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Normal canine fibrinogen 200-400 mg/dL.
+N1  - Notes: Baseline 300 mg/dL from midpoint. liver_metabolic_activity coupling: at MA=1.0, fibrinogen=300; at MA=0.5, fibrinogen=150.
+KW  - coag.fibrinogen_mg_dL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.GH_ng_mL
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Basal GH ~1-5 ng/mL in mammals.
+N1  - Notes: Baseline 2 ng/mL.
+KW  - endocrine.GH_ng_mL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.HPA_axis
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — HPA axis regulates cortisol secretion.
+N1  - Notes: Baseline 1.0 (normal activity). Activated by stress.
+KW  - endocrine.HPA_axis
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.IGF1_nmol_L
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — IGF-1 ~10-40 nmol/L in adult dogs.
+N1  - Notes: Baseline 10 nmol/L.
+KW  - endocrine.IGF1_nmol_L
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.PTH_pg_mL
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine PTH 10-40 pg/mL (resting).
+N1  - Notes: Baseline 30 pg/mL from midpoint.
+KW  - endocrine.PTH_pg_mL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.T3_factor
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — T3/T4 regulate metabolic rate.
+N1  - Notes: Baseline 1.0. MODIFIED by thyroid axis.
+KW  - endocrine.T3_factor
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.T3_ng_dL
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine total T3 normal range 30-80 ng/dL (mean ~50-60 in adult).
+N1  - Notes: Baseline 100 ng/dL = upper end of normal (healthy adult dog).
+KW  - endocrine.T3_ng_dL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.T4_factor
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — T4 converted to active T3 in tissues.
+N1  - Notes: Baseline 1.0. MODIFIED by thyroid axis.
+KW  - endocrine.T4_factor
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.T4_ug_dL
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine total T4 normal range 1-4 ug/dL.
+N1  - Notes: Baseline 1.5 ug/dL from lower normal range.
+KW  - endocrine.T4_ug_dL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.calcium_factor
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — PTH regulates Ca2+ within narrow range via bone, gut, kidney.
+N1  - Notes: Baseline 1.0 (normal Ca2+ homeostasis).
+KW  - endocrine.calcium_factor
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.calcium_mg_dL
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine total Ca 9.4-11.1 mg/dL.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 10.0 mg/dL from midpoint. Iowa State 9.7-11.3 mg/dL.
+KW  - endocrine.calcium_mg_dL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.cortisol_factor
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Cortisol released from adrenal cortex in response to ACTH and stress.
+N1  - Notes: Baseline 1.0. Elevated in stress (HPA axis activation).
+KW  - endocrine.cortisol_factor
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.cortisol_ug_dL
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine baseline cortisol 2-10 ug/dL (resting).
+N1  - Notes: Baseline 5 ug/dL from midpoint of normal range. Stress max 25 ug/dL.
+KW  - endocrine.cortisol_ug_dL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.epinephrine_pg_mL
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Basal plasma epinephrine ~30 pg/mL.
+N1  - Notes: Baseline 30 pg/mL.
+KW  - endocrine.epinephrine_pg_mL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.glucagon_factor
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Glucagon opposes insulin in glucose regulation.
+N1  - Notes: Baseline 1.0 (normal glucagon activity).
+KW  - endocrine.glucagon_factor
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.glucagon_pg_mL
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Basal glucagon ~50-150 pg/mL in mammals.
+N1  - Notes: Baseline 80 pg/mL from midpoint.
+KW  - endocrine.glucagon_pg_mL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.growth_factor
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — GH/IGF-1 axis drives tissue growth and repair.
+N1  - Notes: Baseline 1.0 (normal).
+KW  - endocrine.growth_factor
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.insulin_factor
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Insulin regulates glucose uptake into cells.
+N1  - Notes: Baseline 1.0 (normal insulin sensitivity).
+KW  - endocrine.insulin_factor
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.insulin_uU_mL
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 44 — Canine baseline insulin 5-20 uU/mL (fasting).
+N1  - Notes: Baseline 12 uU/mL from midpoint.
+KW  - endocrine.insulin_uU_mL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.metabolic_rate
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 16 — Basal metabolic rate determined by thyroid hormone levels.
+N1  - Notes: Baseline 1.0 (normal). MODIFIED by T3/T4_factor.
+KW  - endocrine.metabolic_rate
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.norepinephrine_pg_mL
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 24 — Basal plasma norepinephrine ~100 pg/mL.
+N1  - Notes: Baseline 100 pg/mL.
+KW  - endocrine.norepinephrine_pg_mL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] endocrine.phosphate_mg_dL
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine phosphate 2.7-5.4 mg/dL.
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 4.0 mg/dL from midpoint. Iowa State 2.7-5.4 mg/dL.
+KW  - endocrine.phosphate_mg_dL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] fluid.vascular_volume_ml
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Total blood volume ≈ 86 mL/kg in dogs.
+N1  - Notes: Vascular volume fraction ~60% of total blood. Aldosterone coupling coefficient 0.08 from Guyton Ch26.
+KW  - fluid.vascular_volume_ml
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] gut.barrier_integrity
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 36 — Gut mucosal barrier prevents bacterial translocation.
+N1  - Notes: Baseline 1.0 (intact barrier).
+KW  - gut.barrier_integrity
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] gut.microbiome_activity
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 66 — Gut microbiome produces short-chain fatty acids and influences systemic immunity.
+N1  - Notes: Baseline 1.0 (normal microbiome). Reduced by antibiotics, dysbiosis.
+KW  - gut.microbiome_activity
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] gut.motility
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 36 — Normal GI motility regulated by autonomic nervous system and enteric nervous system.
+N1  - Notes: Baseline 1.0 (normal motility).
+KW  - gut.motility
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] heart.CVP
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Normal central venous pressure 2-8 mmHg in mammals; resting dog ≈ 4 mmHg.
+N1  - Notes: Baseline 4.0 mmHg.
+KW  - heart.CVP
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] heart.MAP
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 22 — MAP normal range 80-120 mmHg in dogs.
+N1  - Notes: Baseline 100 mmHg from midpoint of normal range.
+KW  - heart.MAP
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] heart.SVR
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Total peripheral resistance ≈ 1.4 mmHg·s/mL in resting adult dog.
+N1  - Notes: Derived: SVR = (MAP - MAP_rest) / (CO/60), MAP_rest=60, MAP=100, CO=1700 → SVR=1.41. RAAS coupling coefficient 0.3 from Guyton Ch19/26.
+KW  - heart.SVR
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] heart.blood_volume
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Total blood volume ≈ 86 mL/kg in dogs.
+N1  - Notes: Baseline 86 mL/kg.
+KW  - heart.blood_volume
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] heart.contractility_factor
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 22 — Contractility determined by Ca2+ availability and sympathetic stimulation. ESPVR slope reflects inotropic state.
+N1  - Notes: No single reference for baseline; derived from cardiac output calibration. Coefficient 0.15 for AngII effect from Patten 1991 PMID:7858848.
+KW  - heart.contractility_factor
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] heart.heart_rate
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 22 — Canine normal resting HR 60-140 bpm (mean ~85 bpm for healthy adult). Variability by size and breed.
+N1  - Notes: 85 bpm used as midpoint of normal range; stress HR 180 bpm = estimated maximum for athletic dog.
+KW  - heart.heart_rate
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] heart.stroke_volume
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 22 — Stroke volume ≈ 1.0-1.5 mL/kg in resting dog.
+N1  - Notes: Baseline 1.0 mL/kg for critical care baseline.
+KW  - heart.stroke_volume
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] immune.acute_phase_response
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Acute phase response includes CRP, fibrinogen, SAA elevation.
+N1  - Notes: Baseline 0 (no acute inflammation).
+KW  - immune.acute_phase_response
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] immune.coagulation_state
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Inflammation activates coagulation cascade.
+N1  - Notes: Baseline 0 (normal). Activated by cytokine storm.
+KW  - immune.coagulation_state
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] immune.crp_level
+AB  - Cornell University College of Veterinary Medicine Clinical Pathology — Canine CRP 0-12 mg/L (normal).
+UR  - https://www.vet.cornell.edu/animal-health-diagnostic-center/laboratories/clinical-pathology/reference-intervals/chemistry-cobas
+N1  - Notes: Baseline 5 mg/L.
+KW  - immune.crp_level
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] immune.cytokine_level
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Cytokines (IL-1, IL-6, TNF-α) mediate systemic inflammatory response.
+N1  - Notes: Baseline 0 (no inflammation). Elevated in sepsis/SIRS.
+KW  - immune.cytokine_level
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] immune.immune_suppression
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Immunosuppression reduces WBC and cytokine response.
+N1  - Notes: Baseline 0 (no immunosuppression).
+KW  - immune.immune_suppression
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] immune.wbc_count
+AB  - Merck Veterinary Manual — Canine WBC 6.0-17.0 ×10^9/L.
+UR  - https://www.merckvetmanual.com/multimedia/table/hematology-complete-blood-count-reference-ranges
+N1  - Notes: Baseline 11.0 ×10^9/L.
+KW  - immune.wbc_count
+ER  - 
+
+TY  - JOUR
+TI  - [VirtualVet] kidney.GFR
+AB  - Restutto et al. 2018. Reference intervals for serum urea nitrogen and creatinine in client-owned dogs. Vet Clin Pathol.
+AN  - PMID:30284231
+N1  - Notes: 3.0 mL/min/kg used as baseline midpoint. CO→GFR coupling coefficient 0.004 from Ljungman 1990 PMID:18436945.
+KW  - kidney.GFR
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] kidney.GFR
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal canine GFR 2.5-4.0 mL/min/kg.
+N1  - Notes: 3.0 mL/min/kg used as baseline midpoint. CO→GFR coupling coefficient 0.004 from Ljungman 1990 PMID:18436945.
+KW  - kidney.GFR
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] kidney._disease_gfr_multiplier
+AB  - Internal disease module parameter — represents GFR reduction beyond baseline due to disease process.
+N1  - Notes: Set by disease ODE models. 1.0 = no additional reduction beyond baseline GFR.
+KW  - kidney._disease_gfr_multiplier
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] kidney.renal_blood_flow
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Renal blood flow ≈ 20% of cardiac output in resting dog.
+N1  - Notes: Baseline 0.20 × CO. At rest CO=1700 mL/min, RBF ≈ 340 mL/min for 20kg dog.
+KW  - kidney.renal_blood_flow
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] kidney.urine_output
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 53 — Normal urine output 1-2 mL/kg/hr in dogs.
+N1  - Notes: Baseline 0.02 mL/min/kg = 1.2 mL/kg/hr (midpoint of normal range).
+KW  - kidney.urine_output
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] liver.bilirubin_conjugation
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 33 — Bilirubin conjugated by hepatocytes and excreted in bile.
+N1  - Notes: Baseline 1.0 (normal conjugation capacity).
+KW  - liver.bilirubin_conjugation
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] liver.cyp450_activity
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 71 — Cytochrome P450 system metabolizes drugs and toxins.
+N1  - Notes: Baseline 1.0. Inducible by drugs (carbamazepine ↑, cimetidine ↓).
+KW  - liver.cyp450_activity
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] liver.detox_capacity
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 71 — Liver detoxifies drugs, ammonia, bilirubin.
+N1  - Notes: Baseline 1.0. MODIFIED by liver.metabolic_activity.
+KW  - liver.detox_capacity
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] liver.glycogen_fraction
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 71 — Liver glycogen stores ~300g in dogs, mobilized during fasting.
+N1  - Notes: Baseline 1.0 (full glycogen stores). Depleted in fasting/hypoglycemia.
+KW  - liver.glycogen_fraction
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] liver.metabolic_activity
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 37 — Liver synthetic function measured by albumin, coagulation factors, urea.
+N1  - Notes: Baseline 1.0 (normal). Reduced in hepatocellular disease.
+KW  - liver.metabolic_activity
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] lung.PaCO2
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 30 — Normal alveolar PCO2 ≈ 40 mmHg.
+N1  - Notes: Baseline 40 mmHg.
+KW  - lung.PaCO2
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] lung.PaO2
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 40 — Normal alveolar PO2 ≈ 100 mmHg, arterial PO2 95 mmHg.
+N1  - Notes: Baseline alveolar PO2 100 mmHg. Coupled to blood.arterial_PO2_mmHg.
+KW  - lung.PaO2
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] lung.VQ_ratio
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 40 — V/Q ratio normal ≈ 0.8-1.0 in healthy lung regions.
+N1  - Notes: Baseline 1.0 (ideal). Reduced in shunt, elevated in dead space.
+KW  - lung.VQ_ratio
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] lung.diffusion_coefficient
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 40 — Lung diffusion coefficient (DL) for O2 ≈ 20-30 mL/min/mmHg in healthy adult.
+N1  - Notes: Baseline 25 mL O2/min/mmHg.
+KW  - lung.diffusion_coefficient
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] lung.respiratory_rate
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Normal canine respiratory rate 10-30 breaths/min (resting).
+N1  - Notes: 18 breaths/min used as baseline midpoint. PaCO2 coupling coefficient 0.05 from Guyton Ch42.
+KW  - lung.respiratory_rate
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] lymph.interstitial_fluid
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 16 — Starling forces govern fluid exchange across capillary beds.
+N1  - Notes: Baseline ~3L in dogs.
+KW  - lymph.interstitial_fluid
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] lymph.lymph_flow
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 16 — Lymph flow returns interstitial fluid to circulation.
+N1  - Notes: Baseline proportional to interstitial fluid volume.
+KW  - lymph.lymph_flow
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] lymph.splenic_reserve_mL
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 26 — Spleen acts as blood reservoir, releasing RBCs and plasma in stress.
+N1  - Notes: Baseline ~10% of blood volume reserve. Alias: blood.splenic_reserve_ml.
+KW  - lymph.splenic_reserve_mL
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] neuro.chemoreceptor_drive
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 42 — Peripheral and central chemoreceptors respond to PaO2, PaCO2, and pH.
+N1  - Notes: Baseline 0.3 (normal). Elevated in hypoxemia/hypercapnia.
+KW  - neuro.chemoreceptor_drive
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] neuro.consciousness
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 59 — Consciousness depends on cerebral cortex and brainstem arousal centers.
+N1  - Notes: Baseline 1.0 (normal). Decreased in hypoxia, sedatives, hepatic encephalopathy.
+KW  - neuro.consciousness
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] neuro.pain_level
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Pain activates sympathetic nervous system and stress response.
+N1  - Notes: Baseline 0 (no pain).
+KW  - neuro.pain_level
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] neuro.parasympathetic_tone
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 20 — Parasympathetic (vagal) tone dominates at rest.
+N1  - Notes: Baseline 0.7 (normal). Elevated in sedation/heart block.
+KW  - neuro.parasympathetic_tone
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] neuro.seizure
+AB  - Nelson & Couto, Small Animal Internal Medicine, 5th ed. Chapter 6 — Seizure threshold reduced by electrolyte abnormalities, toxins, hypoxia.
+N1  - Notes: Baseline 0 (no seizure activity).
+KW  - neuro.seizure
+ER  - 
+
+TY  - ELEC
+TI  - [VirtualVet] neuro.sympathetic_tone
+AB  - Guyton & Hall, Textbook of Medical Physiology, 14th ed. Chapter 20 — Sympathetic tone maintains vasomotor constriction at baseline.
+N1  - Notes: Baseline 0.3 (normal). Elevated in stress/hemorrhage.
+KW  - neuro.sympathetic_tone
+ER  - 
