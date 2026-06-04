@@ -60,7 +60,7 @@ F_ACT_TAU = 500.0   # If 激活时间常数 (ms)
 PURKINJE_INTRINSIC_HZ = 30.0 / 60.0  # 30 bpm → 0.5 Hz
 
 # 传导速度参数
-CONDUCTION_VELOCITY_MAX = 4.0   # 最大传导速度 (m/s)
+CONDUCTION_VELOCITY_MAX = 5.0   # 最大传导速度 (m/s) — REF: Noble 1962
 PR_INTERVAL_NORMAL_MS = 80.0    # 正常 PR 间期 (ms)
 
 
