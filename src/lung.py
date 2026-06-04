@@ -143,7 +143,7 @@ class LungModule:
         if HCO3 < 1.0:
             HCO3 = HCO3_EXTRACELLULAR_MEQ_L
         pH = 6.1 + math.log10(HCO3 / (0.03 * a_PCO2)) if a_PCO2 > 0 else 7.4
-        a_pH = max(7.0, min(7.8, pH))
+        a_pH = max(6.8, min(7.8, pH))
         # 文献：Henderson-Hasselbalp 方程，pKa=6.1, CO2 溶解系数 0.03
         # 本地文献：Batzel 2009 心血管调节系统识别
 

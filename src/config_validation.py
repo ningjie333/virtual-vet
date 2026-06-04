@@ -172,7 +172,7 @@ def validate_ode_diseases(config: dict) -> list[ValidationError]:
 
     # Programmatic: outputs[].target must be in _PARAM_PATHS
     # Import here to avoid circular import
-    from .simulation import _PARAM_PATHS as PARAM_PATHS
+    from .common_types import _PARAM_PATHS as PARAM_PATHS
 
     for disease_name, disease_conf in config.items():
         if disease_name.startswith("_"):

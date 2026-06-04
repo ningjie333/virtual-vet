@@ -21,7 +21,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 
 def generate() -> str:
-    from src.simulation import _PARAM_PATHS
+    from src.common_types import _PARAM_PATHS
     from src.parameter_refs import get_param_ref, all_param_refs
     from src.organs.coupling import CouplingEngine
 

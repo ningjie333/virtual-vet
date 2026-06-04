@@ -32,6 +32,7 @@ from parameters import (
     DEFAULT_AGE_DAYS,
     HEART_RATE_REST_BPM, HEART_RATE_REST_BPM_FELINE, HEART_RATE_REST_BPM_EQUINE,
     HEART_RATE_STRESS_BPM, HEART_RATE_STRESS_BPM_FELINE, HEART_RATE_STRESS_BPM_EQUINE,
+    HEART_RATE_HARD_MIN, HEART_RATE_HARD_MAX,
     ARTERIAL_PCO2_NORMAL, ARTERIAL_PCO2_NORMAL_FELINE, ARTERIAL_PCO2_NORMAL_EQUINE,
     RESPIRATORY_RATE_REST, RESPIRATORY_RATE_REST_FELINE, RESPIRATORY_RATE_REST_EQUINE,
 )
@@ -751,7 +752,7 @@ class VirtualCreature:
 
             # 生理 clamp：防止疾病累积效应把参数推到非生理范围
             # 心率：犬 40-250，猫 140-300
-            self.heart.heart_rate = max(40.0, min(250.0, self.heart.heart_rate))
+            self.heart.heart_rate = max(HEART_RATE_HARD_MIN, min(HEART_RATE_HARD_MAX, self.heart.heart_rate))
             # MAP：30-200 mmHg
             self.heart.mean_arterial_pressure = max(30.0, min(200.0, self.heart.mean_arterial_pressure))
 

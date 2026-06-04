@@ -371,9 +371,8 @@ class HeartModule:
         # 最大约 15 bpm/s，与 Tucker 1984 数据一致（PaO₂=29 时 HR +8 bpm over ~10s）
         chemo_HR = chemoreceptor_drive * 15.0
         HR_delta = (HR_para + HR_symp + chemo_HR) * dt
-        # 统一与 simulation.py:877 的 clamp 范围（40-250），
-        # 允许高钾性心动过缓（K⁺ 7+ 时 HR 可降至 40-50）
-        self.heart_rate = max(40.0, min(self.HR_max, self.heart_rate + HR_delta))
+        # H7: 使用统一全局常量（HEART_RATE_HARD_MIN/MAX）
+        self.heart_rate = max(HEART_RATE_HARD_MIN, min(self.HR_max, self.heart_rate + HR_delta))
 
         # ── HH 电生理耦合 ──────────────────────────────────────────────
         # 推进电生理计算器（接收当前心率和 [K⁺]）

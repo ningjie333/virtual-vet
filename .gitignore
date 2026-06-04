@@ -23,3 +23,13 @@ static/
 Thumbs.db
 .tmp/
 data/game_sessions.db
+data/game_sessions_test.db
+data/game_sessions_test.db-shm
+data/game_sessions_test.db-wal
+
+# Debug / experimental scripts (not for review)
+experiments/debug_scripts/
+_tools_dev/
+
+# External references (downloaded docs, not project-owned)
+cvs-reference/
