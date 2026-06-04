@@ -17,16 +17,7 @@ Step: 4.9 (neuro之后, organ_health之前)
 直接调用 endocrine.add_stress() 进行细胞因子→HPA耦合。
 """
 
-from dataclasses import dataclass
-from typing import Literal
-
-
-@dataclass(frozen=True)
-class FactorCommand:
-    """统一因子写入接口"""
-    target: str
-    op: Literal["multiply", "add", "set"]
-    value: float
+from src.common_types import FactorCommand
 
 
 class ImmuneModule:

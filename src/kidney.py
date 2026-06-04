@@ -108,7 +108,7 @@ class KidneyModule:
               outputs: dict[str, float] — 供其他模块使用的输出端口
         """
         # ── 1. 肾血流量（与心输出量成正比，代数） ─────────────────────────────
-        co_fraction = co_input / base_cardiac_output_ml_min(self.w)
+        co_fraction = co_input / max(base_cardiac_output_ml_min(self.w), 1e-9)
         renal_blood_flow = self.base_renal_blood_flow * co_fraction
 
         # ── 2. RAAS 系统（代数） ─────────────────────────────────────────────
@@ -156,22 +156,23 @@ class KidneyModule:
         # ── 6. 血浆渗透压（代数） ────────────────────────────────────────────
         plasma_osmolality = 2 * Na_conc + 5 + 10
 
-        # ── 7. BUN / 肌酐（代数 + 低通） ───────────────────────────────────
+        # ── 7. BUN / 肌酐（代数 + 低通）──────────────────────────────────
+        # NOTE(C5): 不再直接写 self.blood.*，改为返回值由调用方写入
         if GFR > 0.5:
             bun_target = (self.base_GFR / GFR) * 15.0
         else:
             bun_target = 150.0
         bun_target = min(150.0, bun_target)
-        dBUN = (bun_target - self.blood.bun_mg_dL) * 0.05
-        self.blood.bun_mg_dL = max(5.0, self.blood.bun_mg_dL + dBUN * dt)
+        bun_current = self.blood.bun_mg_dL
+        bun_next = max(5.0, bun_current + (bun_target - bun_current) * 0.05)
 
         if GFR > 0.01:
             crea_target = (self.base_GFR / GFR) * 1.0
         else:
             crea_target = 5.0
         crea_target = min(5.0, crea_target)
-        dCreat = (crea_target - self.blood.creatinine_mg_dL) * 0.1
-        self.blood.creatinine_mg_dL = max(0.5, self.blood.creatinine_mg_dL + dCreat * dt)
+        crea_current = self.blood.creatinine_mg_dL
+        crea_next = max(0.5, crea_current + (crea_target - crea_current) * 0.1)
 
         # ── 8. ADH（代数） ──────────────────────────────────────────────────
         osmotic_pressure = plasma_osmolality - 295.0
@@ -192,8 +193,8 @@ class KidneyModule:
         }
 
         outputs = {
-            "bun_mg_dL": self.blood.bun_mg_dL,
-            "creatinine_mg_dL": self.blood.creatinine_mg_dL,
+            "bun_mg_dL": bun_next,
+            "creatinine_mg_dL": crea_next,
             "plasma_osmolality_mOsm_kg": plasma_osmolality,
             "blood_volume_loss_rate_mL_min": blood_volume_loss_rate,
             "urine_output_mL_min": urine_output,

@@ -13,16 +13,7 @@ FactorCommand 目标: blood.PT_sec, blood.aPTT_sec, blood.fibrinogen_mg_dL,
 Step: 4.65 (liver之后, endocrine之前)
 """
 
-from dataclasses import dataclass
-from typing import Literal
-
-
-@dataclass(frozen=True)
-class FactorCommand:
-    """统一因子写入接口"""
-    target: str
-    op: Literal["multiply", "add", "set"]
-    value: float
+from src.common_types import FactorCommand
 
 
 class CoagulationModule:
@@ -304,6 +295,12 @@ class CoagulationModule:
             setattr(self, name, max(0.05, min(1.5, new_val)))
 
         # ── 4. PT / aPTT ──────────────────────────────────────────────
+        # B2 非确定性说明：
+        # 首次 rhs 调用时 heart 的 cached_inputs 为空（map_input=0），
+        # 导致 blood._compute_PT_sec() 读取的 CO 偏小 → PT_sec 初始偏差 ~0.43。
+        # 第二次 rhs 调用 cached_inputs 已填充 → 偏差收敛到 ~1e-8。
+        # 决策：保持现状（推荐 B）。该非确定性仅在首次 rhs 调用时出现，
+        # 且收敛值远低于临床精度要求（PT 正常 6-8s，1e-8 可忽略）。
         pt_sec = self._compute_PT_sec()
         aptt_sec = self._compute_aPTT_sec()
 

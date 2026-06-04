@@ -132,29 +132,23 @@ class LungModule:
         VCO2 = max(0.0, VCO2)
         self.CO2_production = VCO2
 
-        # ── 5. 动脉血气（代数） ──────────────────────────────────────────────
+        # ── 5. 动脉血气（代数）─────────────────────────────────────────────
         # A-a 梯度上限提到 60 mmHg 以表达 ARDS 级低氧（McCaffree 1978）
+        # NOTE(C5): 不再直接写 self.blood.*，改为返回值由调用方写入
         aa_gradient = 10.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 50.0
         a_PO2 = max(40.0, min(110.0, alveolar_PO2 - aa_gradient))
         a_PCO2 = max(15.0, min(80.0, alveolar_PCO2))
-        self.blood.arterial_PO2_mmHg = a_PO2
-        self.blood.arterial_PCO2_mmHg = a_PCO2
-
-        # ── 6. 血氧饱和度（代数） ───────────────────────────────────────────
-        self.blood.arterial_saturation = self._oxygen_saturation_curve(a_PO2)
-
-        # ── 7. pH（代数） ─────────────────────────────────────────────────────
-        # 优先用 blood.HCO3（疾病可设置），否则用常数
+        a_saturation = self._oxygen_saturation_curve(a_PO2)
         HCO3 = getattr(self.blood, 'HCO3', HCO3_EXTRACELLULAR_MEQ_L)
-        if HCO3 < 1.0:  # 防止除零/异常值
+        if HCO3 < 1.0:
             HCO3 = HCO3_EXTRACELLULAR_MEQ_L
         pH = 6.1 + math.log10(HCO3 / (0.03 * a_PCO2)) if a_PCO2 > 0 else 7.4
-        self.blood.arterial_pH = max(7.0, min(7.8, pH))
+        a_pH = max(7.0, min(7.8, pH))
         # 文献：Henderson-Hasselbalp 方程，pKa=6.1, CO2 溶解系数 0.03
         # 本地文献：Batzel 2009 心血管调节系统识别
 
         # ── 8. VdP 振荡器推进（获取目标 RR/TV） ──────────────────────────────
-        self._vdp.update(pco2=a_PCO2, po2=a_PO2, ph=self.blood.arterial_pH)
+        self._vdp.update(pco2=a_PCO2, po2=a_PO2, ph=a_pH)
         target_rr = self._vdp.respiratory_rate
         target_tv_factor = 1.0 + 0.7 * max(0.0, (self._vdp.amplitude - 0.8) / 1.2) if self._vdp.amplitude > 0.8 else 1.0
         target_tv = self.base_tidal_volume * target_tv_factor
@@ -180,7 +174,8 @@ class LungModule:
         outputs = {
             "arterial_PO2_mmHg": a_PO2,
             "arterial_PCO2_mmHg": a_PCO2,
-            "arterial_saturation": self.blood.arterial_saturation,
+            "arterial_saturation": a_saturation,
+            "arterial_pH": a_pH,
             "minute_ventilation": minute_ventilation,
             "O2_consumption_mL_min": VO2,
             "CO2_production_mL_min": VCO2,

@@ -25,7 +25,7 @@ from typing import Any, Callable
 
 from . import DiseaseModule, register_disease
 from ..config_validation import validate_ode_diseases, ValidationError
-from ..simulation import FactorCommand
+from ..common_types import FactorCommand
 from ..logger_config import get_logger
 
 logger = get_logger(__name__)

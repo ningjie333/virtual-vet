@@ -12,16 +12,7 @@ FactorCommand 目标: blood.plasma_volume_mL, blood.platelet_K_uL,
 Step: 4.75 (endocrine之后, neuro之前)
 """
 
-from dataclasses import dataclass
-from typing import Literal
-
-
-@dataclass(frozen=True)
-class FactorCommand:
-    """统一因子写入接口"""
-    target: str
-    op: Literal["multiply", "add", "set"]
-    value: float
+from src.common_types import FactorCommand
 
 
 class LymphaticModule:

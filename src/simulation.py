@@ -4,10 +4,8 @@ Simulation Engine - 多系统耦合仿真引擎
 """
 
 import logging
-from dataclasses import dataclass
-from typing import Literal
 
-import numpy as np
+from src.common_types import FactorCommand, _PARAM_PATHS
 from blood import BloodCompartment
 from heart import HeartModule
 from lung import LungModule
@@ -41,139 +39,9 @@ from parameters import (
 logger = logging.getLogger(__name__)
 
 
-# ── FactorCommand 指令结构体 ─────────────────────────────────────────────────
+# 参数路径映射表：见 src/common_types.py（统一来源）
 
-@dataclass(frozen=True)
-class FactorCommand:
-    """
-    单条因子指令：声明式地描述"对哪个参数执行什么操作"。
-
-    Attributes:
-        target: 参数路径，格式 "module.attr"（如 "heart.heart_rate"）
-        op: 操作类型 — "multiply"（乘因子）/ "add"（加偏移）/ "set"（设绝对值）
-        value: 操作数值
-    """
-    target: str
-    op: Literal["multiply", "add", "set"]
-    value: float
-
-
-# ── 参数路径映射表 ───────────────────────────────────────────────────────────
-# 所有可被子系统（疾病、药物、事件）修改的引擎参数，必须在此注册。
-# 格式: "module.attr" → (engine_module_name, attribute_name)
-
-_PARAM_PATHS: dict[str, tuple[str, str]] = {
-    # 心脏
-    "heart.heart_rate":           ("heart", "heart_rate"),
-    "heart.contractility_factor": ("heart", "contractility_factor"),
-    "heart.SVR":                  ("heart", "SVR"),
-    "heart.MAP":                  ("heart", "mean_arterial_pressure"),
-    "heart.CVP":                  ("heart", "central_venous_pressure"),
-    "heart.blood_volume":         ("heart", "circulating_volume_ml"),
-    "heart.stroke_volume":        ("heart", "stroke_volume"),
-    # 肺
-    "lung.diffusion_coefficient": ("lung", "diffusion_coefficient"),
-    "lung.PaO2":                  ("lung", "alveolar_PO2"),
-    "lung.PaCO2":                 ("lung", "alveolar_PCO2"),
-    "lung.VQ_ratio":              ("lung", "VQ_ratio"),
-    "lung.respiratory_rate":      ("lung", "respiratory_rate"),
-    # 肾脏
-    "kidney.GFR":                    ("kidney", "GFR"),
-    "kidney.urine_output":           ("kidney", "urine_output"),
-    "kidney.renal_blood_flow":       ("kidney", "renal_blood_flow"),
-    "kidney._disease_gfr_multiplier": ("kidney", "_disease_gfr_multiplier"),
-    # 血液
-    "blood.sodium_mEq_L":         ("blood", "sodium_mEq_L"),
-    "blood.potassium":            ("blood", "potassium_mEq_L"),
-    "blood.pH":                   ("blood", "arterial_pH"),
-    "blood.temperature":          ("blood", "core_temperature_C"),
-    "blood.BUN":                  ("blood", "bun_mg_dL"),
-    "blood.HCO3":                 ("fluid", "vascular_hco3_meq_l"),
-    "blood.glucose":              ("blood", "glucose_mmol_L"),
-    "blood.lactate":              ("blood", "lactate_mmol_L"),
-    "blood.creatinine":           ("blood", "creatinine_mg_dL"),
-    "blood.red_cell_volume_ml":   ("blood", "red_cell_volume_ml"),
-    "blood.bilirubin_mg_dL":      ("blood", "bilirubin_mg_dL"),
-    "blood.ketone_mmol_L":        ("blood", "ketone_mmol_L"),
-    "blood.PLT":                  ("blood", "PLT"),
-    # Liver/gut blood markers
-    "blood.ALT":                  ("blood", "ALT_U_L"),
-    "blood.AST":                  ("blood", "AST_U_L"),
-    "blood.ALP":                  ("blood", "ALP_U_L"),
-    "blood.GGT":                  ("blood", "GGT_U_L"),
-    "blood.albumin":              ("blood", "albumin_g_dL"),
-    "blood.ammonia":              ("blood", "ammonia_umol_L"),
-    "blood.bile_acids":           ("blood", "bile_acids_umol_L"),
-    "blood.amino_acids":         ("blood", "amino_acids_g_L"),
-    "blood.fatty_acids":         ("blood", "fatty_acids_mmol_L"),
-    # Gut
-    "gut.motility":               ("gut", "gut_motility"),
-    "gut.barrier_integrity":      ("gut", "barrier_integrity"),
-    "gut.microbiome_activity":    ("gut", "microbiome_activity"),
-    # Liver
-    "liver.metabolic_activity":   ("liver", "metabolic_activity"),
-    "liver.detox_capacity":       ("liver", "detox_capacity"),
-    "liver.cyp450_activity":      ("liver", "cyp450_activity"),
-    "liver.glycogen_fraction":   ("liver", "glycogen_fraction"),
-    "liver.bilirubin_conjugation": ("liver", "bilirubin_conjugation"),
-    # Endocrine
-    "endocrine.T3_factor":          ("endocrine", "T3_factor"),
-    "endocrine.T4_factor":          ("endocrine", "T4_ug_dL"),
-    "endocrine.metabolic_rate":     ("endocrine", "metabolic_rate"),
-    "endocrine.T3_ng_dL":           ("endocrine", "T3_ng_dL"),
-    "endocrine.T4_ug_dL":           ("endocrine", "T4_ug_dL"),
-    "endocrine.insulin_factor":      ("endocrine", "insulin_factor"),
-    "endocrine.glucagon_factor":    ("endocrine", "glucagon_factor"),
-    "endocrine.insulin_uU_mL":       ("endocrine", "insulin_uU_mL"),
-    "endocrine.glucagon_pg_mL":     ("endocrine", "glucagon_pg_mL"),
-    "endocrine.cortisol_factor":     ("endocrine", "cortisol_factor"),
-    "endocrine.cortisol_ug_dL":     ("endocrine", "cortisol_ug_dL"),
-    "endocrine.HPA_axis":           ("endocrine", "HPA_axis"),
-    "endocrine.epinephrine_pg_mL":  ("endocrine", "epinephrine_pg_mL"),
-    "endocrine.norepinephrine_pg_mL": ("endocrine", "norepinephrine_pg_mL"),
-    "endocrine.PTH_pg_mL":          ("endocrine", "PTH_pg_mL"),
-    "endocrine.calcium_mg_dL":       ("endocrine", "calcium_mg_dL"),
-    "endocrine.phosphate_mg_dL":    ("endocrine", "phosphate_mg_dL"),
-    "endocrine.calcium_factor":     ("endocrine", "calcium_factor"),
-    "endocrine.GH_ng_mL":           ("endocrine", "GH_ng_mL"),
-    "endocrine.IGF1_nmol_L":        ("endocrine", "IGF1_nmol_L"),
-    "endocrine.growth_factor":      ("endocrine", "growth_factor"),
-    # Neuro
-    "neuro.sympathetic_tone":        ("neuro", "sympathetic_tone"),
-    "neuro.parasympathetic_tone":     ("neuro", "parasympathetic_tone"),
-    "neuro.consciousness":           ("neuro", "consciousness"),
-    "neuro.seizure":                 ("neuro", "seizure"),
-    "neuro.pain_level":              ("neuro", "pain_level"),
-    "neuro.chemoreceptor_drive":     ("neuro", "chemoreceptor_drive"),
-    # Immune
-    "immune.cytokine_level":         ("immune", "cytokine_level"),
-    "immune.wbc_count":              ("immune", "wbc_count"),
-    "immune.crp_level":             ("immune", "crp_level"),
-    "immune.acute_phase_response":   ("immune", "acute_phase_response"),
-    "immune.immune_suppression":     ("immune", "immune_suppression"),
-    "immune.coagulation_state":      ("immune", "coagulation_state"),
-    # Coagulation
-    "coag.PT_sec":               ("blood", "PT_sec"),
-    "blood.PT_sec":             ("blood", "PT_sec"),
-    "coag.aPTT_sec":             ("blood", "aPTT_sec"),
-    "coag.fibrinogen_mg_dL":     ("blood", "fibrinogen_mg_dL"),
-    "coag.factor_VII":           ("coagulation", "factor_VII"),
-    "coag.coagulation_state":    ("coagulation", "coagulation_state"),
-    # Lymphatic
-    "lymph.splenic_reserve_mL":  ("blood", "splenic_reserve_mL"),
-    "blood.splenic_reserve_mL":  ("blood", "splenic_reserve_mL"),  # disease outputs use blood.*
-    "lymph.lymph_flow":          ("lymphatic", "lymph_flow_rate"),
-    "lymph.interstitial_fluid":  ("blood", "interstitial_fluid_mL"),
-    # Coupling engine targets (multi-organ signals)
-    "blood.arterial_PO2_mmHg":  ("blood", "arterial_PO2_mmHg"),
-    "blood.BUN":                ("blood", "bun_mg_dL"),
-    "blood.arterial_PCO2_mmHg": ("blood", "arterial_PCO2_mmHg"),
-    "lung.diffusion_coefficient": ("lung", "diffusion_coefficient"),
-    "lung.respiratory_rate":    ("lung", "respiratory_rate"),
-}
-
-
-# ── CONNECTIONS 表 — 统一 ODE 系统的模块间数据路由 ──────────────────────────
+# ── CONNECTIONS 表 ── 统一 ODE 系统的模块间数据路由 ──────────────────────────
 # 格式: { (from_module, from_var): [(to_module, to_var), ...], ... }
 # 用于 _unified_rhs 中，将上一时间步的 outputs 路由为当前时间步的 inputs
 # 采用半隐式耦合：模块在 rhs(t,y) 调用时使用上一 rhs 调用的 outputs 作为输入
@@ -553,6 +421,13 @@ class VirtualCreature:
             logger.warning("apply_factor: unknown op '%s'", cmd.op)
             return
 
+        # C7: 特殊保护 — heart.blood_volume 不能为负
+        if cmd.target == "heart.blood_volume":
+            if cmd.op == "add":
+                new_value = max(0.0, new_value)
+            elif cmd.op == "set":
+                new_value = max(0.0, new_value)
+
         setattr(module, attr_name, new_value)
         logger.debug(
             "apply_factor: %s %s %.4f → %.4f",
@@ -844,6 +719,8 @@ class VirtualCreature:
         _orig_PaO2 = lung_state["arterial_PO2"]
 
         # 健康因子永久降低器官输出（不可逆）
+        # NOTE(C6): 一次性应用（不是乘法链）。organ_health.factor 由 track() 根据
+        # 当前 stress 计算，每 step 独立。不会产生 base×0.95×0.90 的累积效应。
         if self.organ_health.heart_factor < 1.0:
             heart_state["cardiac_output_ml_min"] *= self.organ_health.heart_factor
             heart_state["MAP_mmHg"] *= self.organ_health.heart_factor
@@ -1046,6 +923,38 @@ class VirtualCreature:
         # 5. 解包结果到模块属性
         self._unpack_unified_state(sol.y[:, -1])
 
+        # 5a. 应用 lung/kidney derivatives() 的 blood 输出（纯函数契约 C5）
+        # lung.derivatives() 不再直接写 blood，现在由调用方写入
+        lung_out = self.lung.derivatives(dt=dt, co_input=self.heart.cardiac_output)[1]
+        self.blood.arterial_PO2_mmHg = lung_out.get("arterial_PO2_mmHg", self.blood.arterial_PO2_mmHg)
+        self.blood.arterial_PCO2_mmHg = lung_out.get("arterial_PCO2_mmHg", self.blood.arterial_PCO2_mmHg)
+        self.blood.arterial_saturation = lung_out.get("arterial_saturation", self.blood.arterial_saturation)
+        self.blood.arterial_pH = lung_out.get("arterial_pH", self.blood.arterial_pH)
+        # kidney 同理
+        kidney_out = self.kidney.derivatives(
+            dt=dt,
+            map_input=self.heart.mean_arterial_pressure,
+            cvp_input=self.heart.central_venous_pressure,
+            co_input=self.heart.cardiac_output,
+        )[1]
+        self.blood.bun_mg_dL = kidney_out.get("bun_mg_dL", self.blood.bun_mg_dL)
+        self.blood.creatinine_mg_dL = kidney_out.get("creatinine_mg_dL", self.blood.creatinine_mg_dL)
+
+        # 5b. Step 7.5: 尿量导致的循环血量损失（Euler 路径 Step 7.5 等价）
+        bv_loss = self.kidney.blood_volume_loss_rate * dt / 60.0  # mL/min × dt(s) / 60
+        self.heart.circulating_volume_ml = max(0.0, self.heart.circulating_volume_ml - bv_loss)
+
+        # 5c. Step 7.6: 三室体液交换 + HH pH（Euler 路径 Step 7.6 等价）
+        # fluid.compute() 更新 V_vascular/V_isf/V_icf，然后 HH 方程更新动脉血 pH
+        fluid_state = self.fluid.compute(dt)
+        self.blood.arterial_pH = self._hh._compute_ph()
+        # 同步 blood.total_volume_ml = heart.circulating_volume_ml
+        self.blood.total_volume_ml = self.heart.circulating_volume_ml
+
+        # 5d. Step 7.7: 血容量同步（Euler 路径 Step 7.7 等价）
+        # HeartModule.circulating_volume_ml 是循环血量的权威来源，fluid 和 blood 都要同步
+        # 这一步已经在 5c 中通过 blood.total_volume_ml = heart.circulating_volume_ml 做了
+
         # 6. 耦合规则（同 Euler 路径）
         ctx = self._organ_contexts
         t_now = self.current_time_s + dt
@@ -1090,6 +999,41 @@ class VirtualCreature:
             cmds = self.disease.compute(dt, engine_state)
             for cmd in cmds:
                 self.apply_factor(cmd)
+
+        # 6b. 器官健康追踪（与 Euler 路径 Step 4.9 等价）
+        # NOTE: 使用 Radau 解包后的当前状态（尚未应用 organ_health 因子）作为 pre-state
+        # 这样 track() 能用未退化的值判断 stress，避免因子×MAP 反馈振荡
+        heart_state = {
+            "heart_rate_bpm": self.heart.heart_rate,
+            "MAP_mmHg": self.heart.mean_arterial_pressure,
+            "cardiac_output_ml_min": self.heart.cardiac_output,
+            "contractility": self.heart.contractility_factor,
+        }
+        lung_state = {
+            "arterial_PO2": self.blood.arterial_PO2_mmHg,
+            "arterial_PCO2": self.blood.arterial_PCO2_mmHg,
+            "respiratory_rate": self.lung.respiratory_rate,
+        }
+        kidney_state = {
+            "GFR_ml_min": self.kidney.GFR,
+            "urine_output_mL_min": self.kidney.urine_output,
+        }
+        liver_state = {
+            "metabolic_activity": self.liver.metabolic_activity,
+            "detox_capacity": self.liver.detox_capacity,
+        }
+        self.organ_health.track(dt, heart_state, lung_state, kidney_state, liver_state)
+
+        # 6c. 应用 organ_health 因子（一次性应用，不是乘法链）
+        # NOTE(C6): 原问题——在已含旧因子的 dict 上再次相乘，导致累积乘法
+        # 修复：直接用 heart_factor 作为唯一乘子，不再重复应用
+        if self.organ_health.heart_factor < 1.0:
+            self.heart.mean_arterial_pressure *= self.organ_health.heart_factor
+            self.heart.cardiac_output *= self.organ_health.heart_factor
+        if self.organ_health.lung_factor < 1.0:
+            self.lung.diffusion_coefficient *= self.organ_health.lung_factor
+        if self.organ_health.kidney_factor < 1.0:
+            self.kidney.GFR *= self.organ_health.kidney_factor
 
         # 8. 记录历史（同 Euler 路径最后部分）
         self._record_history(dt)
@@ -1399,9 +1343,11 @@ class VirtualCreature:
         # 所有模块的 derivatives（用 time-constant 参数 dt，别用 _USE_DT）
         # dydt 收集到 module_dydt（用于打包 return dydt_vec）
         # outputs 收集到 all_outputs（用于 CONNECTIONS 路由和供其他模块调用）
-        # 注：这里 dt 只用于低通滤波时间常数的计算（如 dHR/dt 中的 alpha/dt），
-        # 不影响 dydt 的物理量纲。Radau 积分器自己管理步长，不受这里 dt 值影响。
-        _USE_DT = 0.01  # 代表性时间步长，保证 alpha/dt 不会溢出
+        # 注：这里 dt 用于低通滤波时间常数的计算。
+        # H6 fix: 使用 self.dt（物理步长）代替硬编码的 0.01，
+        # 使 chemoreceptor 低通滤波（τ=30s）的时间常数与实际步长一致。
+        # Radau 积分器自己管理步长，不受这里 dt 值影响。
+        _USE_DT = self.dt
         module_dydt: dict[str, dict] = {}
 
         # 心脏 — 传入当前失血率（用于 blood_volume dydt）

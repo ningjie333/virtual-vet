@@ -11,16 +11,7 @@ FactorCommand 目标: heart.heart_rate, heart.SVR, lung.respiratory_rate, gut.gu
 Step: 4.8 (endocrine之后, organ_health之前)
 """
 
-from dataclasses import dataclass
-from typing import Literal
-
-
-@dataclass(frozen=True)
-class FactorCommand:
-    """统一因子写入接口"""
-    target: str
-    op: Literal["multiply", "add", "set"]
-    value: float
+from src.common_types import FactorCommand
 
 
 class NeuroModule:

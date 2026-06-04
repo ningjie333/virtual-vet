@@ -33,7 +33,8 @@ from lifecycle_profiles import (
 )
 
 if TYPE_CHECKING:
-    from simulation import FactorCommand, VirtualCreature
+    from src.common_types import FactorCommand
+    from src.simulation import VirtualCreature
 
 logger = logging.getLogger(__name__)
 
@@ -342,7 +343,7 @@ class LifecycleEngine:
 
     def apply_age_factors(self, creature) -> None:
         """新接口：应用生命阶段因子到引擎（在 tox/pharma/coupling 之前调用）。"""
-        from simulation import _PARAM_PATHS, FactorCommand
+        from src.common_types import _PARAM_PATHS, FactorCommand
         if self.mode == LifecycleMode.BYPASS:
             for organ, params in self._ORGAN_PARAMS.items():
                 mult = self.organ_multiplier(organ)

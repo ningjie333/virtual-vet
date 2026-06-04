@@ -17,7 +17,7 @@ Disease Module Framework — 疾病扰动模块框架
 import logging
 from abc import ABC, abstractmethod
 
-from ..simulation import FactorCommand
+from ..common_types import FactorCommand
 from ..logger_config import get_logger
 
 logger = get_logger(__name__)

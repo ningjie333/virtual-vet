@@ -18,7 +18,8 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.simulation import VirtualCreature, FactorCommand
+    from src.simulation import VirtualCreature
+    from src.common_types import FactorCommand
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ class Pimobendan(Drug):
 
     def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
         """Pimobendan: multiply contractility_factor by (1 + pd)."""
-        from src.simulation import FactorCommand
+        from src.common_types import FactorCommand
         if pd_effect <= 0.0:
             return []
         return [
@@ -148,7 +149,7 @@ class Furosemide(Drug):
 
     def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
         """Furosemide: multiply urine_output by (1 + pd)."""
-        from src.simulation import FactorCommand
+        from src.common_types import FactorCommand
         if pd_effect <= 0.0:
             return []
         return [
@@ -174,7 +175,7 @@ class Epinephrine(Drug):
 
     def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
         """Epinephrine: multiply SVR and heart_rate."""
-        from src.simulation import FactorCommand
+        from src.common_types import FactorCommand
         if pd_effect <= 0.0:
             return []
         return [
@@ -208,7 +209,7 @@ class FluidBolus(Drug):
 
     def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
         """Fluid bolus: add volume to blood_volume (set concentration as add amount)."""
-        from src.simulation import FactorCommand
+        from src.common_types import FactorCommand
         if self.concentration > 0:
             return [
                 FactorCommand(target="heart.blood_volume", op="add",
