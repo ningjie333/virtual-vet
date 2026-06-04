@@ -110,13 +110,14 @@ def run_pure_euler(vc, y0, dt, t_end=T_END, save_dt=SAVE_DT):
             })
     return records
 
-def run_sequential_euler(vc, t_end=T_END, save_dt=SAVE_DT):
-    """Sequential Euler via vc.step() — internal dt=0.1 (BUG: external dt param ignored)"""
-    save_interval = max(1, int(save_dt / 0.1))  # step() uses dt=0.1 internally
+def run_sequential_euler(vc, t_end=T_END, save_dt=SAVE_DT, dt: float = None):
+    """Sequential Euler via vc.step(dt) — respects external dt parameter."""
+    step_dt = dt if dt is not None else 0.1
+    save_interval = max(1, int(save_dt / step_dt))
     records = []
     n_steps = 0
     while vc.current_time_s < t_end:
-        vc.step()  # dt param IGNORED — internal self.dt=0.1 always used
+        vc.step(dt=step_dt)
         n_steps += 1
         if n_steps % save_interval == 0:
             records.append({
@@ -198,22 +199,34 @@ def main():
         })
         print(f"  dt={dt:.4f}: RMSE={rmse:.4f}, MAP=[{map_vals.min():.1f},{map_vals.max():.1f}], {elapsed:.1f}s")
 
-    # 3. Sequential Euler (dt=0.1 internal, one point)
-    print("\n[3/4] Sequential Euler (dt=0.1 internal)...")
+    # 3. Sequential Euler (one point per dt grid, matching Pure Euler's dt)
+    print("\n[3/4] Sequential Euler (dt-matching)...")
     vc_seq = _make_vc()
     _blood_loss(vc_seq)
     y0_seq = _pack_state(vc_seq)
     _ = vc_seq._unified_rhs(0.0, y0_seq)
-    t0 = time_module.time()
-    seq_ts = run_sequential_euler(vc_seq, T_END, SAVE_DT)
-    elapsed = time_module.time() - t0
-    map_seq = np.array([p["MAP"] for p in seq_ts])
-    t_seq = np.array([p["t"] for p in seq_ts])
-    from scipy.interpolate import interp1d
-    f_seq = interp1d(t_seq, map_seq, kind="linear", fill_value="extrapolate")
-    n_common = min(len(t_bdf), len(t_seq))
-    seq_rmse = compute_rmse(map_bdf[:n_common], f_seq(t_bdf[:n_common]))
-    print(f"  Sequential RMSE={seq_rmse:.4f}, MAP=[{map_seq.min():.1f},{map_seq.max():.1f}], {elapsed:.1f}s")
+    seq_results = []
+    for dt in DT_EULER_GRID:
+        vc = _make_vc()
+        _blood_loss(vc)
+        y0 = _pack_state(vc)
+        _ = vc._unified_rhs(0.0, y0)
+        t0 = time_module.time()
+        ts = run_sequential_euler(vc, T_END, SAVE_DT, dt=dt)
+        elapsed = time_module.time() - t0
+        map_seq = np.array([p["MAP"] for p in ts])
+        t_seq = np.array([p["t"] for p in ts])
+        from scipy.interpolate import interp1d
+        f_seq = interp1d(t_seq, map_seq, kind="linear", fill_value="extrapolate")
+        n_common = min(len(t_bdf), len(t_seq))
+        seq_rmse = compute_rmse(map_bdf[:n_common], f_seq(t_bdf[:n_common]))
+        seq_results.append({
+            "dt": dt,
+            "rmse_MAP": seq_rmse,
+            "time_s": elapsed,
+            "MAP_range": [float(map_seq.min()), float(map_seq.max())],
+        })
+        print(f"  dt={dt:.4f}: RMSE={seq_rmse:.4f}, MAP=[{map_seq.min():.1f},{map_seq.max():.1f}], {elapsed:.1f}s")
 
     # 4. Radau rtol=1e-4 (secondary comparison)
     print("\n[4/4] Radau rtol=1e-4...")
@@ -241,11 +254,8 @@ def main():
         },
         "pure_euler": pure_results,
         "sequential_euler": {
-            "dt_note": "vc.step() ignores external dt param — internal dt=0.1 always used",
-            "rmse_MAP": seq_rmse,
-            "time_s": elapsed,
-            "MAP_range": [float(map_seq.min()), float(map_seq.max())],
-            "time_series": seq_ts,
+            "dt_note": "vc.step(dt) now respects external dt param — fixed",
+            "results_per_dt": seq_results,
         },
         "radau_rtolve4": {
             "rmse_MAP": rad_rmse,
@@ -271,7 +281,9 @@ def main():
         else:
             print(f"{dt:>10.4f}  {rmse:>8.4f}  {'--':>6}")
         prev_rmse = rmse
-    print(f"\nSequential Euler (dt=0.1 internal): RMSE={seq_rmse:.4f}")
+    print(f"\nSequential Euler (dt-respecting):")
+    for r in seq_results:
+        print(f"  dt={r['dt']:.4f}: RMSE={r['rmse_MAP']:.4f}")
     print(f"Radau rtol=1e-4: RMSE={rad_rmse:.4f}")
 
 if __name__ == "__main__":
