@@ -5,6 +5,8 @@ Simulation Engine - 多系统耦合仿真引擎
 
 import logging
 
+import numpy as np
+
 from src.common_types import FactorCommand, _PARAM_PATHS
 from blood import BloodCompartment
 from heart import HeartModule

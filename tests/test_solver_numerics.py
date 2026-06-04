@@ -12,6 +12,7 @@ Ref: docs/audit_report_2026-06-04.md C2 findings (Marchuk 1990 operator splittin
 import sys
 sys.path.insert(0, "src")
 
+import numpy as np
 import pytest
 import logging
 from unittest.mock import patch
