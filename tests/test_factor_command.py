@@ -17,7 +17,8 @@ import logging
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 
 import pytest
-from src.simulation import VirtualCreature, FactorCommand, _PARAM_PATHS
+from src.common_types import _PARAM_PATHS
+from src.simulation import VirtualCreature, FactorCommand
 
 
 # ---------------------------------------------------------------------------

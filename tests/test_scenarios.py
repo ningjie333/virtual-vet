@@ -349,6 +349,7 @@ class TestDeterminePhase:
         phase = determine_phase(e)
         assert phase in ("critical", "moribund")
 
+    @pytest.mark.slower
     def test_determine_phase_moribund(self):
         """Creature near death should return 'moribund'."""
         from src.simulation import VirtualCreature

@@ -17,6 +17,7 @@ def disease_case(request):
     return request.param
 
 
+@pytest.mark.slower
 def test_no_intervention_survival(disease_case):
     """Run 60 min simulation without any intervention. Does the creature die?"""
     title = disease_case["title"]

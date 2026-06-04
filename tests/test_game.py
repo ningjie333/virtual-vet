@@ -48,9 +48,13 @@ def pneumonia_creature():
     e.simulate(20.0)
     return e
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def arf_creature():
-    """20kg dog with severe ARF simulated 60 min."""
+    """20kg dog with severe ARF simulated 60 min.
+
+    session-scoped: computed once, shared across all tests in the session.
+    Tests must not mutate the creature (treat as read-only).
+    """
     from src.simulation import VirtualCreature
     from src.diseases import create_disease
     e = VirtualCreature(body_weight_kg=20.0)
@@ -65,159 +69,56 @@ def arf_creature():
 # =============================================================================
 
 class TestFlag:
-    """Classify raw values into low / normal / high / critical."""
+    """Classify raw values into low / normal / high / critical — parametrized from vitals_ranges.json."""
 
-    # Normal
-    def test_normal_ph(self):
+    @pytest.mark.parametrize("value,param,expected", [
+        # pH
+        (7.40, "pH", "normal"),
+        (7.35, "pH", "normal"),
+        (7.34, "pH", "low"),
+        (7.45, "pH", "normal"),
+        (7.46, "pH", "high"),
+        (7.0,  "pH", "critical"),
+        (6.9,  "pH", "critical"),
+        # HR
+        (90,   "HR", "normal"),
+        (60,   "HR", "normal"),
+        (120,  "HR", "normal"),
+        (121,  "HR", "high"),
+        (185,  "HR", "critical"),
+        # RR
+        (20,   "RR", "normal"),
+        # MAP
+        (100,  "MAP", "normal"),
+        (45,   "MAP", "critical"),
+        # Electrolytes
+        (6.0,  "K",   "high"),
+        (3.0,  "K",   "low"),
+        (4.5,  "K",   "normal"),
+        (160,  "Na",  "high"),
+        (135,  "Na",  "low"),
+        # Blood gas
+        (70,   "PaO2", "low"),
+        (90,   "PaO2", "normal"),
+        (50,   "PaCO2", "high"),
+        (92,   "SpO2", "low"),
+        (80,   "SpO2", "critical"),
+        (85,   "SpO2", "low"),
+        (84,   "SpO2", "critical"),
+        (86,   "SpO2", "low"),
+        # Renal
+        (50,   "BUN", "high"),
+        (40,   "GFR", "low"),
+        # Temperature
+        (39.5, "Temp", "high"),
+        (41.5, "Temp", "critical"),
+        # Lactate
+        (3.0,  "Lactate", "high"),
+        (5.5,  "Lactate", "critical"),
+    ])
+    def test_flag(self, value, param, expected):
         from src.report_engine import flag as _flag
-        assert _flag(7.40, "pH") == "normal"
-
-    def test_normal_hr(self):
-        from src.report_engine import flag as _flag
-        assert _flag(90, "HR") == "normal"
-
-    def test_normal_rr(self):
-        from src.report_engine import flag as _flag
-        assert _flag(20, "RR") == "normal"
-
-    def test_normal_map(self):
-        from src.report_engine import flag as _flag
-        assert _flag(100, "MAP") == "normal"
-
-    # Acidosis / alkalosis
-    def test_acidosis(self):
-        from src.report_engine import flag as _flag
-        assert _flag(7.2, "pH") == "low"
-
-    def test_alkalosis(self):
-        from src.report_engine import flag as _flag
-        assert _flag(7.5, "pH") == "high"
-
-    def test_critical_acidosis_at_threshold(self):
-        from src.report_engine import flag as _flag
-        assert _flag(7.0, "pH") == "critical"
-
-    def test_critical_acidosis_below(self):
-        from src.report_engine import flag as _flag
-        assert _flag(6.9, "pH") == "critical"
-
-    # Electrolytes
-    def test_k_high(self):
-        from src.report_engine import flag as _flag
-        assert _flag(6.0, "K") == "high"
-
-    def test_k_low(self):
-        from src.report_engine import flag as _flag
-        assert _flag(3.0, "K") == "low"
-
-    def test_k_normal(self):
-        from src.report_engine import flag as _flag
-        assert _flag(4.5, "K") == "normal"
-
-    def test_na_high(self):
-        from src.report_engine import flag as _flag
-        assert _flag(160, "Na") == "high"
-
-    def test_na_low(self):
-        from src.report_engine import flag as _flag
-        assert _flag(135, "Na") == "low"
-
-    # Blood gas
-    def test_pao2_low(self):
-        from src.report_engine import flag as _flag
-        assert _flag(70, "PaO2") == "low"
-
-    def test_pao2_normal(self):
-        from src.report_engine import flag as _flag
-        assert _flag(90, "PaO2") == "normal"
-
-    def test_paco2_high(self):
-        from src.report_engine import flag as _flag
-        assert _flag(50, "PaCO2") == "high"
-
-    def test_spo2_low(self):
-        from src.report_engine import flag as _flag
-        assert _flag(92, "SpO2") == "low"
-
-    def test_spo2_critical(self):
-        from src.report_engine import flag as _flag
-        assert _flag(80, "SpO2") == "critical"
-
-    # Renal
-    def test_bun_high(self):
-        from src.report_engine import flag as _flag
-        assert _flag(50, "BUN") == "high"
-
-    def test_gfr_low(self):
-        from src.report_engine import flag as _flag
-        assert _flag(40, "GFR") == "low"
-
-    # Borderline
-    def test_ph_at_lower_border(self):
-        from src.report_engine import flag as _flag
-        assert _flag(7.35, "pH") == "normal"
-
-    def test_ph_just_below_normal(self):
-        from src.report_engine import flag as _flag
-        assert _flag(7.34, "pH") == "low"
-
-    def test_ph_at_upper_border(self):
-        from src.report_engine import flag as _flag
-        assert _flag(7.45, "pH") == "normal"
-
-    def test_ph_just_above_normal(self):
-        from src.report_engine import flag as _flag
-        assert _flag(7.46, "pH") == "high"
-
-    def test_hr_at_lower_border(self):
-        from src.report_engine import flag as _flag
-        assert _flag(60, "HR") == "normal"
-
-    def test_hr_at_upper_border(self):
-        from src.report_engine import flag as _flag
-        assert _flag(120, "HR") == "normal"
-
-    def test_hr_just_above_normal(self):
-        from src.report_engine import flag as _flag
-        assert _flag(121, "HR") == "high"
-
-    def test_hr_critical_high(self):
-        from src.report_engine import flag as _flag
-        assert _flag(185, "HR") == "critical"
-
-    def test_temp_high(self):
-        from src.report_engine import flag as _flag
-        assert _flag(39.5, "Temp") == "high"
-
-    def test_temp_critical(self):
-        from src.report_engine import flag as _flag
-        assert _flag(41.5, "Temp") == "critical"
-
-    def test_lactate_high(self):
-        from src.report_engine import flag as _flag
-        assert _flag(3.0, "Lactate") == "high"
-
-    def test_lactate_critical(self):
-        from src.report_engine import flag as _flag
-        assert _flag(5.5, "Lactate") == "critical"
-
-    # SpO2 critical is asymmetric: only low side dangerous
-    def test_spo2_at_critical_threshold_boundary(self):
-        """SpO2 critical threshold is (85, 100); 85 is NOT < 85, so it's 'low'."""
-        from src.report_engine import flag as _flag
-        assert _flag(85, "SpO2") == "low"
-
-    def test_spo2_below_critical_threshold(self):
-        from src.report_engine import flag as _flag
-        assert _flag(84, "SpO2") == "critical"
-
-    def test_spo2_just_above_critical(self):
-        from src.report_engine import flag as _flag
-        assert _flag(86, "SpO2") == "low"
-
-    def test_map_critical_low(self):
-        from src.report_engine import flag as _flag
-        assert _flag(45, "MAP") == "critical"
+        assert _flag(value, param) == expected, f"_flag({value}, {param}) → {_flag(value, param)}, expected {expected}"
 
 
 class TestResultEntry:

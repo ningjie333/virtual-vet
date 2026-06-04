@@ -251,6 +251,7 @@ class TestAcuteRenalFailure:
 class TestDiseaseIntegrationWithSimulation:
     """Integration tests: diseases modify VirtualCreature physiology."""
 
+    @pytest.mark.slower
     def test_pneumonia_affects_simulation(self):
         """Attach pneumonia; lung.diffusion_coefficient should decrease vs baseline.
 
@@ -280,6 +281,7 @@ class TestDiseaseIntegrationWithSimulation:
             f">= baseline={baseline_dl:.4f}"
         )
 
+    @pytest.mark.slower
     def test_arf_affects_simulation(self):
         """Attach ARF; GFR should decrease and BUN should increase vs baseline."""
         # Baseline: no disease
@@ -301,6 +303,7 @@ class TestDiseaseIntegrationWithSimulation:
         assert disease_gfr < baseline_gfr
         assert disease_bun > baseline_bun
 
+    @pytest.mark.slower
     def test_disease_event_activation(self):
         """Use schedule_event to activate disease mid-simulation.
 

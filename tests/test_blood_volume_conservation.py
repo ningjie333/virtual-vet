@@ -69,6 +69,7 @@ class TestBloodVolumeConservation:
 
         assert abs(vc.blood.total_volume_ml - vc.heart.circulating_volume_ml) < 0.001
 
+    @pytest.mark.slower
     def test_volumes_equal_over_10_minutes(self):
         """10 minutes (6000 steps) — no divergence."""
         vc = VirtualCreature(body_weight_kg=20.0)
@@ -92,6 +93,7 @@ class TestBloodVolumeConservation:
 
         assert abs(vc.blood.total_volume_ml - vc.heart.circulating_volume_ml) < 0.001
 
+    @pytest.mark.slower
     def test_blood_total_volume_not_static(self):
         """blood.total_volume_ml actually changes over time (not stuck at init value)."""
         vc = VirtualCreature(body_weight_kg=20.0)

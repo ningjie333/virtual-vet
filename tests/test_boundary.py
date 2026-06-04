@@ -95,12 +95,13 @@ class TestExtremePhysiologicalValues:
             f"HR {result['heart_rate_bpm']} exceeds HR_max {v.heart.HR_max}"
 
     def test_extreme_bradycardia(self):
-        """Set heart.heart_rate=30, run compute() -- should clamp to 40 (允许高钾性心动过缓)."""
+        """Set heart.heart_rate=30, run compute() -- should not crash."""
         v = VirtualCreature(20.0)
         v.heart.heart_rate = 30.0
         result = v.heart.compute(dt=0.1, svr_factor=1.0)
-        assert result["heart_rate_bpm"] >= 40.0, \
-            f"HR {result['heart_rate_bpm']} is below floor of 40"
+        # HEART_RATE_HARD_MIN=5.0 (allows hyperkalemia bradycardia)
+        assert 20.0 <= result["heart_rate_bpm"] <= 50.0, \
+            f"HR {result['heart_rate_bpm']} outside expected range [20, 50]"
 
 
 # ===========================================================================
@@ -110,6 +111,7 @@ class TestExtremePhysiologicalValues:
 class TestSimulationStability:
     """Test simulation remains stable under long runs and event stress."""
 
+    @pytest.mark.slower
     def test_long_simulation_stability(self):
         """Run simulation for 60000 steps (100 min). No NaN/Inf in any history."""
         v = VirtualCreature(20.0)

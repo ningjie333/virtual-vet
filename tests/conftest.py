@@ -12,3 +12,4 @@ sys.path.insert(0, os.path.join(_project_root, "src"))
 def pytest_configure(config):
     """Register custom marks."""
     config.addinivalue_line("markers", "slower: tests that take noticeably longer to run")
+    config.addinivalue_line("markers", "slow: long-running tests (>2s); excluded from --quick gate")

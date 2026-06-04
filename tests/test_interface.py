@@ -36,14 +36,13 @@ DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 #  SECTION 1: Fixtures
 # ─────────────────────────────────────────────────────────────
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def app():
-    """Create Flask app with test config and clear sessions."""
+    """Create Flask app with test config. Session-scoped: initialized once."""
     import gui_app as gui
     gui.app.config["TESTING"] = True
     gui._game_sessions.clear()
 
-    # Use a separate test database to avoid locking issues
     from src.db.conn import connect
     from src.db.schema import init_db
 
@@ -65,9 +64,9 @@ def app():
     return gui.app
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def client(app):
-    """Flask test client."""
+    """Flask test client. Session-scoped: one client for all tests."""
     return app.test_client()
 
 
@@ -925,10 +924,8 @@ class TestCLI:
         assert "MAP_mmHg" in data["cocaine_metrics"]
         assert "contractility_factor" in data["cocaine_metrics"]
 
-    def test_cli_import_bug_TODO(self):
-        """Document the cli_daemon.py import bug that prevents direct import."""
-        pytest.skip(
-            "cli_daemon.py has import bug: uses 'TOTAL_BLOOD_VOLUME_ML' "
-            "from src.parameters (doesn't exist; actual name is "
-            "'total_blood_volume_ml'). Fix needed in cli_daemon.py line 23-27."
-        )
+    def test_cli_import_works(self):
+        """cli_daemon.py 应当能直接 import（之前有 TOTAL_BLOOD VOLUME_ML 拼写错误，已修复）。"""
+        import cli_daemon  # noqa: F401
+        assert True
+
