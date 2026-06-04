@@ -50,7 +50,7 @@ if [ "$GATE_SKIP" = "1" ]; then
 fi
 
 cd "$(git rev-parse --show-toplevel)"
-python tools/dev/gate_check.py --quick
+python tools/dev/gate_check.py --modules
 exit $?
 """
     hook_path.write_text(hook_content, encoding="utf-8")
@@ -60,6 +60,7 @@ exit $?
     print(f"[OK] pre-commit hook 已安装到 {hook_path}")
     print("  提示: GATE_SKIP=1 git commit -m '...' 可跳过检查")
     print("        git commit --no-verify -m '...' 强制跳过")
+    print("  默认模块化（--modules），跑全量请用 python tools/dev/gate_check.py --full")
 
 
 def run_fix() -> int:
@@ -126,7 +127,7 @@ def run_verify_refs() -> int:
     print("Virtual Vet Gate Check — 文献溯源验证")
     print("=" * 50)
 
-    from src.simulation import _PARAM_PATHS
+    from src.common_types import _PARAM_PATHS
     from src.parameter_refs import all_param_refs
     from src.organs.coupling import CouplingEngine
 
@@ -206,6 +207,123 @@ def run_quick() -> int:
     return max_code
 
 
+def changed_modules() -> list[Path]:
+    """
+    Find test files for modified source files via git diff.
+
+    Maps src/ modifications to corresponding tests/test_*.py files using:
+      1. Same filename: src/heart.py → tests/test_heart.py
+      2. Cross-module tests (test_simulation.py, test_solver_numerics.py,
+         test_cross_module_coupling.py, test_gate_contract.py) always included
+         when src/ changes touch any of their dependents
+    """
+    # Get list of changed files in src/ and tests/ from staged + unstaged
+    result = subprocess.run(
+        ["git", "diff", "--name-only", "HEAD"],
+        capture_output=True, text=True, cwd=PROJECT_ROOT,
+    )
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        capture_output=True, text=True, cwd=PROJECT_ROOT,
+    )
+    changed = (result.stdout + staged.stdout).splitlines()
+    changed = [c for c in changed if c.strip()]
+
+    if not changed:
+        # No changes detected — fall back to nothing
+        return []
+
+    tests_dir = PROJECT_ROOT / "tests"
+    test_files: set[Path] = set()
+
+    # Always include meta-tests (they guard test-suite health)
+    for meta in ["test_gate_contract.py", "test_solver_numerics.py",
+                 "test_cross_module_coupling.py"]:
+        p = tests_dir / meta
+        if p.exists():
+            test_files.add(p)
+
+    # Map src/<module>.py → tests/test_<module>.py
+    for path in changed:
+        p = Path(path)
+        if p.suffix != ".py":
+            continue
+        stem = p.stem
+        # src/heart.py → tests/test_heart.py
+        if p.parent.name == "src" or p.parent == Path("src"):
+            candidate = tests_dir / f"test_{stem}.py"
+            if candidate.exists():
+                test_files.add(candidate)
+        # tests/test_foo.py changes → include self
+        elif p.parent.name == "tests":
+            test_files.add(p)
+
+    # If any src/common_types.py or src/simulation.py changes, include broad tests
+    broad_change = any(
+        c.endswith(("common_types.py", "simulation.py", "parameters.py"))
+        for c in changed
+    )
+    if broad_change:
+        for meta in ["test_simulation.py", "test_solver_numerics.py",
+                     "test_gate_contract.py"]:
+            p = tests_dir / meta
+            if p.exists():
+                test_files.add(p)
+
+    return sorted(test_files)
+
+
+def run_modules() -> int:
+    """
+    Run only the test files for modules changed since HEAD.
+
+    Plus quick checks (API + data). Fast feedback loop.
+    """
+    print("=" * 50)
+    print("Virtual Vet Gate Check — 模块化检查")
+    print("=" * 50)
+
+    test_files = changed_modules()
+
+    if not test_files:
+        print("[INFO] 无 src/tests 改动，跳过模块化测试")
+        return 0
+
+    print(f"\n[模块化] 涉及测试文件 ({len(test_files)}):")
+    for tf in test_files:
+        print(f"  - {tf.relative_to(PROJECT_ROOT)}")
+
+    # 1. Run only the relevant tests
+    print(f"\n[1/2] 跑相关测试...")
+    t0 = time.time()
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-m", "not slow", "--tb=short", "-q"]
+        + [str(tf.relative_to(PROJECT_ROOT)) for tf in test_files],
+        capture_output=False,
+        cwd=PROJECT_ROOT,
+    )
+    elapsed = time.time() - t0
+    test_code = result.returncode
+
+    # 2. Quick data/API checks still run (cheap, <1s)
+    print(f"\n[2/2] 数据 + API 一致性...")
+    api_code = run_checker("API 一致性", "check_api_consistency.py")
+    data_code = run_checker("数据一致性", "check_data_consistency.py")
+
+    max_code = max(test_code, api_code, data_code)
+
+    print("=" * 50)
+    if max_code == 0:
+        print(f"[PASS] 模块化检查全部通过 ✓ ({elapsed:.1f}s)")
+    elif max_code == 1:
+        print(f"[FAIL] 测试或检查发现 CRITICAL/HIGH 问题")
+    else:
+        print(f"[WARN] 发现 MEDIUM/LOW 问题")
+    print("=" * 50)
+
+    return max_code
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Virtual Vet Gate Check — 提交前一致性检查"
@@ -213,6 +331,7 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--quick", action="store_true", help="快速模式（默认）")
     group.add_argument("--full", action="store_true", help="完整模式")
+    group.add_argument("--modules", action="store_true", help="模块化模式：只跑改动 src/ 涉及的测试")
     group.add_argument("--fix", action="store_true", help="自动修复可修复的问题")
     group.add_argument("--schema", action="store_true", help="JSON Schema 验证")
     group.add_argument("--verify-refs", action="store_true", help="验证参数文献溯源覆盖率")
@@ -234,6 +353,8 @@ def main():
         return run_schema()
     elif args.verify_refs:
         return run_verify_refs()
+    elif args.modules:
+        return run_modules()
     elif args.full:
         return run_quick()
     else:
