@@ -226,7 +226,15 @@ class KidneyModule:
         MAP_deficit = (MEAN_ARTERIAL_PRESSURE_MMHG - MAP) / MEAN_ARTERIAL_PRESSURE_MMHG
         Na_deficit = max(0.0, (145.0 - Na_conc) / 145.0)
 
-        self.renin_activity = max(0.0, 0.5 * MAP_deficit + 0.5 * Na_deficit)
+        # 肾素激活（血压低 + 钠低）— REF: Hall 2016 生理学
+        # 用 sigmoid 让低灌注时急剧激活（之前线性可能过度/不足）
+        import math
+        MAP_deficit = (MEAN_ARTERIAL_PRESSURE_MMHG - MAP) / MEAN_ARTERIAL_PRESSURE_MMHG
+        Na_deficit = max(0.0, (145.0 - Na_conc) / 145.0)
+        combined_stress = max(MAP_deficit, Na_deficit)
+        # Sigmoid: combined_stress > 0.2 → renin 急剧上升
+        sigmoid_factor = 1.0 / (1.0 + math.exp(-15.0 * (combined_stress - 0.15)))
+        self.renin_activity = max(0.0, combined_stress * sigmoid_factor + 0.3 * Na_deficit)
 
         # 血管紧张素 II（简化：与肾素成正比）
         self.angiotensin_II = self.renin_activity * 2.0

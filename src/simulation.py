@@ -989,12 +989,14 @@ class VirtualCreature:
 
         # 5e. C1 修复：补全 8 个模块的 compute()（与 Euler 路径等价）
         # 顺序参照 Euler 路径 Step 4-4.9
+        # NOTE: 先建空 dict 给 compute() 作为"上游 state"占位（与 Euler 路径等价语义）
+        empty_state: dict = {}
         try:
             self.gut.compute(dt, self.heart.cardiac_output)
         except Exception as e:
             logger.warning("gut.compute failed: %s", e)
         try:
-            self.liver.compute(dt, self.heart.cardiac_output, gut_state=None)
+            self.liver.compute(dt, gut_state=empty_state, cardiac_output=self.heart.cardiac_output)
         except Exception as e:
             logger.warning("liver.compute failed: %s", e)
         try:
@@ -1002,19 +1004,19 @@ class VirtualCreature:
         except Exception as e:
             logger.warning("endocrine.compute failed: %s", e)
         try:
-            self.lymphatic.compute(dt)
+            self.lymphatic.compute(dt, gut_state=empty_state, immune_state=empty_state)
         except Exception as e:
             logger.warning("lymphatic.compute failed: %s", e)
         try:
-            self.coagulation.compute(dt, liver_state=None, immune_state=None)
+            self.coagulation.compute(dt, liver_state=empty_state, immune_state=empty_state)
         except Exception as e:
             logger.warning("coagulation.compute failed: %s", e)
         try:
-            self.neuro.compute(dt, heart_state=None, lung_state=None)
+            self.neuro.compute(dt, heart_state=empty_state, lung_state=empty_state)
         except Exception as e:
             logger.warning("neuro.compute failed: %s", e)
         try:
-            self.immune.compute(dt, endocrine_state=None)
+            self.immune.compute(dt, endocrine_state=empty_state)
         except Exception as e:
             logger.warning("immune.compute failed: %s", e)
         # tox/pharmacology 由 schedule_event / 外部 API 触发，不强制每步调

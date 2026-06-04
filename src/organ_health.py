@@ -167,6 +167,40 @@ class OrganHealthTracker:
             or self.liver_health <= self._liver_failure_at
         )
 
+    def organ_state(self, health: float, failure_at: float) -> str:
+        """
+        C6 离散状态标签（Markov 状态机视图）— 供游戏内显示与报告生成
+
+        状态：
+          - "stable": health > 0.8 且无 stress
+          - "warning": health 0.5-0.8（黄区）
+          - "critical": health failure_at-0.5（红区）
+          - "failure": health <= failure_at（黑区）
+        """
+        if health <= failure_at:
+            return "failure"
+        if health <= (failure_at + (1.0 - failure_at) * 0.5):
+            return "critical"
+        if health <= 0.8:
+            return "warning"
+        return "stable"
+
+    @property
+    def heart_state(self) -> str:
+        return self.organ_state(self.heart_health, self._heart_failure_at)
+
+    @property
+    def lung_state(self) -> str:
+        return self.organ_state(self.lung_health, self._lung_failure_at)
+
+    @property
+    def kidney_state(self) -> str:
+        return self.organ_state(self.kidney_health, self._kidney_failure_at)
+
+    @property
+    def liver_state(self) -> str:
+        return self.organ_state(self.liver_health, self._liver_failure_at)
+
     # ========== S型加速曲线 ==========
 
     @staticmethod
