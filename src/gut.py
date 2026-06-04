@@ -110,14 +110,15 @@ class GutModule:
         dSCFA = (target_scfa - self.SCFA_mmol_L) / tau_scfa
 
         # ── 5. 血液门静脉缓存（代数） ────────────────────────────────────────
+        # NOTE(C5): 纯函数化 — 改为本地变量
         if portal_flow > 0:
             amino_conc_g_L = (amino_abs / portal_flow) * 1000.0
             fat_conc_mmol_L = (fat_abs / portal_flow) * 1000.0 / 0.885
-            self.blood.amino_acids_g_L = max(0.0, amino_conc_g_L)
-            self.blood.fatty_acids_mmol_L = max(0.0, fat_conc_mmol_L)
+            new_amino_acids_g_L = max(0.0, amino_conc_g_L)
+            new_fatty_acids_mmol_L = max(0.0, fat_conc_mmol_L)
         else:
-            self.blood.amino_acids_g_L = 0.0
-            self.blood.fatty_acids_mmol_L = 0.0
+            new_amino_acids_g_L = 0.0
+            new_fatty_acids_mmol_L = 0.0
 
         # ── 6. 存储吸收数据（供 liver 耦合） ─────────────────────────────────
         self._portal_glucose_absorption_g_min = glucose_abs / dt if dt > 0 else 0.0
@@ -138,11 +139,14 @@ class GutModule:
 
         outputs = {
             "portal_blood_flow_mL_min": portal_flow,
-            "amino_acids_g_L": self.blood.amino_acids_g_L,
-            "fatty_acids_mmol_L": self.blood.fatty_acids_mmol_L,
+            "amino_acids_g_L": new_amino_acids_g_L,  # NOTE(C5): 本地变量
+            "fatty_acids_mmol_L": new_fatty_acids_mmol_L,  # NOTE(C5): 本地变量
             "glucose_absorption_g_min": self._portal_glucose_absorption_g_min,
             "amino_absorption_g_min": self._portal_amino_absorption_g_min,
             "fat_absorption_g_min": self._portal_fat_absorption_g_min,
+            # NOTE(C5): blood 字段 (Newton 迭代 caller 一次性写回)
+            "blood_amino_acids_g_L": new_amino_acids_g_L,
+            "blood_fatty_acids_mmol_L": new_fatty_acids_mmol_L,
         }
 
         return dydt, outputs

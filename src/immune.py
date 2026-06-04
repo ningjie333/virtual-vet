@@ -98,7 +98,9 @@ class ImmuneModule:
             fever_magnitude = (self.cytokine_level - 0.3) / 0.7
             fever_delta = fever_magnitude * 3.0
             fever_target_C = min(41.5, 38.5 + fever_delta)
-            self.blood.core_temperature_C = max(37.0, min(41.5, fever_target_C))
+            # NOTE(C5): 纯函数化 — 不再直接写 self.blood.core_temperature_C
+            # 由 caller (_unified_rhs) 一次性写回，避免 Newton 迭代污染
+            fever_target_C = max(37.0, min(41.5, fever_target_C))
 
         # ── WBC 响应 ───────────────────────────────────────────────────────
         if self.cytokine_level > 0.2:
@@ -120,8 +122,10 @@ class ImmuneModule:
 
         tau_crp = 1800.0
         dCRP = (self._CRP_target - self.blood.CRP_mg_L) / tau_crp if tau_crp > 0 else 0.0
-        self.blood.CRP_mg_L = max(0.0, self.blood.CRP_mg_L + dCRP * dt)
-        self.crp_level = self.blood.CRP_mg_L
+        # NOTE(C5): 纯函数化 — 改为本地变量，由 caller 写回 self.blood.CRP_mg_L
+        new_CRP_mg_L = max(0.0, self.blood.CRP_mg_L + dCRP * dt)
+        # self.crp_level 镜像 blood.CRP_mg_L（与 `_PARAM_PATHS` 兼容），由 caller 同步
+        self.crp_level = new_CRP_mg_L
 
         # ── 高凝状态 ───────────────────────────────────────────────────────
         if self.cytokine_level > 0.6:
@@ -139,11 +143,12 @@ class ImmuneModule:
 
         # ── 毛细血管漏（钠浓度变化） ──────────────────────────────────────
         capillary_leak_factor = 0.0
+        # NOTE(C5): 纯函数化 — 改为本地变量 + outputs dict，由 caller 写回 self.blood
+        sodium_shift = 0.0
         if self.cytokine_level > 0.4:
             leak_intensity = (self.cytokine_level - 0.4) / 0.6
             capillary_leak_factor = leak_intensity
             sodium_shift = leak_intensity * 8.0 * dt_min
-            self.blood.sodium_mEq_L += sodium_shift
 
         # ── 肠道屏障损伤因子（输出，供 gut 读取） ──────────────────────
         gut_barrier_mult = 1.0
@@ -173,8 +178,8 @@ class ImmuneModule:
         outputs = {
             "cytokine_level": self.cytokine_level,
             "wbc_count": self.wbc_count,
-            "crp_level": self.blood.CRP_mg_L,
-            "fever_C": fever_target_C,
+            "crp_level": self.crp_level,  # NOTE(C5): 本地变量 (new_CRP_mg_L)
+            "fever_C": fever_target_C,  # NOTE(C5): 本地变量
             "immune_suppression": immune_suppression,
             "coagulation_state": self.coagulation_state,
             "acute_phase_response": self.acute_phase_response,
@@ -182,6 +187,10 @@ class ImmuneModule:
             "liver_metabolic_factor": liver_factor,
             "svr_factor": svr_factor,
             "capillary_leak_factor": capillary_leak_factor,
+            # NOTE(C5): blood 字段 (Newton 迭代 caller 一次性写回)
+            "blood_crp_mg_L": self.crp_level,
+            "blood_core_temperature_C": fever_target_C,
+            "blood_sodium_shift": sodium_shift,
         }
 
         return dydt, outputs

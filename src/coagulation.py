@@ -106,8 +106,9 @@ class CoagulationModule:
 
         tau_pt = 300.0
         alpha_pt = dt / tau_pt if tau_pt > 0 else 0.0
-        self.blood.PT_sec += alpha_pt * (pt_sec - self.blood.PT_sec)
-        self.blood.aPTT_sec += alpha_pt * (aptt_sec - self.blood.aPTT_sec)
+        # NOTE(C5): 纯函数化 — 改为本地变量
+        new_PT_sec = self.blood.PT_sec + alpha_pt * (pt_sec - self.blood.PT_sec)
+        new_aPTT_sec = self.blood.aPTT_sec + alpha_pt * (aptt_sec - self.blood.aPTT_sec)
 
         # ── 纤维蛋白原 ─────────────────────────────────────────────────────
         if cytokine > 0.3:
@@ -121,30 +122,37 @@ class CoagulationModule:
             fibrin_consumption = 0.0
 
         fibrin_net = fibrin_synthesis - fibrin_consumption
-        self.fibrinogen = max(50.0, min(800.0, self.fibrinogen + fibrin_net))
-        self.blood.fibrinogen_mg_dL = self.fibrinogen
+        # NOTE(C5): 纯函数化 — 改为本地变量
+        new_fibrinogen = max(50.0, min(800.0, self.fibrinogen + fibrin_net))
         dFibrinogen = fibrin_net / dt if dt > 0 else 0.0
+        new_fibrinogen_mg_dL = new_fibrinogen
 
         # ── 凝血状态 ─────────────────────────────────────────────────────
         target_coag_state = self._compute_coagulation_state()
         tau_coag = 900.0
         dCoag = (target_coag_state - self.coagulation_state) / tau_coag if tau_coag > 0 else 0.0
-        self.coagulation_state = max(0.0, min(1.0, self.coagulation_state + dCoag * dt))
-        self.blood.coagulation_state = self.coagulation_state
+        new_coagulation_state = max(0.0, min(1.0, self.coagulation_state + dCoag * dt))
+        # NOTE(C5): 纯函数化 — self.coagulation_state 写入移到 caller 或 compute()
+        # 在 Radau 路径下，dydt 返回 dCoag，y-vector 积分会更新 self.coagulation_state
 
         dydt = {**factor_derivatives, "fibrinogen": dFibrinogen, "coagulation_state": dCoag}
 
         outputs = {
-            "PT_sec": self.blood.PT_sec,
-            "aPTT_sec": self.blood.aPTT_sec,
-            "coagulation_state": self.coagulation_state,
-            "fibrinogen_mg_dL": self.fibrinogen,
+            "PT_sec": new_PT_sec,  # NOTE(C5): 本地变量
+            "aPTT_sec": new_aPTT_sec,  # NOTE(C5): 本地变量
+            "coagulation_state": new_coagulation_state,  # NOTE(C5): 本地变量
+            "fibrinogen_mg_dL": new_fibrinogen,  # NOTE(C5): 本地变量
             "factor_VII": self.factor_VII,
             "factor_V": self.factor_V,
             "factor_II": self.factor_II,
             "factor_IX": self.factor_IX,
             "factor_X": self.factor_X,
             "factor_XI": self.factor_XI,
+            # NOTE(C5): blood 字段 (Newton 迭代 caller 一次性写回)
+            "blood_PT_sec": new_PT_sec,
+            "blood_aPTT_sec": new_aPTT_sec,
+            "blood_fibrinogen_mg_dL": new_fibrinogen,
+            "blood_coagulation_state": new_coagulation_state,
         }
 
         return dydt, outputs

@@ -109,9 +109,10 @@ class EndocrineModule:
         # 体温
         dt_min = dt / 60.0
         heat_drift = (metabolic_rate - METABOLIC_RATE_NORMAL) * 0.05 * dt_min
-        self.blood.core_temperature_C = max(37.0, min(42.0, self.blood.core_temperature_C + heat_drift))
-        baseline_pull = (38.5 - self.blood.core_temperature_C) * 0.001
-        self.blood.core_temperature_C = max(37.0, min(42.0, self.blood.core_temperature_C + baseline_pull))
+        # NOTE(C5): 纯函数化 — 改为本地变量，由 caller 写回
+        new_core_temp = max(37.0, min(42.0, self.blood.core_temperature_C + heat_drift))
+        baseline_pull = (38.5 - new_core_temp) * 0.001
+        new_core_temp = max(37.0, min(42.0, new_core_temp + baseline_pull))
 
         # ── 胰腺轴 ────────────────────────────────────────────────────────
         if glucose > INSULIN_HYPERGLYCEMIA_THRESHOLD:
@@ -138,10 +139,12 @@ class EndocrineModule:
         insulin_effect = (insulin_factor - 1.0) * 0.01 * dt
         glucagon_effect = (1.0 - glucagon_factor) * 0.005 * dt
         net_glucose_shift = insulin_effect - glucagon_effect
+        # NOTE(C5): 纯函数化 — 改为本地变量
+        new_glucose_mmol_L = self.blood.glucose_mmol_L
         if self.insulin_uU_mL > BASELINE_INSULIN_UU_ML * 1.5:
-            self.blood.glucose_mmol_L = max(2.0, self.blood.glucose_mmol_L + net_glucose_shift)
+            new_glucose_mmol_L = max(2.0, self.blood.glucose_mmol_L + net_glucose_shift)
         elif self.glucagon_pg_mL > BASELINE_GLUCAGON_PG_ML * 1.5:
-            self.blood.glucose_mmol_L = min(12.0, self.blood.glucose_mmol_L - net_glucose_shift)
+            new_glucose_mmol_L = min(12.0, self.blood.glucose_mmol_L - net_glucose_shift)
 
         # ── 肾上腺轴 ───────────────────────────────────────────────────────
         baseline_activity = 0.05
@@ -181,9 +184,10 @@ class EndocrineModule:
             self.phosphate_mg_dL = max(1.5, self.phosphate_mg_dL - 0.001 * (self.PTH_pg_mL / BASELINE_PTH_PG_ML - 1.0) * dt)
 
         calcium_factor = self.calcium_mg_dL / BASELINE_CALCIUM_MG_DL
-        self.blood.PTH_pg_mL = self.PTH_pg_mL
-        self.blood.calcium_mg_dL = self.calcium_mg_dL
-        self.blood.phosphate_mg_dL = self.phosphate_mg_dL
+        # NOTE(C5): 纯函数化 — 改为本地变量，caller 写回
+        new_PTH_pg_mL = self.PTH_pg_mL
+        new_calcium_mg_dL = self.calcium_mg_dL
+        new_phosphate_mg_dL = self.phosphate_mg_dL
 
         # ── 生长轴 ─────────────────────────────────────────────────────────
         nutrition_factor = 1.0
@@ -198,8 +202,11 @@ class EndocrineModule:
         self.IGF1_nmol_L = max(0.0, self.IGF1_nmol_L + dIGF1 * dt)
         growth_factor = self.IGF1_nmol_L / BASELINE_IGF1_NMOL_L
         self.GH_ng_mL = BASELINE_GH_NG_ML * (0.8 + 0.2 * growth_factor)
+        # NOTE(C5): 纯函数化
+        albumin_delta = 0.0
         if growth_factor > 1.05:
-            self.blood.albumin_g_dL = min(4.5, self.blood.albumin_g_dL + (growth_factor - 1.0) * 0.001 * dt)
+            albumin_delta = min(4.5, self.blood.albumin_g_dL + (growth_factor - 1.0) * 0.001 * dt) - self.blood.albumin_g_dL
+        new_albumin_g_dL = self.blood.albumin_g_dL + albumin_delta
 
         dydt = {
             "T3": dT3,
@@ -221,10 +228,17 @@ class EndocrineModule:
             "cortisol_factor": cortisol_factor,
             "calcium_factor": calcium_factor,
             "growth_factor": growth_factor,
-            "core_temperature_C": self.blood.core_temperature_C,
+            "core_temperature_C": new_core_temp,  # NOTE(C5): 本地变量
             "epinephrine_pg_mL": self.epinephrine_pg_mL,
             "norepinephrine_pg_mL": self.norepinephrine_pg_mL,
             "GH_ng_mL": self.GH_ng_mL,
+            # NOTE(C5): blood 字段 (Newton 迭代 caller 一次性写回)
+            "blood_core_temperature_C": new_core_temp,
+            "blood_glucose_mmol_L": new_glucose_mmol_L,
+            "blood_PTH_pg_mL": new_PTH_pg_mL,
+            "blood_calcium_mg_dL": new_calcium_mg_dL,
+            "blood_phosphate_mg_dL": new_phosphate_mg_dL,
+            "blood_albumin_g_dL": new_albumin_g_dL,
         }
 
         return dydt, outputs

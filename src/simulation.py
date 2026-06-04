@@ -926,8 +926,8 @@ class VirtualCreature:
         # 5. 解包结果到模块属性
         self._unpack_unified_state(sol.y[:, -1])
 
-        # 5a. 应用 lung/kidney derivatives() 的 blood 输出（纯函数契约 C5）
-        # lung.derivatives() 不再直接写 blood，现在由调用方写入
+        # 5a. 应用 lung/kidney/immune/endocrine/coagulation/gut derivatives() 的 blood 输出（纯函数契约 C5）
+        # derivatives() 不再直接写 blood，现在由调用方一次性写入（避免 Newton 迭代污染）
         lung_out = self.lung.derivatives(dt=dt, co_input=self.heart.cardiac_output)[1]
         self.blood.arterial_PO2_mmHg = lung_out.get("arterial_PO2_mmHg", self.blood.arterial_PO2_mmHg)
         self.blood.arterial_PCO2_mmHg = lung_out.get("arterial_PCO2_mmHg", self.blood.arterial_PCO2_mmHg)
@@ -942,6 +942,35 @@ class VirtualCreature:
         )[1]
         self.blood.bun_mg_dL = kidney_out.get("bun_mg_dL", self.blood.bun_mg_dL)
         self.blood.creatinine_mg_dL = kidney_out.get("creatinine_mg_dL", self.blood.creatinine_mg_dL)
+        # immune (C5): 发热/CRP/钠
+        immune_out = self.immune.derivatives(dt=dt)[1]
+        if "blood_core_temperature_C" in immune_out:
+            self.blood.core_temperature_C = immune_out["blood_core_temperature_C"]
+        if "blood_crp_mg_L" in immune_out:
+            self.blood.CRP_mg_L = immune_out["blood_crp_mg_L"]
+        if "blood_sodium_shift" in immune_out:
+            self.blood.sodium_mEq_L += immune_out["blood_sodium_shift"]
+        # endocrine (C5): 体温/血糖/PTH/钙/磷/白蛋白
+        endocrine_out = self.endocrine.derivatives(dt=dt)[1]
+        for key in ("blood_core_temperature_C", "blood_glucose_mmol_L",
+                    "blood_PTH_pg_mL", "blood_calcium_mg_dL",
+                    "blood_phosphate_mg_dL", "blood_albumin_g_dL"):
+            blood_key = key.replace("blood_", "")
+            if key in endocrine_out:
+                setattr(self.blood, blood_key, endocrine_out[key])
+        # coagulation (C5): PT/aPTT/fibrinogen/coagulation_state
+        coag_out = self.coagulation.derivatives(dt=dt)[1]
+        for key in ("blood_PT_sec", "blood_aPTT_sec",
+                    "blood_fibrinogen_mg_dL", "blood_coagulation_state"):
+            blood_key = key.replace("blood_", "")
+            if key in coag_out:
+                setattr(self.blood, blood_key, coag_out[key])
+        # gut (C5): 门静脉氨基酸/脂肪酸
+        gut_out = self.gut.derivatives(dt=dt, co_input=self.heart.cardiac_output)[1]
+        if "blood_amino_acids_g_L" in gut_out:
+            self.blood.amino_acids_g_L = gut_out["blood_amino_acids_g_L"]
+        if "blood_fatty_acids_mmol_L" in gut_out:
+            self.blood.fatty_acids_mmol_L = gut_out["blood_fatty_acids_mmol_L"]
 
         # 5b. Step 7.5: 尿量导致的循环血量损失（Euler 路径 Step 7.5 等价）
         bv_loss = self.kidney.blood_volume_loss_rate * dt / 60.0  # mL/min × dt(s) / 60
@@ -957,6 +986,38 @@ class VirtualCreature:
         # 5d. Step 7.7: 血容量同步（Euler 路径 Step 7.7 等价）
         # HeartModule.circulating_volume_ml 是循环血量的权威来源，fluid 和 blood 都要同步
         # 这一步已经在 5c 中通过 blood.total_volume_ml = heart.circulating_volume_ml 做了
+
+        # 5e. C1 修复：补全 8 个模块的 compute()（与 Euler 路径等价）
+        # 顺序参照 Euler 路径 Step 4-4.9
+        try:
+            self.gut.compute(dt, self.heart.cardiac_output)
+        except Exception as e:
+            logger.warning("gut.compute failed: %s", e)
+        try:
+            self.liver.compute(dt, self.heart.cardiac_output, gut_state=None)
+        except Exception as e:
+            logger.warning("liver.compute failed: %s", e)
+        try:
+            self.endocrine.compute(dt)
+        except Exception as e:
+            logger.warning("endocrine.compute failed: %s", e)
+        try:
+            self.lymphatic.compute(dt)
+        except Exception as e:
+            logger.warning("lymphatic.compute failed: %s", e)
+        try:
+            self.coagulation.compute(dt, liver_state=None, immune_state=None)
+        except Exception as e:
+            logger.warning("coagulation.compute failed: %s", e)
+        try:
+            self.neuro.compute(dt, heart_state=None, lung_state=None)
+        except Exception as e:
+            logger.warning("neuro.compute failed: %s", e)
+        try:
+            self.immune.compute(dt, endocrine_state=None)
+        except Exception as e:
+            logger.warning("immune.compute failed: %s", e)
+        # tox/pharmacology 由 schedule_event / 外部 API 触发，不强制每步调
 
         # 6. 耦合规则（同 Euler 路径）
         ctx = self._organ_contexts
