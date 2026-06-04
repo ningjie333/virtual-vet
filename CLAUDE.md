@@ -10,18 +10,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working in this
 
 ## Commands
 
+**Always use `uv run` to run Python commands** — keeps the project isolated in `.venv/`
+(per `pyproject.toml` + `uv.lock`). Never use bare `python` or `python -m` for project work.
+
 ```bash
-# Install dependencies
+# Install dependencies (creates .venv/ if missing)
 uv sync
 
-# Backend (from project root)
-python gui_app.py                    # Start Flask at http://127.0.0.1:5000
-python -m pytest tests/ -v           # All tests (586 tests)
-python -m pytest tests/test_game.py -v  # Specific test file
+# Backend (from project root) — always via `uv run`
+uv run python gui_app.py             # Start Flask at http://127.0.0.1:5000
+uv run pytest tests/ -v              # All tests
+uv run pytest tests/test_game.py -v  # Specific test file
 
-# Lint / Format (Python)
-ruff check .                         # Lint
-ruff format .                        # Format
+# Lint / Format (Python) — also via `uv run`
+uv run ruff check .                  # Lint
+uv run ruff format .                 # Format
 
 # Frontend (from vite-project/)
 cd vet-game-frontend/vite-project
