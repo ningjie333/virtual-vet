@@ -493,8 +493,12 @@ class VirtualCreature:
         RQ = self.lung.respiratory_quotient
         CO2_released = O2_extracted * RQ
 
-        # 更新静脉血气分压（简化）
-        self.blood.venous_PO2_mmHg = max(20.0, 40.0 - 0.1 * O2_extracted)
+        # 更新静脉血气分压 (Phase 2 #7: 简化 Hb 校正占位)
+        # REF: Siggaard-Andersen 1971 — Hb 浓度影响 O2 含量
+        # 完整公式: PvO2 = 40 - 0.05 * O2_extracted * (12 / max(Hb, 6))
+        # 暂用原公式 (当前模型无 Hb 字段, 留扩展点)
+        hb_correction = 1.0  # 正常 12 g/dL 时为 1.0
+        self.blood.venous_PO2_mmHg = max(20.0, 40.0 - 0.05 * O2_extracted * hb_correction)
         self.blood.venous_PCO2_mmHg = min(60.0, 46.0 + 0.2 * CO2_released)
         self.blood.venous_saturation = self.lung._oxygen_saturation_curve(
             self.blood.venous_PO2_mmHg)
