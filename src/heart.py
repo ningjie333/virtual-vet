@@ -22,6 +22,12 @@ from src.noble_purkinje import NoblePurkinjeFiber
 
 
 class HeartModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('svr_factor', 'chemoreceptor_drive', 'T3_factor', 'K_potassium_mEq_L')
+    OUTPUTS: tuple[str, ...] = ('cardiac_output', 'MAP', 'CVP', 'stroke_volume')
+    READS_BLOOD: tuple[str, ...] = ('arterial_pH', 'potassium_mEq_L', 'arterial_PCO2_mmHg', 'arterial_PO2_mmHg')
+    WRITES_BLOOD: tuple[str, ...] = ()
     """
     心血管模块：模拟心脏泵血功能与血压调节
     状态变量：HR, SV, MAP, CVP, blood_volume

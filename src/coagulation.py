@@ -17,6 +17,12 @@ from src.common_types import FactorCommand
 
 
 class CoagulationModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('liver_health_factor', 'immune_cytokine')
+    OUTPUTS: tuple[str, ...] = ('PT_sec', 'aPTT_sec', 'coagulation_state', 'fibrinogen_mg_dL', 'factor_VII', 'factor_V', 'factor_II', 'factor_IX', 'factor_X', 'factor_XI', 'factor_VIII')
+    READS_BLOOD: tuple[str, ...] = ('cytokine_level', 'PLT', 'coagulation_state', 'fibrinogen_mg_dL')
+    WRITES_BLOOD: tuple[str, ...] = ('PT_sec', 'aPTT_sec', 'coagulation_state', 'fibrinogen_mg_dL')
     """
     凝血模块: 凝血因子动力学 + 临床凝血指标
 

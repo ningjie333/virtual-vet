@@ -16,6 +16,12 @@ from parameters import *
 
 
 class EndocrineModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('blood_pH',)
+    OUTPUTS: tuple[str, ...] = ('T3_ng_dL', 'T4_ug_dL', 'insulin_uU_mL', 'glucagon_pg_mL', 'cortisol_ug_dL', 'epinephrine_pg_mL', 'norepinephrine_pg_mL', 'PTH_pg_mL', 'calcium_mg_dL', 'phosphate_mg_dL', 'GH_ng_mL', 'IGF1_nmol_L', 'metabolic_rate', 'core_temperature_C')
+    READS_BLOOD: tuple[str, ...] = ('glucose_mmol_L', 'albumin_g_dL', 'calcium_mg_dL', 'phosphate_mg_dL', 'cortisol_ug_dL', 'core_temperature_C')
+    WRITES_BLOOD: tuple[str, ...] = ('core_temperature_C', 'glucose_mmol_L', 'PTH_pg_mL', 'calcium_mg_dL', 'phosphate_mg_dL', 'albumin_g_dL', 'cortisol_ug_dL')
     """
     内分泌模块：整合5个激素轴对生理功能的影响
 

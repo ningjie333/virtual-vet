@@ -22,6 +22,12 @@ _CYP450_KM = 2.0                 # Michaelis 常数（相对单位）
 
 
 class LiverModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('co_input', 'gut_state', 'insulin', 'glucagon', 'PTH', 'cytokine')
+    OUTPUTS: tuple[str, ...] = ('metabolic_activity', 'detox_capacity', 'cyp450_activity', 'glycogen_fraction', 'bilirubin_conjugation', 'glucose_output', 'ammonia_umol_L', 'albumin_g_dL', 'bilirubin_mg_dL', 'urea_mmol', 'PT_sec', 'INR')
+    READS_BLOOD: tuple[str, ...] = ('glucose_mmol_L', 'ammonia_umol_L', 'amino_acids_g_L', 'drug_concentration_mg_kg', 'lactate_mmol_L', 'albumin_g_dL', 'bilirubin_mg_dL', 'ALT_U_L', 'AST_U_L', 'ALP_U_L', 'GGT_U_L', 'coagulation_factor_VII', 'PT_sec', 'INR', 'fibrinogen_mg_dL')
+    WRITES_BLOOD: tuple[str, ...] = ('ammonia_umol_L', 'albumin_g_dL', 'bilirubin_mg_dL', 'bun_mg_dL', 'coagulation_factor_VII', 'PT_sec', 'INR', 'fibrinogen_mg_dL', 'ALT_U_L', 'AST_U_L', 'ALP_U_L', 'GGT_U_L', 'glucose_mmol_L', 'drug_concentration_mg_kg', 'amino_acids_g_L')
     """
     肝脏模块：核心代谢和解毒器官
 

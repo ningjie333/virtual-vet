@@ -21,6 +21,12 @@ from src.common_types import FactorCommand
 
 
 class ImmuneModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('endocrine_cortisol',)
+    OUTPUTS: tuple[str, ...] = ('cytokine_level', 'wbc_count', 'crp_level', 'acute_phase_response', 'immune_suppression', 'coagulation_state', 'fever_C')
+    READS_BLOOD: tuple[str, ...] = ('cortisol_ug_dL', 'core_temperature_C', 'cytokine_level')
+    WRITES_BLOOD: tuple[str, ...] = ('core_temperature_C', 'CRP_mg_L', 'cytokine_level', 'sodium_mEq_L')
     """
     免疫/炎症模块: 整合固有免疫应答对生理的影响
 

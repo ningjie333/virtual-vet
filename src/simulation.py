@@ -160,6 +160,21 @@ class VirtualCreature:
             self._organ_contexts[mod_name] = OrganContext(mod_name)
         self.coupling_engine = CouplingEngine()
 
+        # ── Phase 5: I/O contract registration (no behavior change) ──────
+        # Modules declare INPUTS / OUTPUTS / READS_BLOOD / WRITES_BLOOD as class
+        # attributes. Here we register those contracts with the SignalBus so
+        # topology introspection is possible.
+        self._signal_bus.register_module("heart", inputs=self.heart.INPUTS, outputs=self.heart.OUTPUTS, reads_blood=self.heart.READS_BLOOD, writes_blood=self.heart.WRITES_BLOOD)
+        self._signal_bus.register_module("lung", inputs=self.lung.INPUTS, outputs=self.lung.OUTPUTS, reads_blood=self.lung.READS_BLOOD, writes_blood=self.lung.WRITES_BLOOD)
+        self._signal_bus.register_module("kidney", inputs=self.kidney.INPUTS, outputs=self.kidney.OUTPUTS, reads_blood=self.kidney.READS_BLOOD, writes_blood=self.kidney.WRITES_BLOOD)
+        self._signal_bus.register_module("gut", inputs=self.gut.INPUTS, outputs=self.gut.OUTPUTS, reads_blood=self.gut.READS_BLOOD, writes_blood=self.gut.WRITES_BLOOD)
+        self._signal_bus.register_module("liver", inputs=self.liver.INPUTS, outputs=self.liver.OUTPUTS, reads_blood=self.liver.READS_BLOOD, writes_blood=self.liver.WRITES_BLOOD)
+        self._signal_bus.register_module("endocrine", inputs=self.endocrine.INPUTS, outputs=self.endocrine.OUTPUTS, reads_blood=self.endocrine.READS_BLOOD, writes_blood=self.endocrine.WRITES_BLOOD)
+        self._signal_bus.register_module("neuro", inputs=self.neuro.INPUTS, outputs=self.neuro.OUTPUTS, reads_blood=self.neuro.READS_BLOOD, writes_blood=self.neuro.WRITES_BLOOD)
+        self._signal_bus.register_module("immune", inputs=self.immune.INPUTS, outputs=self.immune.OUTPUTS, reads_blood=self.immune.READS_BLOOD, writes_blood=self.immune.WRITES_BLOOD)
+        self._signal_bus.register_module("coagulation", inputs=self.coagulation.INPUTS, outputs=self.coagulation.OUTPUTS, reads_blood=self.coagulation.READS_BLOOD, writes_blood=self.coagulation.WRITES_BLOOD)
+        self._signal_bus.register_module("lymphatic", inputs=self.lymphatic.INPUTS, outputs=self.lymphatic.OUTPUTS, reads_blood=self.lymphatic.READS_BLOOD, writes_blood=self.lymphatic.WRITES_BLOOD)
+
         # ── 统一 ODE 求解器缓存（半隐式耦合）────────────────────────────
         # _cached_inputs[module_name][input_name] = value
         # 在 rhs(t,y) 调用时，用上一 rhs 调用的 outputs 填充 inputs

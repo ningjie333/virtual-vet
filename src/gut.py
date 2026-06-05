@@ -7,6 +7,12 @@ from parameters import *
 
 
 class GutModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('co_input',)
+    OUTPUTS: tuple[str, ...] = ('motility', 'barrier_integrity', 'microbiome_activity', 'SCFA_mmol_L', 'portal_blood_flow_mL_min', 'amino_absorption_g_min', 'glucose_absorption_g_min', 'fat_absorption_g_min')
+    READS_BLOOD: tuple[str, ...] = ('amino_acids_g_L', 'fatty_acids_mmol_L')
+    WRITES_BLOOD: tuple[str, ...] = ('amino_acids_g_L', 'fatty_acids_mmol_L')
     """
     肠道模块：模拟肠道吸收功能和门静脉血流
 

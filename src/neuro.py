@@ -15,6 +15,12 @@ from src.common_types import FactorCommand
 
 
 class NeuroModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('heart_state', 'lung_state')
+    OUTPUTS: tuple[str, ...] = ('sympathetic_tone', 'parasympathetic_tone', 'consciousness', 'seizure', 'pain_level', 'chemoreceptor_drive')
+    READS_BLOOD: tuple[str, ...] = ('arterial_PCO2_mmHg', 'arterial_PO2_mmHg', 'arterial_pH')
+    WRITES_BLOOD: tuple[str, ...] = ()
     """
     神经模块: 整合自主神经、CNS功能和疼痛通路
 

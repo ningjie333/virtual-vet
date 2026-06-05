@@ -44,6 +44,8 @@ class SignalBus:
         self._read_count: dict[str, int] = defaultdict(int)
         # Optional: ring buffer of last N writes (Phase 5+)
         # self._recent_writes: list[tuple[float, str, Any]] = []
+        # Phase 5: per-module I/O contract registry
+        self._module_contracts: dict[str, dict[str, tuple[str, ...]]] = {}
 
     def publish_blood(self, name: str, value: Any) -> None:
         """Record a blood field write (no behavior change)."""
@@ -52,6 +54,39 @@ class SignalBus:
     def read_blood(self, name: str) -> None:
         """Record a blood field read."""
         self._read_count[name] += 1
+
+    def register_module(
+        self,
+        name: str,
+        inputs: tuple[str, ...] = (),
+        outputs: tuple[str, ...] = (),
+        reads_blood: tuple[str, ...] = (),
+        writes_blood: tuple[str, ...] = (),
+    ) -> None:
+        """Phase 5: register a module's declared I/O contract.
+
+        The contract is metadata only — it does not affect runtime
+        behavior. It is used by `discover_topology()` and by diagnostic
+        queries (`engine._signal_bus.contracts`).
+
+        Args:
+            name: module name (e.g. "heart", "liver")
+            inputs: tuple of input names the module consumes
+            outputs: tuple of output names the module produces
+            reads_blood: tuple of blood field names the module reads
+            writes_blood: tuple of blood field names the module writes
+        """
+        self._module_contracts[name] = {
+            "inputs": tuple(inputs),
+            "outputs": tuple(outputs),
+            "reads_blood": tuple(reads_blood),
+            "writes_blood": tuple(writes_blood),
+        }
+
+    @property
+    def module_contracts(self) -> dict[str, dict[str, tuple[str, ...]]]:
+        """Return all registered module I/O contracts."""
+        return dict(self._module_contracts)
 
     @property
     def write_count(self) -> dict[str, int]:
@@ -68,6 +103,7 @@ class SignalBus:
             "total_reads": sum(self._read_count.values()),
             "unique_written_fields": len(self._write_count),
             "fields_written": dict(self._write_count),
+            "registered_modules": list(self._module_contracts.keys()),
         }
 
 

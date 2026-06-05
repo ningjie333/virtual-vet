@@ -12,6 +12,12 @@ _GFR_KF = 3.0                  # 肾小球超滤系数 mL/min/mmHg
 
 
 class KidneyModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('map_input', 'cvp_input', 'co_input', 'blood_glucose', 'blood_Na', 'blood_pH', 'blood_K')
+    OUTPUTS: tuple[str, ...] = ('GFR', 'renal_blood_flow', 'urine_output', 'ADH_level', 'angiotensin_II', 'renin_activity', 'aldosterone')
+    READS_BLOOD: tuple[str, ...] = ('glucose_mmol_L', 'sodium_mEq_L', 'arterial_pH', 'potassium_mEq_L', 'bun_mg_dL', 'creatinine_mg_dL')
+    WRITES_BLOOD: tuple[str, ...] = ('bun_mg_dL', 'creatinine_mg_dL')
     """
     肾脏泌尿模块：模拟肾脏滤过、重吸收和排泄功能
 

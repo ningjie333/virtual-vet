@@ -16,6 +16,12 @@ from src.common_types import FactorCommand
 
 
 class LymphaticModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('map_input', 'hr_input', 'cytokine_input', 'gut_fat_absorption', 'isf_input')
+    OUTPUTS: tuple[str, ...] = ('splenic_reserve_mL', 'lymph_flow_rate', 'interstitial_fluid_mL')
+    READS_BLOOD: tuple[str, ...] = ('MAP_mmHg', 'heart_rate_bpm', 'cytokine_level', 'splenic_reserve_mL', 'lymph_flow_mL_min', 'interstitial_fluid_mL')
+    WRITES_BLOOD: tuple[str, ...] = ('splenic_reserve_mL', 'lymph_flow_mL_min', 'interstitial_fluid_mL')
     """
     淋巴/脾脏模块: 淋巴循环 + 脾脏储血
 

@@ -14,6 +14,12 @@ import math
 
 
 class LungModule:
+
+    # ── Phase 5: I/O contract (declarative, no behavior change) ────────
+    INPUTS: tuple[str, ...] = ('co_input', 'P_ACO2')
+    OUTPUTS: tuple[str, ...] = ('arterial_PO2_mmHg', 'arterial_PCO2_mmHg', 'arterial_pH', 'arterial_saturation', 'alveolar_PO2_mmHg', 'alveolar_PCO2_mmHg', 'minute_ventilation')
+    READS_BLOOD: tuple[str, ...] = ('arterial_PO2_mmHg', 'arterial_PCO2_mmHg', 'arterial_saturation', 'arterial_pH', 'venous_PCO2_mmHg', 'HCO3')
+    WRITES_BLOOD: tuple[str, ...] = ('arterial_PO2_mmHg', 'arterial_PCO2_mmHg', 'arterial_pH', 'arterial_saturation')
     """
     肺气体交换模块：模拟肺通气与气体交换
 
