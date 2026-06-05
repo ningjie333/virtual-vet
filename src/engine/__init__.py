@@ -26,6 +26,10 @@ from .factor_pipeline import (
     FactorCommandRegistry,
     _get_param_path,
 )
+from .signal_bus import (
+    SignalBus,
+    BloodShim,
+)
 
 __all__ = [
     "Topology",
@@ -35,4 +39,6 @@ __all__ = [
     "apply_factor",
     "FactorCommandRegistry",
     "_get_param_path",
+    "SignalBus",
+    "BloodShim",
 ]

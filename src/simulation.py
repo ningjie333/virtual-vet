@@ -110,10 +110,15 @@ class VirtualCreature:
         _urine = baseline_urine_output_ml_min(body_weight_kg)
 
         # 初始化血液隔室（最先创建，所有器官共享）
-        self.blood = BloodCompartment(
+        # Phase 4: BloodShim 包装，所有 self.blood.X 读写经 SignalBus 记录
+        # 9 个器官模块代码不变（self.blood.X 仍直接写）
+        from src.engine import BloodShim, SignalBus
+        self._signal_bus = SignalBus()
+        self._real_blood = BloodCompartment(
             total_volume_ml=_tbv,
             plasma_fraction=PLASMA_VOLUME_FRACTION
         )
+        self.blood = BloodShim(self._real_blood, self._signal_bus)
 
         # 初始化器官模块（传入体重缩放后的参数）
         self.heart = HeartModule(
