@@ -334,13 +334,20 @@ class LungModule:
             "vdp_inspiration_fraction": self._vdp.inspiration_fraction,
         }
 
-    def _oxygen_saturation_curve(self, PO2_mmHg: float) -> float:
+    def _oxygen_saturation_curve(self, PO2_mmHg: float, pH: float = 7.4, temperature_C: float = 38.5) -> float:
         """
-        氧解离曲线（Hill 方程近似）
-        P50 ≈ 30 mmHg（犬，文献 29-31；人类 26-27）
-        犬血氧亲和力略低于人，曲线右移
+        氧解离曲线（Hill 方程近似）+ Bohr+温度效应 — REF: Bohr 1904
+        P50 随 pH↓ 增大 (右移, 释氧能力↑), 随 T↑ 增大
+        P50_base ≈ 30 mmHg (犬, 文献 29-31; 人类 26-27)
+        Phase 2 #9: 动态 P50 反映临床情况
         """
-        P50 = 30.0  # mmHg
+        P50_base = 30.0  # mmHg
+        # Bohr 效应: 每降 1 pH 单位, P50 +3 mmHg (Bohr 系数犬约 -0.5)
+        pH_effect = 3.0 * (7.4 - pH)
+        # 温度效应: 每升 1°C, P50 +1.5 mmHg
+        T_effect = 1.5 * (temperature_C - 38.5)
+        P50 = P50_base + pH_effect + T_effect
+        P50 = max(15.0, min(50.0, P50))  # clamp
         n = 2.8     # Hill 系数
         sat = PO2_mmHg**n / (P50**n + PO2_mmHg**n)
         return max(0.0, min(1.0, sat))
