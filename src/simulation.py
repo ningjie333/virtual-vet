@@ -7,7 +7,9 @@ import logging
 
 import numpy as np
 
-from src.common_types import FactorCommand, _PARAM_PATHS
+from src.common_types import FactorCommand
+from src.engine import CONNECTIONS
+from src.engine.factor_pipeline import apply_factor as _apply_factor_impl
 from blood import BloodCompartment
 from heart import HeartModule
 from lung import LungModule
@@ -40,94 +42,6 @@ from parameters import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-# 参数路径映射表：见 src/common_types.py（统一来源）
-
-# ── CONNECTIONS 表 ── 统一 ODE 系统的模块间数据路由 ──────────────────────────
-# 格式: { (from_module, from_var): [(to_module, to_var), ...], ... }
-# 用于 _unified_rhs 中，将上一时间步的 outputs 路由为当前时间步的 inputs
-# 采用半隐式耦合：模块在 rhs(t,y) 调用时使用上一 rhs 调用的 outputs 作为输入
-
-CONNECTIONS: dict[tuple[str, str], list[tuple[str, str]]] = {
-    # Heart → kidney, fluid, neuro
-    ("heart", "cardiac_output"):    [("kidney", "co_input"), ("lung", "co_input"), ("gut", "co_input")],
-    ("heart", "MAP"):                [("kidney", "map_input"), ("fluid", "map_input"), ("neuro", "map_input")],
-    ("heart", "CVP"):               [("kidney", "cvp_input")],
-    ("heart", "blood_volume_ratio"): [("fluid", "blood_volume_ratio")],
-
-    # Lung → blood, neuro
-    ("lung", "arterial_PO2_mmHg"):  [("blood", "arterial_PO2"), ("neuro", "PO2")],
-    ("lung", "arterial_PCO2_mmHg"): [("blood", "arterial_PCO2"), ("neuro", "PCO2")],
-    ("lung", "arterial_saturation"): [("blood", "arterial_saturation")],
-    ("lung", "arterial_pH"):         [("blood", "arterial_pH")],
-    ("lung", "respiratory_rate"):   [("neuro", "lung_rr")],
-
-    # Blood → kidney, neuro, endocrine, immune
-    ("blood", "potassium_mEq_L"):    [("kidney", "blood_K"), ("endocrine", "K"), ("heart", "potassium_mEq_L")],
-    ("blood", "sodium_mEq_L"):      [("kidney", "blood_Na")],
-    ("blood", "glucose_mmol_L"):    [("kidney", "blood_glucose"), ("endocrine", "glucose")],
-    ("blood", "arterial_pH"):        [("kidney", "blood_pH"), ("heart", "arterial_pH")],
-    ("blood", "arterial_PO2_mmHg"): [("neuro", "PO2")],
-    ("blood", "arterial_PCO2_mmHg"): [("neuro", "PCO2")],
-
-    # Kidney → fluid, blood
-    ("kidney", "ADH_level"):         [("fluid", "ADH")],
-    ("kidney", "urine_output_mL_min"): [("fluid", "urine_output")],
-    ("kidney", "angiotensin_II"):    [("fluid", "RAAS_activity")],
-    ("kidney", "blood_volume_loss_rate_mL_min"): [("blood", "urine_loss")],
-
-    # Fluid → heart, blood, lymphatic
-    ("fluid", "V_vascular_mL"):      [("heart", "preload_volume")],
-    ("fluid", "V_isf_mL"):           [("lymphatic", "isf_input")],
-
-    # Endocrine → immune, liver, heart, kidney
-    ("endocrine", "cortisol_ug_dL"): [("immune", "endocrine_cortisol")],
-    ("endocrine", "T3_factor"):     [("heart", "T3")],
-    ("endocrine", "insulin_uU_mL"):  [("liver", "insulin")],
-    ("endocrine", "glucagon_pg_mL"): [("liver", "glucagon")],
-    ("endocrine", "PTH_pg_mL"):      [("kidney", "PTH")],
-    ("endocrine", "calcium_mg_dL"): [("kidney", "calcium")],
-
-    # Neuro → kidney, endocrine, lymphatic
-    ("neuro", "pain_level"):         [("endocrine", "pain_stress")],
-    ("neuro", "heart_rate_bpm"):     [("lymphatic", "hr_input")],
-
-    # Immune → neuro, liver, coagulation, lymphatic
-    ("immune", "cytokine_level"):    [("neuro", "cytokine"), ("coagulation", "immune_cytokine"), ("lymphatic", "cytokine_input"), ("liver", "inflammation")],
-    ("immune", "coagulation_state"): [("coagulation", "immune_coagulation_state")],
-    ("immune", "wbc_count"):         [("blood", "WBC")],
-    ("immune", "capillary_leak_factor"): [("blood", "capillary_leak")],
-
-    # Coagulation → blood, immune
-    ("coagulation", "PT_sec"):        [("blood", "PT_sec")],
-    ("coagulation", "aPTT_sec"):     [("blood", "aPTT_sec")],
-    ("coagulation", "fibrinogen_mg_dL"): [("blood", "fibrinogen_mg_dL")],
-    ("coagulation", "coagulation_state"): [("blood", "coagulation_state")],
-
-    # Liver → blood
-    ("liver", "metabolic_activity"):  [("coagulation", "liver_health_factor")],
-    ("liver", "glucose_output"):      [("blood", "liver_glucose")],
-    ("liver", "ammonia_umol_L"):      [("blood", "ammonia_umol_L")],
-    ("liver", "albumin_g_dL"):       [("blood", "albumin_g_dL")],
-    ("liver", "bilirubin_mg_dL"):    [("blood", "bilirubin_mg_dL")],
-
-    # Gut → liver
-    ("gut", "amino_absorption_g_min"): [("liver", "amino_absorption_g_min")],
-    ("gut", "portal_flow"):           [("liver", "portal_flow")],
-    ("gut", "fat_absorption_active"):  [("lymphatic", "gut_fat_absorption")],
-
-    # Lymphatic → blood
-    ("lymphatic", "splenic_reserve_mL"): [("blood", "splenic_reserve_mL")],
-    ("lymphatic", "lymph_flow_rate"): [("blood", "lymph_flow_mL_min")],
-    ("lymphatic", "interstitial_fluid_mL"): [("blood", "interstitial_fluid_mL")],
-
-    # Disease outputs (from disease.derivatives) → target modules
-    # disease.compute_derivatives returns FactorCommand-style outputs
-    # routed via CONNECTIONS as a special "disease" module
-}
-
-
 class VirtualCreature:
     """
     虚拟生物体：整合所有器官模块的耦合仿真
@@ -395,47 +309,13 @@ class VirtualCreature:
         根据 FactorCommand 中的 target 查找 _PARAM_PATHS，对对应模块的属性执行
         multiply / add / set 操作。未知 target 或 op 记录警告并静默返回。
 
+        Phase 4 refactor: thin wrapper delegating to
+        `src.engine.factor_pipeline.apply_factor`. Logic is unchanged.
+
         Args:
             cmd: FactorCommand 指令
         """
-        path = _PARAM_PATHS.get(cmd.target)
-        if path is None:
-            logger.warning("apply_factor: unknown target '%s'", cmd.target)
-            return
-
-        module_name, attr_name = path
-        module = getattr(self, module_name, None)
-        if module is None:
-            logger.warning("apply_factor: module '%s' not found", module_name)
-            return
-
-        current = getattr(module, attr_name, None)
-        if current is None:
-            logger.warning("apply_factor: attr '%s' not found on %s", attr_name, module_name)
-            return
-
-        if cmd.op == "multiply":
-            new_value = current * cmd.value
-        elif cmd.op == "add":
-            new_value = current + cmd.value
-        elif cmd.op == "set":
-            new_value = cmd.value
-        else:
-            logger.warning("apply_factor: unknown op '%s'", cmd.op)
-            return
-
-        # C7: 特殊保护 — heart.blood_volume 不能为负
-        if cmd.target == "heart.blood_volume":
-            if cmd.op == "add":
-                new_value = max(0.0, new_value)
-            elif cmd.op == "set":
-                new_value = max(0.0, new_value)
-
-        setattr(module, attr_name, new_value)
-        logger.debug(
-            "apply_factor: %s %s %.4f → %.4f",
-            cmd.target, cmd.op, current, new_value,
-        )
+        _apply_factor_impl(cmd, self)
 
     def _process_events(self, t: float):
         """处理到达当前时间的事件"""
