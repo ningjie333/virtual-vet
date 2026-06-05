@@ -36,12 +36,15 @@ class CoagulationModule:
         self.blood = blood  # BloodCompartment 引用
 
         # 凝血因子活性 (0-1, 1=100%)
-        self.factor_VII = 1.0   # 外源性途径（肝脏合成）
-        self.factor_V = 1.0    # 辅因子
-        self.factor_II = 1.0   # 凝血酶原
-        self.factor_IX = 1.0   # 内源性途径
-        self.factor_X = 1.0    # 共同途径
-        self.factor_XI = 1.0   # 内源性途径
+        # REF: Furie & Furie 2008 (Cell) — 凝血 cascade 关键因子
+        self.factor_VII = 1.0   # 外源性途径（肝脏合成，半衰期 ~5h）
+        self.factor_V = 1.0    # 辅因子（肝脏合成，半衰期 ~24h）
+        self.factor_II = 1.0   # 凝血酶原（肝脏合成，半衰期 ~66h）
+        self.factor_IX = 1.0   # 内源性途径（肝脏合成，半衰期 ~24h）
+        self.factor_X = 1.0    # 共同途径（肝脏合成，半衰期 ~42h）
+        self.factor_XI = 1.0   # 内源性途径（肝脏合成，半衰期 ~60h）
+        # Phase 2 #2: 新增 Factor VIII（内源性途径关键辅因子，半衰期 ~10h）
+        self.factor_VIII = 1.0  # 内源性途径辅因子（von Willebrand factor 携带）
 
         # 凝血状态 (0=正常, 1=DIC)
         self.coagulation_state = 0.0
@@ -53,7 +56,7 @@ class CoagulationModule:
         self._liver_health = 1.0
 
     # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
-    # 状态变量（进入统一 y 向量）: factor_VII, factor_V, factor_II, factor_IX, factor_X, factor_XI, fibrinogen, coagulation_state
+    # 状态变量（进入统一 y 向量）: factor_VII, factor_V, factor_II, factor_IX, factor_X, factor_XI, factor_VIII, fibrinogen, coagulation_state
     # 输出端口（供其他模块）: PT_sec, aPTT_sec, coagulation_state, fibrinogen
 
     def derivatives(self, dt: float, liver_health_factor: float = 1.0, immune_cytokine: float = 0.0) -> tuple[dict, dict]:
@@ -79,7 +82,7 @@ class CoagulationModule:
         synthesis_rate = 0.005 * dt_min * liver_health_factor * inflammation_factor
         decay_rate = 0.001 * dt_min
 
-        factors = ["factor_VII", "factor_V", "factor_II", "factor_IX", "factor_X", "factor_XI"]
+        factors = ["factor_VII", "factor_V", "factor_II", "factor_IX", "factor_X", "factor_XI", "factor_VIII"]
         factor_derivatives = {}
         for name in factors:
             current = getattr(self, name)
@@ -100,9 +103,9 @@ class CoagulationModule:
         effective_pt = max(0.1, effective_pt)
         pt_sec = max(10.0, min(60.0, 12.0 / effective_pt))
 
-        effective_aptt = self.factor_VII * 0.5 + self.factor_IX * self.factor_XI * self.factor_X
+        effective_aptt = self.factor_VIII * 2.0 + self.factor_IX * self.factor_XI
         effective_aptt = max(0.1, effective_aptt)
-        aptt_sec = max(20.0, min(120.0, 30.0 / effective_aptt))
+        aptt_sec = max(20.0, min(120.0, 35.0 / effective_aptt))
 
         tau_pt = 300.0
         alpha_pt = dt / tau_pt if tau_pt > 0 else 0.0
