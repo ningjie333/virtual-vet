@@ -126,7 +126,12 @@ class KidneyModule:
         PGC = map_input * _GFR_PGC_MAP_RATIO
         PBS = cvp_input + _GFR_PBS_CVP_OFFSET
         plasma_colloid = PLASMA_COLLOID_OSMOTIC_MMHG
-        filtration_pressure = PGC - PBS - plasma_colloid
+        # Phase 2 #4: GFR Starling π_BS (Bowman space oncotic pressure)
+        # REF: Hall 2016 生理学
+        # Bowman space albumin 极低 → π_BS ≈ 0
+        # 占位项, 便于以后扩展 (低蛋白血症 / 滤过分数异常)
+        bowman_space_colloid = 0.0
+        filtration_pressure = PGC - PBS - plasma_colloid + bowman_space_colloid
         Kf = _GFR_KF
         GFR = max(0.0, Kf * filtration_pressure) * self._disease_gfr_multiplier
 
