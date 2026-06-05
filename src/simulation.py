@@ -526,6 +526,24 @@ class VirtualCreature:
         CVP = heart_state["CVP_mmHg"]
         CO = heart_state["cardiac_output_ml_min"]
 
+        # Step 2.5: 疾病模块 — 必须在 lung.compute() 之前执行
+        # FIX B: compute() path 之前跳过了 disease.compute()，
+        # 导致 ode_diseases.json 中对 diffusion_coefficient 的修正从未执行
+        # disease 对 diffusion_coefficient 的 multiply 操作需要在本轮 lung.compute() 之前生效
+        if self.disease and self.disease.active:
+            self.disease._current_time_s = self.current_time_s
+            engine_state = {
+                "heart": {
+                    "heart_rate_bpm": heart_state["heart_rate_bpm"],
+                    "MAP_mmHg": heart_state["MAP_mmHg"],
+                    "cardiac_output_ml_min": CO,
+                },
+                "lung": {"arterial_PO2": self.blood.arterial_PO2_mmHg},
+                "kidney": {"GFR_ml_min": self.kidney.GFR},
+            }
+            for cmd in self.disease.compute(dt, engine_state):
+                self.apply_factor(cmd)
+
         # Step 3: 肺部气体交换（输入：CO → 输出：血气）
         lung_state = self.lung.compute(dt, CO)
 
@@ -605,7 +623,7 @@ class VirtualCreature:
         for cmd in coupling_cmds:
             self.apply_factor(cmd)
 
-        # Step 5: 器官衰竭追踪
+        # Step 5.1: 器官衰竭追踪
         # 保存 pre-degradation 值用于 stress 判断，避免 feedback 振荡
         heart_state_pre = {
             "MAP_mmHg": heart_state["MAP_mmHg"],
@@ -614,7 +632,7 @@ class VirtualCreature:
         lung_state_pre = dict(lung_state)
 
         # 器官健康因子应用前的心肺原始状态（用于 stress 检测）
-        # 在 Step 5.5 疾病模块之前捕获，确保疾病和耦合的影响不干扰 organ_health
+        # 在 Step 5 疾病模块之后捕获，疾病效应已体现在 state 中
         self.organ_health.track(
             dt, heart_state, lung_state, kidney_state, liver_state,
             heart_state_pre=heart_state_pre,
