@@ -80,8 +80,18 @@ class CoagulationModule:
 
         # ── 因子动力学 ────────────────────────────────────────────────────
         synthesis_rate = 0.005 * dt_min * liver_health_factor * inflammation_factor
-        decay_rate = 0.001 * dt_min
-
+        # Phase 2 #10: per-factor 半衰期 (h) → REF: Furie & Furie 2008
+        # VII:5h, V:24h, II:66h, VIII:10h, IX:24h, X:42h, XI:60h
+        # decay = factor * (current - 0.3) / (tau_h * 60) per min
+        FACTOR_TAU_HOURS = {
+            "factor_VII": 5.0,
+            "factor_V": 24.0,
+            "factor_II": 66.0,
+            "factor_VIII": 10.0,
+            "factor_IX": 24.0,
+            "factor_X": 42.0,
+            "factor_XI": 60.0,
+        }
         factors = ["factor_VII", "factor_V", "factor_II", "factor_IX", "factor_X", "factor_XI", "factor_VIII"]
         factor_derivatives = {}
         for name in factors:
@@ -91,7 +101,10 @@ class CoagulationModule:
                 synthesis = synthesis_rate * (1.0 - current) + baseline_synthesis
             else:
                 synthesis = baseline_synthesis
-            decay = decay_rate * (current - 0.3) if current > 0.3 else 0.0
+            # Phase 2 #10: per-factor 半衰期驱动 decay
+            tau_min = FACTOR_TAU_HOURS[name] * 60.0
+            factor_decay = (1.0 / tau_min) * dt_min  # per dt_min
+            decay = factor_decay * (current - 0.3) if current > 0.3 else 0.0
             new_val = current + synthesis - decay
             new_val = max(0.05, min(1.5, new_val))
             setattr(self, name, new_val)
