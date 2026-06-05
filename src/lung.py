@@ -135,7 +135,7 @@ class LungModule:
         # ── 5. 动脉血气（代数）─────────────────────────────────────────────
         # A-a 梯度上限提到 60 mmHg 以表达 ARDS 级低氧（McCaffree 1978）
         # NOTE(C5): 不再直接写 self.blood.*，改为返回值由调用方写入
-        aa_gradient = 10.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 50.0
+        aa_gradient = 5.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 50.0  # REF: West Ch. 5 (正常 5-15 mmHg, 年轻 5)
         a_PO2 = max(40.0, min(110.0, alveolar_PO2 - aa_gradient))
         a_PCO2 = max(15.0, min(80.0, alveolar_PCO2))
         a_saturation = self._oxygen_saturation_curve(a_PO2)
@@ -294,7 +294,7 @@ class LungModule:
 
         # Step 4: 血气分压更新
         # A-a gradient 随扩散能力下降而增大（正常 10，严重障碍时可达 40）
-        aa_gradient = 10.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 50.0
+        aa_gradient = 5.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 50.0  # REF: West Ch. 5 (正常 5-15 mmHg, 年轻 5)
         a_PO2 = self.alveolar_PO2 - aa_gradient
         a_PCO2 = self.alveolar_PCO2        # 动脉 PCO2 ≈ 肺泡 PCO2
 
