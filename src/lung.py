@@ -79,6 +79,9 @@ class LungModule:
 
         # 通气血流比（V/Q matching）
         self.VQ_ratio = 0.8                         # 正常约 0.8
+        # Phase 2 #6: 分流 + 死腔通道 (West 2012)
+        self.shunt_fraction = 0.0                   # 0=正常, 0.3=ARDS
+        self.dead_space_fraction = 0.3              # 正常 ≈ 0.3
 
         # 代偿参数
         self.respiratory_compensation = 0.0         # 呼吸代偿程度
@@ -135,7 +138,13 @@ class LungModule:
         # ── 5. 动脉血气（代数）─────────────────────────────────────────────
         # A-a 梯度上限提到 60 mmHg 以表达 ARDS 级低氧（McCaffree 1978）
         # NOTE(C5): 不再直接写 self.blood.*，改为返回值由调用方写入
-        aa_gradient = 5.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 50.0  # REF: West Ch. 5 (正常 5-15 mmHg, 年轻 5)
+        # Phase 2 #6: A-a 梯度加 shunt + dead_space
+        # shunt: 直通右→左血 (PaO2 ↓ 严重, 即使 DL 正常)
+        # dead_space: 通气但不换气 (PaCO2 ↑)
+        # REF: West 2012
+        aa_gradient = 5.0 + (1.0 - self.diffusion_coefficient / LUNG_DIFFUSION_COEFFICIENT) * 50.0
+        # shunt 增加梯度 (右向左分流 5% → +5 mmHg, 30% → +30 mmHg)
+        aa_gradient += self.shunt_fraction * 100.0
         a_PO2 = max(40.0, min(110.0, alveolar_PO2 - aa_gradient))
         a_PCO2 = max(15.0, min(80.0, alveolar_PCO2))
         a_saturation = self._oxygen_saturation_curve(a_PO2)
