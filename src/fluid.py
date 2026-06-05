@@ -179,6 +179,15 @@ class FluidCompartment:
               outputs: dict[str, float] — 供其他模块使用的输出端口
         """
         if map_input is None:
+            # Phase 2 #8: 无外部 MAP 时使用基线
+            map_input = BASE_CAPILLARY_HYDROSTATIC_MMHG
+        else:
+            # Phase 2 #8: MAP-coupling 动态 (Landis-Pappenheimer)
+            # 毛细血管静水压 ≈ 静脉端 25 mmHg 基线 + α × (MAP - 90)
+            # α ≈ 0.3 (动脉-毛细血管压降)
+            BASE_MAP_MMHG = 90.0  # 静息犬 MAP
+            self.capillary_hydrostatic_mmHg = max(10.0, min(50.0,
+                BASE_CAPILLARY_HYDROSTATIC_MMHG + 0.3 * (map_input - BASE_MAP_MMHG)))
             map_input = self.capillary_hydrostatic_mmHg
 
         # ── 1. Starling Forces（代数） ─────────────────────────────────────────
