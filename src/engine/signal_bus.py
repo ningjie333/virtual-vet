@@ -46,6 +46,8 @@ class SignalBus:
         # self._recent_writes: list[tuple[float, str, Any]] = []
         # Phase 5: per-module I/O contract registry
         self._module_contracts: dict[str, dict[str, tuple[str, ...]]] = {}
+        # Phase 6: real blood compartment (set by VirtualCreature after BloodShim creation)
+        self._real_blood: Any = None
 
     def publish_blood(self, name: str, value: Any) -> None:
         """Record a blood field write (no behavior change)."""
@@ -95,6 +97,16 @@ class SignalBus:
     @property
     def read_count(self) -> dict[str, int]:
         return dict(self._read_count)
+
+    # Phase 6: expose real blood for explicit read/write by organ modules
+    @property
+    def real_blood(self) -> Any:
+        """Return the underlying real blood compartment (for Phase 6 migration)."""
+        return self._real_blood
+
+    @real_blood.setter
+    def real_blood(self, value: Any) -> None:
+        self._real_blood = value
 
     def stats(self) -> dict[str, Any]:
         """Return bus statistics for diagnostics."""

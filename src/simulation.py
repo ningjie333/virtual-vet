@@ -119,6 +119,7 @@ class VirtualCreature:
             plasma_fraction=PLASMA_VOLUME_FRACTION
         )
         self.blood = BloodShim(self._real_blood, self._signal_bus)
+        self._signal_bus._real_blood = self._real_blood
 
         # 初始化器官模块（传入体重缩放后的参数）
         self.heart = HeartModule(
@@ -146,7 +147,7 @@ class VirtualCreature:
             pco2_mmHg=self.blood.arterial_PCO2_mmHg,
         )
         self.gut = GutModule(weight_kg=body_weight_kg, blood=self.blood)
-        self.liver = LiverModule(weight_kg=body_weight_kg, blood=self.blood)
+        self.liver = LiverModule(weight_kg=body_weight_kg, blood=self.blood, signal_bus=self._signal_bus)
         self.endocrine = EndocrineModule(weight_kg=body_weight_kg, blood=self.blood)
         self.neuro = NeuroModule(weight_kg=body_weight_kg, blood=self.blood)
         self.immune = ImmuneModule(weight_kg=body_weight_kg, blood=self.blood, endocrine=self.endocrine)

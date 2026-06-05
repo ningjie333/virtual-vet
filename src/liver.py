@@ -4,6 +4,7 @@ Liver Module - 肝脏代谢系统
 """
 
 import math
+from typing import Any
 from parameters import *
 
 # ── 生理常数 ──
@@ -46,9 +47,11 @@ class LiverModule:
                          → 返回 liver_state
     """
 
-    def __init__(self, weight_kg: float, blood):
+    def __init__(self, weight_kg: float, blood, signal_bus=None):
+        # Phase 6: signal bus 显式参数. None 时回退到 blood (BloodShim 兼容).
         self.w = weight_kg
-        self.blood = blood  # 血液隔室引用
+        self.blood = blood  # 保留供向后兼容 (summary 等仍可读)
+        self._bus = signal_bus if signal_bus is not None else blood
 
         # 代谢功能 (0-1)
         self.metabolic_activity = 1.0
@@ -79,6 +82,38 @@ class LiverModule:
         self.cumulative_urea_production_mmol = 0.0
         self.cumulative_albumin_production_g = 0.0
 
+    # ── Phase 6: 显式 blood I/O helper ─────────────────────────────────
+    def _blood_read(self, name: str) -> Any:
+        """显式 blood 字段读：record to bus + return real blood value.
+
+        Works in two regimes:
+        - Phase 6 (signal_bus is SignalBus): record read + return real_blood.X
+        - Legacy / tests (signal_bus is BloodCompartment or None): direct access
+        """
+        bus = self._bus
+        if hasattr(bus, "read_blood") and hasattr(bus, "real_blood"):
+            # Phase 6: proper SignalBus
+            bus.read_blood(name)
+            return getattr(bus.real_blood, name)
+        # Legacy: direct access (backward compat for tests with plain BloodCompartment)
+        return getattr(self.blood, name)
+
+    def _blood_write(self, name: str, value: Any) -> None:
+        """显式 blood 字段写：record to bus + write to real blood.
+
+        Works in two regimes:
+        - Phase 6 (signal_bus is SignalBus): record write + write to real_blood
+        - Legacy / tests (signal_bus is BloodCompartment or None): direct write
+        """
+        bus = self._bus
+        if hasattr(bus, "publish_blood") and hasattr(bus, "real_blood"):
+            # Phase 6: proper SignalBus
+            bus.publish_blood(name, value)
+            setattr(bus.real_blood, name, value)
+        else:
+            # Legacy: direct write
+            setattr(self.blood, name, value)
+
     # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
     # 状态变量（进入统一 y 向量）: glycogen_fraction, bilirubin_accumulation
     # 输出端口（供其他模块）: glucose_output, ammonia_umol_L, albumin_g_dL, etc.
@@ -105,7 +140,7 @@ class LiverModule:
         hepatic_flow = 0.25 * co_input
 
         # ── 2. 葡萄糖稳态（代数 + 状态更新） ───────────────────────────────
-        glucose = self.blood.glucose_mmol_L
+        glucose = self._blood_read("glucose_mmol_L")
 
         # 低血糖：糖原分解
         if glucose < 3.5:
@@ -133,8 +168,9 @@ class LiverModule:
             dGlycogen += glycogen_synthesized_g / _MAX_GLYCOGEN_G
 
         # 氨抑制
-        if self.blood.ammonia_umol_L > 100:
-            glucose_output *= max(0.3, 1.0 - (self.blood.ammonia_umol_L - 100) / 400)
+        ammonia_val = self._blood_read("ammonia_umol_L")
+        if ammonia_val > 100:
+            glucose_output *= max(0.3, 1.0 - (ammonia_val - 100) / 400)
 
         # 糖异生（利用氨基酸）
         amino_g_min = gut_state.get("amino_absorption_g_min", 0.0)
@@ -151,24 +187,27 @@ class LiverModule:
 
         if k > 1e-6:
             new_ammonia = (
-                self.blood.ammonia_umol_L * math.exp(-k * dt_min)
+                ammonia_val * math.exp(-k * dt_min)
                 + (total_production / k) * (1.0 - math.exp(-k * dt_min))
             )
             new_ammonia = max(0.0, new_ammonia)
-            self.blood.ammonia_umol_L = new_ammonia
+            self._blood_write("ammonia_umol_L", new_ammonia)
 
         # 尿素产生
-        ammonia_consumed = max(0.0, self.blood.ammonia_umol_L - new_ammonia) if k > 1e-6 else 0.0
+        ammonia_consumed = max(0.0, ammonia_val - new_ammonia) if k > 1e-6 else 0.0
         urea_mmol = ammonia_consumed / 2.0
         if urea_mmol > 0:
-            self.blood.bun_mg_dL += urea_mmol * _UREA_MMOL_TO_BUN_MG_DL * dt_min
+            self._blood_write("bun_mg_dL",
+                self._blood_read("bun_mg_dL") + urea_mmol * _UREA_MMOL_TO_BUN_MG_DL * dt_min)
 
         # ── 4. 白蛋白合成（代数更新到 blood.albumin） ───────────────────────
         base_rate_g_day = 0.5 * self.w
-        amino_factor = min(2.0, self.blood.amino_acids_g_L / 1.0)
+        amino_g_L = self._blood_read("amino_acids_g_L")
+        amino_factor = min(2.0, amino_g_L / 1.0)
         synthesis_rate = base_rate_g_day * self.metabolic_activity * amino_factor
         albumin_change = synthesis_rate * dt_hour / 24.0
-        self.blood.albumin_g_dL = max(1.0, min(5.0, self.blood.albumin_g_dL + albumin_change))
+        alb_current = self._blood_read("albumin_g_dL")
+        self._blood_write("albumin_g_dL", max(1.0, min(5.0, alb_current + albumin_change)))
         self.cumulative_albumin_production_g += synthesis_rate * dt_min / 60.0
 
         # ── 5. 胆红素代谢（时序 ODE → 状态变量） ───────────────────────────
@@ -189,25 +228,29 @@ class LiverModule:
         self._bilirubin_accumulation = new_accum
 
         bilirubin_level = _BILIRUBIN_AXIS_INTERCEPT + new_accum * _BILIRUBIN_SEVERITY_SLOPE
-        self.blood.bilirubin_mg_dL = max(0.1, min(15.0, bilirubin_level))
+        self._blood_write("bilirubin_mg_dL", max(0.1, min(15.0, bilirubin_level)))
 
         # 肝酶
         if conj < 0.8:
-            self.blood.ALT_U_L = 25.0 + (1.0 - conj) * 150.0
-            self.blood.AST_U_L = 25.0 + (1.0 - conj) * 200.0
-            self.blood.ALP_U_L = 30.0 + (1.0 - conj) * 300.0
+            self._blood_write("ALT_U_L", 25.0 + (1.0 - conj) * 150.0)
+            self._blood_write("AST_U_L", 25.0 + (1.0 - conj) * 200.0)
+            self._blood_write("ALP_U_L", 30.0 + (1.0 - conj) * 300.0)
 
         # ── 6. 凝血因子（代数更新到 blood） ──────────────────────────────────
         k_VII = 0.12
         target_VII = 0.04 * self.metabolic_activity * max(0.1, conj)
-        self.blood.coagulation_factor_VII += (target_VII - self.blood.coagulation_factor_VII) * k_VII * dt_hour
-        self.blood.coagulation_factor_VII = max(0.05, min(1.0, self.blood.coagulation_factor_VII))
-        PT_factor = 1.0 + (1.0 - self.blood.coagulation_factor_VII) * 1.5
-        self.blood.PT_sec = 12.0 * PT_factor
-        self.blood.INR = self.blood.PT_sec / 12.0
+        vii_current = self._blood_read("coagulation_factor_VII")
+        vii_new = vii_current + (target_VII - vii_current) * k_VII * dt_hour
+        vii_new = max(0.05, min(1.0, vii_new))
+        self._blood_write("coagulation_factor_VII", vii_new)
+        PT_factor = 1.0 + (1.0 - vii_new) * 1.5
+        PT_sec = 12.0 * PT_factor
+        INR = PT_sec / 12.0
+        self._blood_write("PT_sec", PT_sec)
+        self._blood_write("INR", INR)
 
         # ── 7. CYP450（代数） ───────────────────────────────────────────────
-        drug_conc = getattr(self.blood, "drug_concentration_mg_kg", 0.0)
+        drug_conc = self._blood_read("drug_concentration_mg_kg")
         if drug_conc > 0 and self.cyp450_activity > 0:
             baseline_flow = 0.25 * base_cardiac_output_ml_min(self.w)
             hepatic_factor = min(1.0, hepatic_flow / baseline_flow)
@@ -215,19 +258,20 @@ class LiverModule:
             metabolism_rate = Vmax * drug_conc / (_CYP450_KM + drug_conc)
             max_clearance = drug_conc
             cleared = min(metabolism_rate, max_clearance)
-            self.blood.drug_concentration_mg_kg = max(0.0, drug_conc - cleared)
+            self._blood_write("drug_concentration_mg_kg", max(0.0, drug_conc - cleared))
 
         # ── 8. 肠道氨基酸清除 ────────────────────────────────────────────────
         if hepatic_flow > 0:
             amino_removed_g_L = amino_g_min * dt_min / (hepatic_flow / 1000)
-            self.blood.amino_acids_g_L = max(0.1, self.blood.amino_acids_g_L - amino_removed_g_L)
+            amino_current = self._blood_read("amino_acids_g_L")
+            self._blood_write("amino_acids_g_L", max(0.1, amino_current - amino_removed_g_L))
 
         self.hepatic_blood_flow = hepatic_flow
         self.cumulative_glucose_production_g += glucose_output * dt_min
         self.cumulative_urea_production_mmol += total_production * dt_min / 2.0
 
         # ── 9. Cori cycle（代数更新到 blood.lactate 和 blood.glucose） ─────
-        lactate = self.blood.lactate_mmol_L
+        lactate = self._blood_read("lactate_mmol_L")
         if lactate > 0.1:
             baseline_flow = 0.25 * base_cardiac_output_ml_min(self.w)
             hepatic_factor = min(1.0, hepatic_flow / baseline_flow)
@@ -237,10 +281,10 @@ class LiverModule:
             )
             lactate_consumed = uptake_rate * dt_min
             glucose_from_lactate = lactate_consumed / 2.0
-            self.blood.glucose_mmol_L = min(25.0, self.blood.glucose_mmol_L + glucose_from_lactate)
+            glu_current = self._blood_read("glucose_mmol_L")
+            self._blood_write("glucose_mmol_L", min(25.0, glu_current + glucose_from_lactate))
 
         # ── 状态变量导数 ───────────────────────────────────────────────────
-        # dGlycogen 已经是 per-second rate (dt_min/dt 抵消)，无需再除以 dt
         dGlycogen_net = dGlycogen  # per-second rate
         dydt = {
             "glycogen_fraction": dGlycogen_net,
@@ -249,18 +293,18 @@ class LiverModule:
 
         outputs = {
             "glucose_output_g_min": glucose_output,
-            "ammonia_umol_L": self.blood.ammonia_umol_L,
-            "albumin_g_dL": self.blood.albumin_g_dL,
-            "bilirubin_mg_dL": self.blood.bilirubin_mg_dL,
-            "ALT_U_L": self.blood.ALT_U_L,
-            "AST_U_L": self.blood.AST_U_L,
-            "ALP_U_L": self.blood.ALP_U_L,
-            "GGT_U_L": self.blood.GGT_U_L,
+            "ammonia_umol_L": new_ammonia,
+            "albumin_g_dL": self._blood_read("albumin_g_dL"),
+            "bilirubin_mg_dL": self._blood_read("bilirubin_mg_dL"),
+            "ALT_U_L": self._blood_read("ALT_U_L"),
+            "AST_U_L": self._blood_read("AST_U_L"),
+            "ALP_U_L": self._blood_read("ALP_U_L"),
+            "GGT_U_L": self._blood_read("GGT_U_L"),
             "hepatic_blood_flow_mL_min": hepatic_flow,
-            "coagulation_factor_VII": self.blood.coagulation_factor_VII,
-            "PT_sec": self.blood.PT_sec,
-            "INR": self.blood.INR,
-            "fibrinogen_mg_dL": self.blood.fibrinogen_mg_dL,
+            "coagulation_factor_VII": self._blood_read("coagulation_factor_VII"),
+            "PT_sec": PT_sec,
+            "INR": INR,
+            "fibrinogen_mg_dL": self._blood_read("fibrinogen_mg_dL"),
             "metabolic_activity": self.metabolic_activity,
             "detox_capacity": self.detox_capacity,
             "cyp450_activity": self.cyp450_activity,
@@ -290,53 +334,47 @@ class LiverModule:
         gut_state: 包含 absorption_amino_g_min 等速率值
         """
         dt_min = dt / 60.0
-        glucose = self.blood.glucose_mmol_L
+        glucose = self._blood_read("glucose_mmol_L")
         glucose_production_g_min = 0.0
 
         # 低血糖：糖原分解
         if glucose < 3.5:
-            # 糖原分解速率 (g/min)，受 metabolic_activity 调节
             base_rate = 0.3 * self.glycogen_fraction  # 最大 0.3 g/min（满糖原时）
             rate = base_rate * self.metabolic_activity
 
-            # 极低血糖时加速
             if glucose < 2.5:
                 rate *= 3.0
             elif glucose < 3.0:
                 rate *= 1.5
 
-            # 消耗糖原（per-minute rate × dt_min）
             glycogen_consumed_g = rate * dt_min * _MAX_GLYCOGEN_G
             self.glycogen_fraction = max(0.0, self.glycogen_fraction - glycogen_consumed_g / _MAX_GLYCOGEN_G)
             glucose_production_g_min += rate
 
         # 高血糖：糖原合成
         if glucose > 6.0:
-            # 糖原合成速率 (g/min)
             base_rate = 0.2 * self.metabolic_activity
             rate = base_rate
 
-            # 极高血糖时加速
             if glucose > 8.0:
                 rate *= 2.0
             elif glucose > 7.0:
                 rate *= 1.5
 
-            # 合成糖原（限制最大糖原量），per-minute rate × dt_min
             glycogen_synthesized_g = rate * dt_min * _MAX_GLYCOGEN_G
-            max_glycogen_g = _MAX_GLYCOGEN_G
             self.glycogen_fraction = min(
                 1.0,
-                self.glycogen_fraction + glycogen_synthesized_g / max_glycogen_g
+                self.glycogen_fraction + glycogen_synthesized_g / _MAX_GLYCOGEN_G
             )
 
         # 氨中毒时抑制糖异生（肝脏受损时）
-        if self.blood.ammonia_umol_L > 100:
-            glucose_production_g_min *= max(0.3, 1.0 - (self.blood.ammonia_umol_L - 100) / 400)
+        ammonia_umol_L = self._blood_read("ammonia_umol_L")
+        if ammonia_umol_L > 100:
+            glucose_production_g_min *= max(0.3, 1.0 - (ammonia_umol_L - 100) / 400)
 
         # 糖异生：利用氨基酸（来自 gut_state 速率）合成葡萄糖
-        if self.blood.glucose_mmol_L < 3.5 and self.metabolic_activity > 0.3:
-            # 氨基酸糖异生（使用 gut_state 中的吸收速率 g/min）
+        blood_glucose = self._blood_read("glucose_mmol_L")
+        if blood_glucose < 3.5 and self.metabolic_activity > 0.3:
             amino_g_min = gut_state.get("absorption_amino_g_min", 0.0)
             gluconeogenesis_rate = amino_g_min * 0.6  # 60% 转化为葡萄糖
             glucose_production_g_min += gluconeogenesis_rate * self.metabolic_activity
@@ -361,21 +399,17 @@ class LiverModule:
         detox_capacity=0.2 时：
           k_eff = 0.2 → SS = 22/0.2 = 110 μmol/L（严重高氨血症）
         """
-        ammonia = self.blood.ammonia_umol_L
+        ammonia = self._blood_read("ammonia_umol_L")
         dt_min = dt / 60.0
 
-        # 清除：第一阶动力学，k 受 detox_capacity 调节
         k = 1.0 * self.detox_capacity  # 随解毒能力缩放
         detox_rate_umol_min = k * ammonia  # 随浓度变化的清除率
 
-        # 肠道来源的氨（来自 gut_state 的氨基酸吸收速率，per-minute）
         gut_amino_rate = gut_state.get("absorption_amino_g_min", 0.0)
         gut_ammonia_rate = gut_amino_rate * _AMINO_TO_AMMONIA_UMOL_PER_G
 
-        # 内源性氨产生率（组织蛋白分解 + 肾脏产氨，per-minute）
         endogenous_rate = self.endogenous_ammonia_rate
 
-        # 总产氨速率 (μmol/min)
         total_production_rate = gut_ammonia_rate + endogenous_rate
 
         # 血氨更新：dA/dt = production - k*A
@@ -385,7 +419,7 @@ class LiverModule:
             + (total_production_rate / k) * (1.0 - math.exp(-k * dt_min))
         )
         new_ammonia = max(0.0, new_ammonia)
-        self.blood.ammonia_umol_L = new_ammonia
+        self._blood_write("ammonia_umol_L", new_ammonia)
 
         # 尿素产生（2 NH3 → 1 CO(NH2)2）
         ammonia_consumed = max(0.0, ammonia - new_ammonia)
@@ -393,7 +427,8 @@ class LiverModule:
 
         # 更新血尿素氮
         if urea_produced_mmol > 0:
-            self.blood.bun_mg_dL += urea_produced_mmol * _UREA_MMOL_TO_BUN_MG_DL * dt_min
+            bun_current = self._blood_read("bun_mg_dL")
+            self._blood_write("bun_mg_dL", bun_current + urea_produced_mmol * _UREA_MMOL_TO_BUN_MG_DL * dt_min)
 
         return total_production_rate
 
@@ -410,15 +445,16 @@ class LiverModule:
         activity_factor = self.metabolic_activity
 
         # 氨基酸可用性因子（门静脉氨基酸浓度）
-        amino_factor = min(2.0, self.blood.amino_acids_g_L / 1.0)  # 正常 ~1.0 g/L
+        amino_g_L = self._blood_read("amino_acids_g_L")
+        amino_factor = min(2.0, amino_g_L / 1.0)  # 正常 ~1.0 g/L
 
         # 合成速率 g/day
         synthesis_rate = base_rate_g_day * activity_factor * amino_factor
 
         # 更新白蛋白（正常 2.5-4.0 g/dL，半衰期 ~20 天，简化处理）
         albumin_change_g_dL = synthesis_rate * dt_hour / 24.0  # g/dL per step
-        self.blood.albumin_g_dL = max(1.0, self.blood.albumin_g_dL + albumin_change_g_dL)
-        self.blood.albumin_g_dL = min(5.0, self.blood.albumin_g_dL)  # 上限
+        alb_current = self._blood_read("albumin_g_dL")
+        self._blood_write("albumin_g_dL", max(1.0, min(5.0, alb_current + albumin_change_g_dL)))
 
         # 累计（g）
         self.cumulative_albumin_production_g += synthesis_rate * dt_min / 60.0
@@ -468,14 +504,14 @@ class LiverModule:
             _BILIRUBIN_AXIS_INTERCEPT
             + new_accumulation * _BILIRUBIN_SEVERITY_SLOPE
         )
-        self.blood.bilirubin_mg_dL = max(0.1, min(15.0, bilirubin_level))
+        self._blood_write("bilirubin_mg_dL", max(0.1, min(15.0, bilirubin_level)))
 
         # 肝酶升高模拟（ALT, AST 反映肝细胞损伤）
         # ALP 反映胆汁淤积
         if conjugation_factor < 0.8:
-            self.blood.ALT_U_L = 25.0 + (1.0 - conjugation_factor) * 150.0
-            self.blood.AST_U_L = 25.0 + (1.0 - conjugation_factor) * 200.0
-            self.blood.ALP_U_L = 30.0 + (1.0 - conjugation_factor) * 300.0
+            self._blood_write("ALT_U_L", 25.0 + (1.0 - conjugation_factor) * 150.0)
+            self._blood_write("AST_U_L", 25.0 + (1.0 - conjugation_factor) * 200.0)
+            self._blood_write("ALP_U_L", 30.0 + (1.0 - conjugation_factor) * 300.0)
 
     def _compute_cyp450_drug_metabolism(self, dt: float, drug_conc: float) -> float:
         """
@@ -554,10 +590,8 @@ class LiverModule:
         # Cori cycle：2 lactate → 1 glucose（糖异生）
         glucose_from_lactate = lactate_consumed / 2.0
         if glucose_from_lactate > 0.001:
-            self.blood.glucose_mmol_L = min(
-                25.0,
-                self.blood.glucose_mmol_L + glucose_from_lactate
-            )
+            glu_current = self._blood_read("glucose_mmol_L")
+            self._blood_write("glucose_mmol_L", min(25.0, glu_current + glucose_from_lactate))
 
         return lactate_consumed
 
@@ -568,7 +602,8 @@ class LiverModule:
         此方法读取当前血乳酸浓度，执行 Cori cycle，更新血糖，
         返回本步净消耗量（供 caller 计算总清除率）。
         """
-        return self._compute_lactate_metabolism(dt, self.blood.lactate_mmol_L)
+        lactate = self._blood_read("lactate_mmol_L")
+        return self._compute_lactate_metabolism(dt, lactate)
 
     def compute_drug_clearance(self, dt: float, drug_conc: float) -> float:
         """
@@ -600,24 +635,22 @@ class LiverModule:
         dt_hour = dt / 3600.0
 
         # 因子 VII 更新（一阶动力学）
-        # d[F]/dt = synthesis - k * F，其中 k = ln(2) / t_half
-        # 因子 VII t_half ≈ 6h, k ≈ 0.12/h
         k_VII = 0.12
         base_synthesis_VII = 0.04  # 每天合成约 4% 总量（半衰期 6h≈24%/天）
         synthesis_factor = self.metabolic_activity * max(0.1, self.detox_capacity)
         target_VII = base_synthesis_VII * synthesis_factor
-        self.blood.coagulation_factor_VII += (
-            (target_VII - self.blood.coagulation_factor_VII) * k_VII * dt_hour
-        )
-        self.blood.coagulation_factor_VII = max(
-            0.05, min(1.0, self.blood.coagulation_factor_VII)
-        )
+        vii_current = self._blood_read("coagulation_factor_VII")
+        vii_new = vii_current + (target_VII - vii_current) * k_VII * dt_hour
+        vii_new = max(0.05, min(1.0, vii_new))
+        self._blood_write("coagulation_factor_VII", vii_new)
 
         # PT 估算：正常 12s，因子 VII 活性越低 PT 越长
         base_PT = 12.0
-        PT_factor = 1.0 + (1.0 - self.blood.coagulation_factor_VII) * 1.5
-        self.blood.PT_sec = base_PT * PT_factor
-        self.blood.INR = self.blood.PT_sec / base_PT
+        PT_factor = 1.0 + (1.0 - vii_new) * 1.5
+        PT_sec = base_PT * PT_factor
+        INR = PT_sec / base_PT
+        self._blood_write("PT_sec", PT_sec)
+        self._blood_write("INR", INR)
 
     def compute(self, dt: float, gut_state: dict, cardiac_output: float) -> dict:
         """
@@ -640,16 +673,13 @@ class LiverModule:
         # 将肠道吸收的葡萄糖加入血液（gut 已经写了 blood.glucose，这里补充糖异生）
         if glucose_output_g_min > 0.05:
             dt_min = dt / 60.0
-            # 葡萄糖增加量 = 产生速率 × dt_min → 转换为 mmol/L
             plasma_ml = self.w * 86 * 0.55
             if plasma_ml > 0:
                 glucose_mmol = (glucose_output_g_min * 1000 / 180)  # g → mmol
                 glucose_increase = glucose_mmol / (plasma_ml / 1000)  # mmol/L per min
-                # 移除地板：允许血糖跌至生理下限（约 1.5 mmol/L）
-                self.blood.glucose_mmol_L = max(
-                    1.0,  # 生理下限（不是地板，是糖异生极限）
-                    min(25.0, self.blood.glucose_mmol_L + glucose_increase * dt_min)
-                )
+                glu_current = self._blood_read("glucose_mmol_L")
+                self._blood_write("glucose_mmol_L",
+                    max(1.0, min(25.0, glu_current + glucose_increase * dt_min)))
 
         # Step 3: 氨解毒（使用 gut_state 速率）
         ammonia_clearance = self._compute_ammonia_detox(dt, gut_state)
@@ -660,28 +690,24 @@ class LiverModule:
         # Step 5: 胆红素代谢（时序 ODE）
         self._compute_bilirubin_metabolism(dt)
 
-        # Step 6: CYP450 代谢 — drug_conc 通过 compute_drug_clearance() API
-        # 由 pharmacology.py 调用（per-drug），此处以 blood.drug_concentration_mg_kg
-        # 为通用药物浓度占位（多药物场景由 PharmacologyState 分别处理）
-        drug_conc = getattr(self.blood, "drug_concentration_mg_kg", 0.0)
+        # Step 6: CYP450 代谢
+        drug_conc = self._blood_read("drug_concentration_mg_kg")
         cyp450_cleared = self._compute_cyp450_drug_metabolism(dt, drug_conc)
         if cyp450_cleared > 0 and drug_conc > 0:
-            self.blood.drug_concentration_mg_kg = max(
-                0.0, self.blood.drug_concentration_mg_kg - cyp450_cleared
-            )
+            self._blood_write("drug_concentration_mg_kg", max(0.0, drug_conc - cyp450_cleared))
 
         # Step 7: 凝血因子合成（PT/INR）
         self._compute_coagulation_factors(dt)
 
         # 清除门户缓存（模拟肝脏对肠道吸收营养的摄取）
-        # 肠道来的氨基酸被肝脏摄取用于糖异生/蛋白质合成
         gut_amino_rate = gut_state.get("absorption_amino_g_min", 0.0)
         dt_min = dt / 60.0
         amino_removed_g_L = gut_amino_rate * dt_min / (self.hepatic_blood_flow / 1000) if self.hepatic_blood_flow > 0 else 0.0
-        self.blood.amino_acids_g_L = max(0.1, self.blood.amino_acids_g_L - amino_removed_g_L)
+        if amino_removed_g_L > 0:
+            amino_current = self._blood_read("amino_acids_g_L")
+            self._blood_write("amino_acids_g_L", max(0.1, amino_current - amino_removed_g_L))
 
         # 累计输出追踪
-        dt_min = dt / 60.0
         self.cumulative_glucose_production_g += glucose_output_g_min * dt_min
         self.cumulative_urea_production_mmol += ammonia_clearance * dt_min / 2.0
 
@@ -695,19 +721,19 @@ class LiverModule:
             "glucose_output_g_min": round(glucose_output_g_min, 3),
             "ammonia_clearance_umol_min": round(ammonia_clearance, 1),
             "albumin_synthesis_g_day": round(albumin_synthesis, 2),
-            "ALT_U_L": round(self.blood.ALT_U_L, 1),
-            "AST_U_L": round(self.blood.AST_U_L, 1),
-            "ALP_U_L": round(self.blood.ALP_U_L, 1),
-            "GGT_U_L": round(self.blood.GGT_U_L, 1),
-            "albumin_g_dL": round(self.blood.albumin_g_dL, 2),
-            "ammonia_umol_L": round(self.blood.ammonia_umol_L, 1),
-            "glucose_mmol_L": round(self.blood.glucose_mmol_L, 2),
-            "BUN_mg_dL": round(self.blood.bun_mg_dL, 1),
+            "ALT_U_L": round(self._blood_read("ALT_U_L"), 1),
+            "AST_U_L": round(self._blood_read("AST_U_L"), 1),
+            "ALP_U_L": round(self._blood_read("ALP_U_L"), 1),
+            "GGT_U_L": round(self._blood_read("GGT_U_L"), 1),
+            "albumin_g_dL": round(self._blood_read("albumin_g_dL"), 2),
+            "ammonia_umol_L": round(self._blood_read("ammonia_umol_L"), 1),
+            "glucose_mmol_L": round(self._blood_read("glucose_mmol_L"), 2),
+            "BUN_mg_dL": round(self._blood_read("bun_mg_dL"), 1),
             "lactate_consumed_mmol_L": 0.0,  # Cori cycle via consume_lactate() API
             "cyp450_drug_cleared": round(cyp450_cleared, 4),
-            "PT_sec": round(self.blood.PT_sec, 1),
-            "INR": round(self.blood.INR, 2),
-            "coagulation_factor_VII": round(self.blood.coagulation_factor_VII, 3),
+            "PT_sec": round(self._blood_read("PT_sec"), 1),
+            "INR": round(self._blood_read("INR"), 2),
+            "coagulation_factor_VII": round(self._blood_read("coagulation_factor_VII"), 3),
         }
 
     def summary(self) -> dict:
@@ -718,8 +744,8 @@ class LiverModule:
             "cyp450_activity": round(self.cyp450_activity, 3),
             "glycogen": round(self.glycogen_fraction, 3),
             "hepatic_flow": round(self.hepatic_blood_flow, 1),
-            "albumin": round(self.blood.albumin_g_dL, 2),
-            "ammonia": round(self.blood.ammonia_umol_L, 1),
-            "PT_sec": round(self.blood.PT_sec, 1),
-            "INR": round(self.blood.INR, 2),
+            "albumin": round(self._blood_read("albumin_g_dL"), 2),
+            "ammonia": round(self._blood_read("ammonia_umol_L"), 1),
+            "PT_sec": round(self._blood_read("PT_sec"), 1),
+            "INR": round(self._blood_read("INR"), 2),
         }
