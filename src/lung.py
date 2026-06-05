@@ -190,11 +190,30 @@ class LungModule:
 
     def _alveolar_gas_equation(self, RR: float, Vt: float, PACO2: float) -> float:
         """
-        肺泡气体方程
+        肺泡气体方程 + Phase 2 #11 代谢耦合 RQ — REF: Frayn 2010
         PAO2 = FiO2 × (Patm - PH2O) - PACO2/R
+        RQ 随血糖状态变化:
+        - glucose > 12 (DKA) → RQ ≈ 0.70 (脂肪氧化)
+        - glucose 6-12 → RQ ≈ 0.85
+        - glucose 4-6 → RQ ≈ 0.95 (糖类氧化)
+        - glucose < 4 → RQ ≈ 0.80 (低血糖脂肪)
         """
         PIO2 = self.FiO2 * (self.Patm_mmHg - self.PH2O_mmHg)  # 吸入气氧分压 ≈ 150 mmHg
-        R = self.respiratory_quotient
+        # Phase 2 #11: 代谢耦合 RQ (温和范围, 不破坏基线 PAO2)
+        # - DKA (glucose > 12) → RQ 0.70 (脂肪氧化)
+        # - 高血糖 (6-12) → 0.82
+        # - 正常 (4-6) → 0.88 (略低于 0.95 避免 PAO2 越界)
+        # - 低血糖 (<4) → 0.78
+        glucose = getattr(self.blood, 'glucose_mmol_L', 5.0)
+        if glucose > 12.0:
+            R = 0.70
+        elif glucose > 6.0:
+            R = 0.82
+        elif glucose > 4.0:
+            R = 0.88
+        else:
+            R = 0.78
+        R = max(0.65, min(1.0, R))
         PAO2 = PIO2 - PACO2 / R
         return max(50.0, min(150.0, PAO2))
 
