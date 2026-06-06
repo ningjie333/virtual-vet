@@ -125,7 +125,9 @@ def _snapshot_json(vc: VirtualCreature) -> str:
 # ============================================================
 # 游戏会话存储（单用户，内存存储）
 # ============================================================
+import threading
 _game_sessions: dict[str, GameState] = {}
+_session_locks: dict[str, threading.Lock] = {}  # session_id → lock
 _action_seq: dict[str, int] = {}  # session_id → next seq number
 _DEFAULT_SESSION_ID = "case_001"
 
@@ -315,6 +317,7 @@ def api_new_game():
 
     # 用 case_id 作为 session id（单用户原型）
     session_id = case_id
+    _session_locks[session_id] = threading.Lock()
     _game_sessions[session_id] = state
 
     # Persist to SQLite
@@ -360,48 +363,53 @@ def api_examine():
     session_id = data.get("session_id", _DEFAULT_SESSION_ID)
     test_type = data.get("test_type", "physical")
 
-    state = _game_sessions.get(session_id)
-    if not state:
+    lock = _session_locks.get(session_id)
+    if not lock:
         return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
 
-    if state.phase in ("won", "lost"):
-        return jsonify({"error": f"游戏已结束: {state.phase}"}), 400
+    with lock:
+        state = _game_sessions.get(session_id)
+        if not state:
+            return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
 
-    # 使用 action_system 的 process_action
-    result = process_action(state, "examine", {"test_type": test_type})
+        if state.phase in ("won", "lost"):
+            return jsonify({"error": f"游戏已结束: {state.phase}"}), 400
 
-    engine_summary = result.get("engine_summary", {})
-    response = {
-        "success": result["success"],
-        "phase": result["phase"],
-        "medical_phase": result.get("medical_phase", "stable"),
-        "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
-        "time_budget_min": state.time_budget_min,
-        "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
-        "death_timer": state.death_timer,
-        "report": result.get("result"),
-        "new_reports": result.get("new_reports", []),
-        "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.time_elapsed_min),
-        "game_log": _build_game_log(state),
-        "game_time": engine_summary.get("game_time", "08:00"),
-        "is_night": engine_summary.get("is_night", False),
-        "time_cost_min": result.get("time_cost_min", 0),
-    }
+        # 使用 action_system 的 process_action
+        result = process_action(state, "examine", {"test_type": test_type})
 
-    if not result["success"] and result.get("error"):
-        response["error"] = result["error"]
-
-    if state.phase == "lost":
-        response["game_over"] = {
-            "reason": "患犬未能挺过危机，抢救无效。",
-            "actual_disease": state.disease_name,
+        engine_summary = result.get("engine_summary", {})
+        response = {
+            "success": result["success"],
+            "phase": result["phase"],
+            "medical_phase": result.get("medical_phase", "stable"),
+            "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
+            "time_budget_min": state.time_budget_min,
+            "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
+            "death_timer": state.death_timer,
+            "report": result.get("result"),
+            "new_reports": result.get("new_reports", []),
+            "pending_reports": result.get("pending_count", 0),
+            "vitals": _get_vitals(state.engine, state.time_elapsed_min),
+            "game_log": _build_game_log(state),
+            "game_time": engine_summary.get("game_time", "08:00"),
+            "is_night": engine_summary.get("is_night", False),
+            "time_cost_min": result.get("time_cost_min", 0),
         }
 
-    # Persist to SQLite (best-effort)
-    _persist_action(state, session_id, "examine", {"test_type": test_type}, result)
+        if not result["success"] and result.get("error"):
+            response["error"] = result["error"]
 
-    return jsonify(response)
+        if state.phase == "lost":
+            response["game_over"] = {
+                "reason": "患犬未能挺过危机，抢救无效。",
+                "actual_disease": state.disease_name,
+            }
+
+        # Persist to SQLite (best-effort)
+        _persist_action(state, session_id, "examine", {"test_type": test_type}, result)
+
+        return jsonify(response)
 
 
 @app.route("/api/administer-drug", methods=["POST"])
