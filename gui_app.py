@@ -938,4 +938,4 @@ if __name__ == "__main__":
     print("  访问: http://127.0.0.1:5000")
     print("  按 Ctrl+C 停止")
     print("=" * 60)
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, use_reloader=False)
