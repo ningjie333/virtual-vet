@@ -55,7 +55,7 @@ MU_SHALLOW = 0.8                   # 浅快呼吸（肺顺应性降低时）
 PCO2_DRIVE_GAIN = 0.008            # PCO2 每升高 1 mmHg → 频率增加 0.8%（生理：严重高碳酸血症 RR约增加 50-80%）
 PO2_DRIVE_THRESHOLD = 80.0         # 低氧驱动阈值 (mmHg)
 PO2_DRIVE_GAIN = 0.04              # PO2 每降低 1 mmHg → 频率增加 4%（外周化学感受器）
-PH_DRIVE_GAIN = 0.8                # pH 每降低 0.1 → 频率增加 80%（Kussmaul 呼吸）
+PH_DRIVE_GAIN = 0.1                # pH 每降低 0.1 → 频率增加 1%（原80%，过高导致闭环振荡）
 
 # 呼气/吸气时间比（正常 I:E ≈ 1:1.5）
 IE_RATIO_EXPIRATION = 1.5          # 呼气时长 = 吸气 × 1.5
@@ -128,7 +128,7 @@ class VanDerPolRespiratoryRhythm:
         self._compute_chemoreceptor_drive(pco2, po2, ph)
 
         # 2. 平滑更新 VdP 参数（避免突变）
-        alpha = min(1.0, self.dt / 5.0)  # 5s 时间常数（与 RR 代偿同步）
+        alpha = min(1.0, self.dt / 10.0)  # 10s 时间常数（更慢的代偿，防振荡）
         self.omega += (self._target_omega - self.omega) * alpha
         self.mu += (self._target_mu - self.mu) * alpha
 
@@ -166,11 +166,12 @@ class VanDerPolRespiratoryRhythm:
             omega *= (1.0 + PO2_DRIVE_GAIN * hypoxic_drive * 10.0)
             mu = min(MU_DEEP, mu + 0.1 * hypoxic_drive)
 
-        # pH 驱动（代谢性酸中毒 → Kussmaul 呼吸）
+        # pH 驱动（代谢性酸中毒 → Kussmaul 呼吸，仅调频率不调幅度）
+        # 注意：mu 不能受 pH 调制——mu 控制极限环半径，mu变化 → amplitude 变化
+        # → TV 变化 → PCO2 变化 → pH 变化，形成正反馈振荡
         ph_error = 7.40 - ph
         if ph_error > 0.05:
             omega *= (1.0 + PH_DRIVE_GAIN * ph_error)
-            mu = min(MU_DEEP, mu + 0.5 * ph_error)
 
         self._target_omega = omega
         self._target_mu = mu

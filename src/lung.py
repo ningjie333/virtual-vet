@@ -85,6 +85,10 @@ class LungModule:
 
         # 通气血流比（V/Q matching）
         self.VQ_ratio = 0.8                         # 正常约 0.8
+
+        # VdP 幅度平滑追踪器（步骤3：消除每呼吸周期振幅振荡）
+        # amplitude 振荡在呼吸周期频率上，用 3s 窗口平均消除
+        self._vdp_amp_smoothed = 2.0                # 初始值与极限环幅值一致
         # Phase 2 #6: 分流 + 死腔通道 (West 2012)
         self.shunt_fraction = 0.0                   # 0=正常, 0.3=ARDS
         self.dead_space_fraction = 0.3              # 正常 ≈ 0.3
@@ -282,9 +286,11 @@ class LungModule:
         # 从 VdP 输出获取目标呼吸频率
         target_rr = self._vdp.respiratory_rate
 
-        # 平滑过渡（避免数值振荡，alpha 最大 1.0 防过冲）
-        alpha = min(1.0, dt / 5.0)  # 5s 时间常数（呼吸代偿需要分钟级响应，不是亚秒级）
-        self.respiratory_rate += (target_rr - self.respiratory_rate) * alpha
+        # 步骤5：RR 变化限幅（每步最多 ±1 breath/min，防止 Kussmaul 超调）
+        rr_error = target_rr - self.respiratory_rate
+        max_rr_change =1.0  # breath/min per step
+        clamped_error = max(-max_rr_change, min(max_rr_change, rr_error))
+        self.respiratory_rate += clamped_error
 
         # 限幅
         self.respiratory_rate = max(
@@ -292,10 +298,14 @@ class LungModule:
             min(self.max_respiratory_rate, self.respiratory_rate)
         )
 
-        # 潮气量随 VdP 幅度调制：以正常极限环幅度（~2.0）为中心，
-        # 幅度增大（低氧/高碳酸血症）→ TV 增大，幅度降低 → TV 减小。
-        vdp_amplitude = self._vdp.amplitude
-        tv_factor = 1.0 + 0.4 * (vdp_amplitude - 2.0) / 1.0
+        # 步骤3：VdP 幅度3s 滑动平均（消除每呼吸周期振荡）
+        alpha_amp = min(1.0, dt / 3.0)
+        self._vdp_amp_smoothed += (self._vdp.amplitude - self._vdp_amp_smoothed) * alpha_amp
+
+        # 步骤4：TV 改用 RR 偏差驱动（而非 amplitude），解耦 TV 与 VdP 幅度
+        # RR 偏离基线越大 → 通气需求越高 → TV 增大
+        rr_ratio = self.respiratory_rate / self.base_respiratory_rate
+        tv_factor = 1.0 + 0.3 * max(0.0, rr_ratio - 1.0)
         tv_factor = max(0.8, min(1.5, tv_factor))
         self.tidal_volume = self.base_tidal_volume * tv_factor
 
