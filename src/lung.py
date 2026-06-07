@@ -283,7 +283,7 @@ class LungModule:
         target_rr = self._vdp.respiratory_rate
 
         # 平滑过渡（避免数值振荡，alpha 最大 1.0 防过冲）
-        alpha = min(1.0, dt / 0.5)  # 500ms 时间常数
+        alpha = min(1.0, dt / 5.0)  # 5s 时间常数（呼吸代偿需要分钟级响应，不是亚秒级）
         self.respiratory_rate += (target_rr - self.respiratory_rate) * alpha
 
         # 限幅

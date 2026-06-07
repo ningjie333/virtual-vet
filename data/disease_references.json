@@ -113,14 +113,14 @@
         "mechanism": "Loss of concentrating ability"
       },
       "t_wave_tall": {
-        "threshold": "K+ 5.5-6.0",
-        "source": "Iimori 2026; Today's Vet Pract 2022",
+        "threshold": "K+ 5.5-6.0 mEq/L",
+        "source": "Langston & Reineks 2011; Cowgill 2023",
         "mechanism": "Accelerated repolarization from elevated extracellular K+"
       },
       "qrs_wide": {
-        "threshold": "K+ 6.5-7.0",
-        "source": "Iimori 2026",
-        "mechanism": "Slowed ventricular conduction"
+        "threshold": "K+ 6.5-7.0 mEq/L",
+        "source": "Langston & Reineks 2011; Cowgill 2023",
+        "mechanism": "Slowed ventricular conduction; further widening → sine wave at K+ >8.0"
       },
       "SDMA_high": {
         "threshold": ">14 ug/dL",
@@ -182,6 +182,28 @@
         "clinical": "Severe azotemia with life-threatening complications"
       },
       "source": "IRIS 2023 AKI Guidelines"
+    },
+    "treatment_basis": {
+      "fluid_bolus": {
+        "rationale": "Balance crystalloids (LRS or Normosol) to restore renal perfusion; avoid fluid overload in oliguric patients",
+        "source": "IRIS 2024; Cowgill 2023"
+      },
+      "furosemide": {
+        "rationale": "Loop diuretic to promote urine output; given after initial fluid resuscitation",
+        "source": "IRIS 2024; Segev 2024"
+      },
+      "antiemetic": {
+        "rationale": "Control nausea/vomiting from uremia and gastric irritation (maropitant or ondansetron)",
+        "source": "IRIS 2024"
+      },
+      "phosphate_binder": {
+        "rationale": "Bind enteric phosphate when hyperphosphatemia is severe (e.g., aluminum hydroxide)",
+        "source": "IRIS 2024"
+      },
+      "peritoneal_dialysis": {
+        "rationale": "Indicated for refractory oliguria/anuria, severe hyperkalemia, or fluid overload unresponsive to diuretics",
+        "source": "Cowgill 2023; Segev 2024"
+      }
     }
   },
   "dilated_cardiomyopathy": {
@@ -519,18 +541,17 @@
         "type": "review"
       },
       {
-        "authors": "Iimori Y, Johnson PA, Thomovsky EJ, et al.",
-        "year": 2026,
-        "title": "Emergency management of hyperkalemia in dogs and cats",
-        "journal": "Can Vet J",
-        "pmid": "41929733",
-        "type": "review"
+        "authors": "Langston VC, Reineks R",
+        "year": 2011,
+        "title": "Urolithiasis",
+        "journal": "Nephrology and Urology of Small Animals",
+        "type": "textbook"
       }
     ],
     "criteria": {
       "hr_low": {
         "threshold": "Bradycardia",
-        "source": "Iimori 2026",
+        "source": "Langston 2011; McLoughlin 2000",
         "mechanism": "Hyperkalemia depresses cardiac conduction"
       },
       "hr_high": {
@@ -545,12 +566,12 @@
       },
       "potassium_high": {
         "threshold": ">5.5 mEq/L",
-        "source": "Iimori 2026",
+        "source": "Langston 2011; McLoughlin 2000",
         "mechanism": "Impaired renal K+ excretion from obstruction"
       },
       "ph_low": {
         "threshold": "<7.35",
-        "source": "Iimori 2026",
+        "source": "Langston 2011",
         "mechanism": "Impaired H+ excretion"
       },
       "bladder_distension": {
@@ -564,14 +585,14 @@
         "mechanism": "Complete outflow obstruction"
       },
       "t_wave_tall": {
-        "threshold": "K+ 5.5-6.0",
-        "source": "Iimori 2026",
-        "mechanism": "Accelerated repolarization"
+        "threshold": "K+ 5.5-6.0 mEq/L",
+        "source": "Langston 2011; Merck Vet Manual",
+        "mechanism": "Accelerated repolarization — earliest ECG sign of hyperkalemia"
       },
       "qrs_wide": {
-        "threshold": "K+ 6.5-7.0",
-        "source": "Iimori 2026",
-        "mechanism": "Slowed ventricular conduction"
+        "threshold": "K+ 6.5-7.0 mEq/L",
+        "source": "Langston 2011; Merck Vet Manual",
+        "mechanism": "Slowed ventricular conduction; sine wave pattern at K+ >8.0"
       }
     }
   },
@@ -726,7 +747,18 @@
         "breeds": "Brachycephalic",
         "source": "Mincă 2025"
       }
-    ]
+    ],
+    "pericardiocentesis_indication": {
+      "principle": "Pericardiocentesis is indicated when echocardiographic evidence of cardiac tamponade physiology is present — NOT based on a specific fluid volume threshold",
+      "echo_signs": [
+        "RA diastolic collapse (>1/3 cardiac cycle duration)",
+        "RV diastolic collapse (right ventricular diastolic compression)",
+        "IVC plethora (dilated IVC with <50% collapse on inspiration)",
+        "Respirophasic variation in transvalvular flows (>25% variation in mitral inflow)"
+      ],
+      "source": "Shaw 2007; DeFrancesco 2013; ACVIM Cardiac Disease Consensus 2022",
+      "note": "Even small volumes (<50 mL) can cause life-threatening tamponade if accumulated rapidly; slow accumulation may allow >200 mL without clinical signs"
+    }
   },
   "disseminated_intravascular_coagulation": {
     "guidelines": [

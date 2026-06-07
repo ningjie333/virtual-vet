@@ -1,0 +1,239 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Observable clinical sign rules derived from physiological parameters. All thresholds are species-aware via symptom_thresholds.json. Rules marked 'instantaneous' fire on current parameter values; 'sustained' require a time window; 'cumulative' integrate over time.",
+    "evaluation_types": ["instantaneous", "sustained", "cumulative"],
+    "note": "SymptomEngine reads ENGINE state (blood.xxx, heart.xxx, lung.xxx), NOT disease.xxx state variables. disease.xxx is used only when no engine parameter exists."
+  },
+  "symptoms": {
+    "icterus": {
+      "display_name": "黏膜黄染",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "blood.bilirubin_mg_dL",
+      "threshold_ref": "bilirubin_icterus",
+      "clue_id": "icterus",
+      "description": "血清胆红素超过阈值时可见黏膜黄染。使用真实浓度而非disease.bilirubin_load。"
+    },
+    "vomiting": {
+      "display_name": "呕吐",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": ["BUN", "K", "pH", "Glu", "Na_K_ratio"],
+      "rule": "BUN > bun_uremia OR K > k_hyperkalemia OR pH < ph_metabolic_acidosis OR Glu < glu_hypoglycemia_mg_dL",
+      "compound_rule": "Na_K_ratio < na_k_ratio_addison AND K > k_hyperkalemia",
+      "clue_id": "vomiting",
+      "description": "CTZ激活：尿毒症(BUN>阈值)、高钾血症、酸中毒、低血糖。注：BUN>40是正常上限，>80才是尿毒症。"
+    },
+    "weakness": {
+      "display_name": "虚弱/乏力",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": ["HCT", "PaO2", "pH", "Glu", "Na", "K", "MAP", "Lactate", "Temp_C"],
+      "rule": "HCT < hct_anemia OR PaO2 < pao2_hypoxemia OR Glu < glu_hypoglycemia_mg_dL OR Glu > glu_hyperglycemia_mg_dL OR Na < na_hyponatremia OR Na > na_hypernatremia OR K < k_hypokalemia OR K > k_hyperkalemia OR MAP < map_hypotension OR (Lactate > lactate_shock AND MAP < map_hypotension) OR Temp_C < hypothermia_temp_C OR Temp_C > fever_temp_C",
+      "severity_spread": true,
+      "clue_id": "weakness",
+      "description": "多因素：贫血+低氧+酸中毒+电解质紊乱+低灌注均可导致虚弱。触发条件越多越严重。"
+    },
+    "cough": {
+      "display_name": "咳嗽",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": ["disease_alveolar_exudate", "heart_la_ao_ratio", "lvedp", "tracheal_collapse_grade"],
+      "rule": "disease_alveolar_exudate > 0.3 OR heart_la_ao_ratio > la_ao_ratio_cardiomegaly OR lvedp > lvedp_pulmonary_edema OR tracheal_collapse_grade >= 2",
+      "clue_id": "cough",
+      "description": "下呼吸道刺激：肺泡渗出、左心房扩大导致气道压迫、肺静脉淤血、气管塌陷。RR>35不是咳嗽机制，已删除。"
+    },
+    "dyspnea": {
+      "display_name": "呼吸困难",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": ["RR", "PaO2", "SpO2", "pleural_effusion", "upper_airway_obstruction"],
+      "rule": "(RR > tachypnea_rr AND respiratory_effort >= 2) OR PaO2 < pao2_hypoxemia OR SpO2 < spo2_cyanosis OR pleural_effusion > pleural_effusion_mL_kg OR upper_airway_obstruction == True",
+      "clue_id": "dyspnea",
+      "description": "PaO2<70=低氧血症，不是呼吸困难。呼吸困难=呼吸做功增加+气体交换受损。复合规则：RR升高+呼吸费力，或严重低氧，或胸腔积液，或上呼吸道阻塞。"
+    },
+    "tachypnea": {
+      "display_name": "呼吸急促",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "RR",
+      "threshold_ref": "tachypnea_rr",
+      "clue_id": "tachypnea",
+      "description": "呼吸频率超过物种阈值。补偿性增快：低氧、高热、疼痛、代谢性酸中毒均可触发。"
+    },
+    "tachycardia": {
+      "display_name": "心动过速",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "HR",
+      "threshold_ref": "tachycardia_hr",
+      "clue_id": "tachycardia",
+      "description": "心率超过物种阈值。疼痛、血容量不足、发热、甲状腺功能亢进、休克均可导致。"
+    },
+    "bradycardia": {
+      "display_name": "心动过缓",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "HR",
+      "threshold_ref": "bradycardia_hr",
+      "rule": "HR < bradycardia_hr",
+      "clue_id": "bradycardia",
+      "description": "心率低于物种阈值。艾迪森病、高钾血症、颅内压升高均可导致。"
+    },
+    "syncope": {
+      "display_name": "晕厥",
+      "type": "observable",
+      "evaluation_type": "sustained",
+      "duration_s": 10,
+      "rule_type": "multi_parameter",
+      "params": ["MAP", "HR", "CO", "sustained_vtach"],
+      "rule": "MAP < map_syncope OR (sustained_vtach == True AND HR > vtach_rate) OR (HR < bradycardia_hr AND CO < co_reduction_syncope_percent)",
+      "clue_id": "syncope",
+      "description": "心输出量骤降导致脑灌注不足。MAP<45mmHg持续10秒以上，或持续性室性心动过速，或严重心动过缓伴心输出量下降。HR>180在正常犬不导致晕厥。"
+    },
+    "petechiae": {
+      "display_name": "瘀点/瘀斑",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": ["PLT", "PT", "Fibrinogen", "PT_control"],
+      "rule": "PLT < plt_petechiae OR (PT > 1.5 * PT_control AND Fibrinogen < 100)",
+      "clue_id": "petechiae",
+      "description": "血小板减少(<5万)或DIC(PT延长1.5倍+纤维蛋白原<100)。disease.hemorrhage_risk是抽象值，不使用。"
+    },
+    "fever": {
+      "display_name": "发热",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "Temp_C",
+      "threshold_ref": "fever_temp_C",
+      "rule": "Temp_C > fever_temp_C",
+      "clue_id": "fever",
+      "description": "体温超过物种发热阈值。感染、炎症、热射病、肿瘤坏死均可导致。"
+    },
+    "hypothermia": {
+      "display_name": "低体温",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "Temp_C",
+      "threshold_ref": "hypothermia_temp_C",
+      "rule": "Temp_C < hypothermia_temp_C",
+      "clue_id": "hypothermia",
+      "description": "体温低于正常。见于休克、濒死状态、低温麻醉、甲状腺功能减退。"
+    },
+    "hypotension": {
+      "display_name": "低血压",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "MAP",
+      "threshold_ref": "map_hypotension",
+      "rule": "MAP < map_hypotension",
+      "clue_id": "hypotension",
+      "description": "平均动脉压低于60mmHg。休克、心衰、严重脱水均可导致。"
+    },
+    "polyuria_polydipsia": {
+      "display_name": "多尿/多饮",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": ["Glu", "USG", "Ca"],
+      "rule": "Glu > glu_pu_pd_mg_dL OR USG < usg_isosthenuria OR Ca > 12",
+      "clue_id": "pu_pd",
+      "description": "USG<阈值是临床检测多尿的标准方法，比GFR更直接。糖尿病(Calves>阈值)、甲亢、Cushing's均可导致。"
+    },
+    "pale_mucous_membranes": {
+      "display_name": "黏膜苍白",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "HCT",
+      "threshold_ref": "hct_anemia",
+      "rule": "HCT < hct_anemia",
+      "clue_id": "pale_mm",
+      "description": "贫血导致黏膜苍白。见于失血、溶血、骨髓抑制。HCT阈值：犬<20%，猫<15%。"
+    },
+    "melena": {
+      "display_name": "黑粪",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": ["PT", "upper_gi_bleed"],
+      "rule": "PT > 1.5 * PT_control AND upper_gi_bleed == True",
+      "clue_id": "melena",
+      "description": "上消化道出血+凝血障碍。见于肝衰竭凝血因子合成减少、NSAID溃疡、DIC。"
+    },
+    "ataxia": {
+      "display_name": "共济失调",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.cns_inflammation",
+      "threshold": 0.5,
+      "clue_id": "ataxia",
+      "description": "中枢神经系统炎症导致运动协调障碍。见于脑膜炎、脑炎、肝性脑病。"
+    },
+    "dehydration": {
+      "display_name": "脱水",
+      "type": "observable",
+      "evaluation_type": "sustained",
+      "duration_s": 3600,
+      "rule_type": "threshold",
+      "param": "bv_ratio",
+      "threshold": 0.95,
+      "clue_id": "dehydration",
+      "description": "血容量比降至95%以下持续1小时。皮肤充盈时间>3秒是临床检查方法。"
+    },
+    "abdominal_distension": {
+      "display_name": "腹部膨隆",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.gastric_distension",
+      "threshold": 0.3,
+      "clue_id": "abdominal_distension",
+      "description": "胃或腹部气体/液体积蓄导致可见膨隆。GDV、气腹、腹水均可导致。"
+    },
+    "arrhythmia": {
+      "display_name": "心律失常",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.arrhythmia_severity",
+      "threshold": 0.5,
+      "clue_id": "arrhythmia",
+      "description": "心电图或听诊发现异常心律。室性早搏、房颤、心动过缓等均可触发。"
+    },
+    "muffled_heart_sounds": {
+      "display_name": "心音遥远",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.tamponade_severity",
+      "threshold": 0.3,
+      "clue_id": "muffled_heart_sounds",
+      "description": "心包积液导致心音被液体阻隔。心脏填塞的体征之一。"
+    },
+    "jugular_distension": {
+      "display_name": "颈静脉怒张",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.venous_congestion",
+      "threshold": 0.2,
+      "clue_id": "jugular_distension",
+      "description": "静脉回流受阻导致颈静脉可见怒张。右心衰、心脏填塞、心包积液均可导致。"
+    }
+  }
+}

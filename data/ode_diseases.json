@@ -18,7 +18,7 @@
       },
       "severe": {
         "bacterial_seed": 0.6,
-        "growth_rate": 0.003571,
+        "growth_rate": 0.008,
         "exudate_K": 0.95,
         "immune_clearance": 0.005
       }
@@ -88,6 +88,11 @@
         "target": "heart.heart_rate",
         "op": "add",
         "fn": "0.05 * (100 - engine['heart']['heart_rate_bpm'])"
+      },
+      {
+        "target": "immune._infection_signal",
+        "op": "set",
+        "fn": "min(bacterial_load / (bacterial_load + 2.0), 1.0)"
       }
     ],
     "meta": {
@@ -151,7 +156,7 @@
         "damage_K": 0.4
       },
       "moderate": {
-        "damage_rate": 0.000571,
+        "damage_rate": 0.02,
         "damage_K": 1.0
       },
       "severe": {
@@ -203,7 +208,7 @@
         ],
         "ode_type": "first_order_lag",
         "params": {
-          "tau": 900.0,
+          "tau": 100.0,
           "target_fn": "gfr_decline * 0.8"
         }
       }
@@ -220,9 +225,9 @@
         "fn": "4.2 + potassium_shift"
       },
       {
-        "target": "blood.pH",
+        "target": "blood.HCO3",
         "op": "set",
-        "fn": "7.40 - metabolic_acidosis * 0.3"
+        "fn": "max(14.0, 24.0 - metabolic_acidosis * 8.0)"
       },
       {
         "target": "heart.heart_rate",

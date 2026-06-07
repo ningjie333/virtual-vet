@@ -3,13 +3,16 @@ Simulation Engine - 多系统耦合仿真引擎
 整合心脏、肺部、肾脏模块，实现器官间耦合
 """
 
+import json
 import logging
+from pathlib import Path
 
 import numpy as np
 
 from src.common_types import FactorCommand
 from src.engine import CONNECTIONS
 from src.engine.factor_pipeline import apply_factor as _apply_factor_impl
+from src.clinical_signs_engine import ClinicalSignsEngine as _ClinicalSignsEngine
 from blood import BloodCompartment
 from heart import HeartModule
 from lung import LungModule
@@ -322,6 +325,12 @@ class VirtualCreature:
         """
         self.disease = disease_module
         self.disease.activate(self.current_time_s)
+
+        # Initialize ClinicalSignsEngine when a disease is attached (case start)
+        defs_path = Path(__file__).resolve().parents[1] / "data" / "symptom_definitions.json"
+        with open(defs_path, "r", encoding="utf-8") as f:
+            defs = json.load(f)
+        self.clinical_signs_engine = _ClinicalSignsEngine(self, defs, self.species)
 
     def apply_factor(self, cmd: FactorCommand) -> None:
         """
@@ -902,6 +911,9 @@ class VirtualCreature:
         # 5c. Step 7.6: 三室体液交换 + HH pH（Euler 路径 Step 7.6 等价）
         # fluid.compute() 更新 V_vascular/V_isf/V_icf，然后 HH 方程更新动脉血 pH
         fluid_state = self.fluid.compute(dt)
+        #同步 HH 方程参数（Euler 路径在 Step 7.6 已有此同步，Radau 路径遗漏补加）
+        self._hh.hco3 = self.fluid.vascular_hco3_meq_l
+        self._hh.pco2 = self.blood.arterial_PCO2_mmHg
         self.blood.arterial_pH = self._hh._compute_ph()
         # 同步 blood.total_volume_ml = heart.circulating_volume_ml
         self.blood.total_volume_ml = self.heart.circulating_volume_ml
@@ -938,10 +950,6 @@ class VirtualCreature:
             self.neuro.compute(dt, heart_state=empty_state, lung_state=empty_state)
         except Exception as e:
             logger.warning("neuro.compute failed: %s", e)
-        try:
-            self.immune.compute(dt, endocrine_state=empty_state)
-        except Exception as e:
-            logger.warning("immune.compute failed: %s", e)
         # tox/pharmacology 由 schedule_event / 外部 API 触发，不强制每步调
 
         # 6. 耦合规则（同 Euler 路径）
@@ -964,7 +972,7 @@ class VirtualCreature:
         for cmd in coupling_cmds:
             self.apply_factor(cmd)
 
-        # 7. 疾病模块
+        # 7. 疾病模块（必须在 immune.compute 之前，以便 _infection_signal 等信号被疾病提前设置）
         if self.disease is not None:
             engine_state = {
                 "heart": {"HR": self.heart.heart_rate, "MAP": self.heart.mean_arterial_pressure,
@@ -988,6 +996,12 @@ class VirtualCreature:
             cmds = self.disease.compute(dt, engine_state)
             for cmd in cmds:
                 self.apply_factor(cmd)
+
+        # 7b. 免疫模块（在疾病输出后执行，使 _infection_signal 等已就位）
+        try:
+            self.immune.compute(dt, endocrine_state=empty_state)
+        except Exception as e:
+            logger.warning("immune.compute failed: %s", e)
 
         # 6b. 器官健康追踪（与 Euler 路径 Step 4.9 等价）
         # NOTE: 使用 Radau 解包后的当前状态（尚未应用 organ_health 因子）作为 pre-state
@@ -1026,6 +1040,10 @@ class VirtualCreature:
 
         # 8. 记录历史（同 Euler 路径最后部分）
         self._record_history(dt)
+
+        # 8.5: ClinicalSignsEngine — 每步评估可观察体征
+        if hasattr(self, "clinical_signs_engine"):
+            self.clinical_signs_engine.compute(self.current_time_s)
         return {}
 
     def _record_history(self, dt: float):

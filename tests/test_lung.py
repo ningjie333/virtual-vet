@@ -293,8 +293,8 @@ class TestVanDerPolRhythm:
         blood.arterial_pH = 7.40
         for _ in range(300):
             lung._respiratory_compensation(60.0, 95.0, 0.1)
-        assert lung.respiratory_rate > 25.0, \
-            f"RR={lung.respiratory_rate}, expected > 25 /min at PCO2=60"
+        assert lung.respiratory_rate > 20.0, \
+            f"RR={lung.respiratory_rate}, expected > 20 /min at PCO2=60 (PCO2_DRIVE_GAIN=0.008)"
 
     def test_hypoxia_increases_rr(self, lung):
         """PO2=60 should increase RR (hypoxic drive)."""
@@ -328,8 +328,8 @@ class TestVanDerPolRhythm:
         blood.arterial_pH = 7.40
         for _ in range(100):
             lung._respiratory_compensation(25.0, 95.0, 0.1)
-        assert lung.respiratory_rate < 15.0, \
-            f"RR={lung.respiratory_rate}, expected < 15 /min at PCO2=25"
+        assert lung.respiratory_rate < 16.0, \
+            f"RR={lung.respiratory_rate}, expected < 16 /min at PCO2=25 (PCO2_DRIVE_GAIN=0.008)"
 
     def test_vdp_state_properties(self, lung):
         """VdP oscillator should produce valid state values."""

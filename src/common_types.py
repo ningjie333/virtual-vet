@@ -138,6 +138,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "immune.acute_phase_response": ("immune", "acute_phase_response"),
     "immune.immune_suppression":   ("immune", "immune_suppression"),
     "immune.coagulation_state":    ("immune", "coagulation_state"),
+    "immune._infection_signal":     ("immune", "_infection_signal"),
     # ── Coagulation ────────────────────────────────────────────────────────
     "coag.PT_sec":                 ("blood", "PT_sec"),
     "coag.aPTT_sec":               ("blood", "aPTT_sec"),

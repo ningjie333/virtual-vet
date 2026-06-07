@@ -637,6 +637,10 @@ def _apply_tag_rules(
         if _eval_condition(condition, ctx):
             if clue_id not in tags:
                 tags.append(clue_id)
+    # 追加 ClinicalSignsEngine 产生的 sign_tags（症状层线索，不覆盖现有tag）
+    for sig_tag in ctx.get("sign_tags", []):
+        if sig_tag and sig_tag not in tags:
+            tags.append(sig_tag)
     return tags
 
 
@@ -722,6 +726,11 @@ def _build_ctx(meta: dict, state: dict, creature) -> dict[str, Any]:
     # 计算 bv_ratio（多个检查类型需要）
     total_bv = creature.blood.total_volume_ml
     ctx["bv_ratio"] = state["BV"] / total_bv if total_bv > 0 else 1.0
+    # 注入 ClinicalSignsEngine 产生的 sign_tags（症状层线索）
+    if hasattr(creature, "clinical_signs_engine"):
+        ctx["sign_tags"] = creature.clinical_signs_engine.get_sign_tags()
+    else:
+        ctx["sign_tags"] = []
     return ctx
 
 

@@ -52,7 +52,7 @@ MU_DEEP = 3.0                      # 深呼吸/酸中毒时（Kussmaul 呼吸）
 MU_SHALLOW = 0.8                   # 浅快呼吸（肺顺应性降低时）
 
 # 化学感受器驱动增益
-PCO2_DRIVE_GAIN = 0.04             # PCO2 每升高 1 mmHg → 频率增加 4%（中枢化学感受器高敏感）
+PCO2_DRIVE_GAIN = 0.008            # PCO2 每升高 1 mmHg → 频率增加 0.8%（生理：严重高碳酸血症 RR约增加 50-80%）
 PO2_DRIVE_THRESHOLD = 80.0         # 低氧驱动阈值 (mmHg)
 PO2_DRIVE_GAIN = 0.04              # PO2 每降低 1 mmHg → 频率增加 4%（外周化学感受器）
 PH_DRIVE_GAIN = 0.8                # pH 每降低 0.1 → 频率增加 80%（Kussmaul 呼吸）
@@ -128,7 +128,7 @@ class VanDerPolRespiratoryRhythm:
         self._compute_chemoreceptor_drive(pco2, po2, ph)
 
         # 2. 平滑更新 VdP 参数（避免突变）
-        alpha = min(1.0, self.dt / 0.5)  # 500ms 时间常数
+        alpha = min(1.0, self.dt / 5.0)  # 5s 时间常数（与 RR 代偿同步）
         self.omega += (self._target_omega - self.omega) * alpha
         self.mu += (self._target_mu - self.mu) * alpha
 
@@ -154,7 +154,7 @@ class VanDerPolRespiratoryRhythm:
         pco2_error = pco2 - 40.0
         if pco2_error > 0:
             omega *= (1.0 + PCO2_DRIVE_GAIN * pco2_error)
-            mu = min(MU_DEEP, mu + 0.05 * pco2_error)
+            mu = min(MU_DEEP, mu + 0.02 * pco2_error)  # 更慢的深度响应（避免Kussmaul过度触发）
         elif pco2_error < -10:
             # 过度通气 → 呼吸抑制
             omega *= max(0.5, 1.0 + 0.015 * pco2_error)
