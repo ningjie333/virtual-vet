@@ -248,10 +248,11 @@ class CouplingEngine:
             commands.append(cmd)
 
         # Oscillation detection: warn if any signal changed >50% between steps
+        # Only check signals with meaningful magnitude (avoid near-zero noise: 0→0.001 reports 100%+ change)
         if self._prev_signal_map:
             for key, val in self._signal_map.items():
                 prev = self._prev_signal_map.get(key)
-                if prev is not None and abs(prev) > 1e-6:
+                if prev is not None and abs(prev) > 1e-2 and abs(val) > 1e-2:
                     change = abs(val - prev) / abs(prev)
                     if change > 0.5:
                         logger.warning(

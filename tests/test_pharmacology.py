@@ -16,6 +16,7 @@ _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _project_root)
 sys.path.insert(0, os.path.join(_project_root, "src"))
 
+import threading
 import pytest
 
 
@@ -407,7 +408,7 @@ class TestApiAdministerDrug:
     @pytest.fixture(autouse=True)
     def _setup_app(self):
         """Create Flask test client and seed a game session."""
-        from gui_app import app, _game_sessions, CASES_DATA
+        from gui_app import app, _game_sessions, _session_locks, CASES_DATA
         from src.simulation import VirtualCreature
         from src.diseases import create_disease
         from game.action_system import GameState
@@ -589,7 +590,7 @@ class TestE2EGameFlow:
     def _setup(self):
         """Create Flask test client and seed game sessions for all cases."""
         import json
-        from gui_app import app, _game_sessions, CASES_DATA
+        from gui_app import app, _game_sessions, _session_locks, CASES_DATA
         from src.simulation import VirtualCreature
         from src.diseases import create_disease
         from game.action_system import GameState
@@ -606,6 +607,7 @@ class TestE2EGameFlow:
             state = GameState(engine=vc, disease_name=case["disease"])
             sid = f"e2e_{case['id']}"
             _game_sessions[sid] = state
+            _session_locks[sid] = threading.Lock()
             self.session_ids[case["disease"]] = sid
 
         yield
@@ -613,6 +615,7 @@ class TestE2EGameFlow:
         # Cleanup
         for sid in self.session_ids.values():
             _game_sessions.pop(sid, None)
+            _session_locks.pop(sid, None)
 
     def _post(self, path: str, json: dict):
         return self.client.post(path, json=json)
