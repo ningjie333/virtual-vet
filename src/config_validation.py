@@ -478,7 +478,7 @@ def main() -> int:
             "coupling_rules.json": ("coupling_rules.json", _load_json(data_dir / "coupling_rules.json")),
         }
         if args.file not in file_map:
-            print(f"Unknown file: {args.file}")
+            logger.warning("Unknown file: %s", args.file)
             return 1
         filename, config = file_map[args.file]
         errors = _run_validators_for_file(filename, config)
@@ -492,14 +492,14 @@ def main() -> int:
         output = []
         for err in errors:
             output.append({"file": err.file, "path": err.path, "message": err.message})
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        logger.info("%s", json.dumps(output, indent=2, ensure_ascii=False))
     else:
         if not errors:
-            print("PASS: All validations passed")
+            logger.info("PASS: All validations passed")
             return 0
-        print(f"FAIL: {len(errors)} validation error(s):")
+        logger.warning("FAIL: %s validation error(s):", len(errors))
         for err in errors:
-            print(f"  [{err.file}] {err.path}: {err.message}")
+            logger.warning("  [%s] %s: %s", err.file, err.path, err.message)
 
     return 1 if errors else 0
 

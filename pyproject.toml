@@ -11,6 +11,13 @@ dependencies = [
     "scipy>=1.15.3",
 ]
 
+[tool.pytest.ini_options]
+markers = [
+    "architecture: architectural constraint checks (AST-based rule enforcement)",
+    "suite_disease_blackbox: disease black-box stability test suite",
+    "stability: stability tests (cardiovascular, disease, convergence)",
+]
+
 [tool.uv]
 dev-dependencies = [
     "pytest>=7.0",

@@ -1092,15 +1092,17 @@ class VirtualCreature:
         total_steps = int(duration_minutes * 60.0 / self.dt)
 
         if verbose:
-            print(f"开始仿真：{duration_minutes} min, {total_steps} steps")
+            logger.info("开始仿真：%s min, %s steps", duration_minutes, total_steps)
 
         for i in range(total_steps):
             self.step()
             if verbose and i % 1000 == 0:
                 t = self.current_time_s
-                print(f"  t={t:.1f}s, HR={self.history['HR_bpm'][-1]:.0f}, "
-                      f"MAP={self.history['MAP_mmHg'][-1]:.1f}, "
-                      f"GFR={self.history['GFR'][-1]:.1f}")
+                logger.info("  t=%.1fs, HR=%s, MAP=%s, GFR=%s",
+                            t,
+                            self.history['HR_bpm'][-1],
+                            self.history['MAP_mmHg'][-1],
+                            self.history['GFR'][-1])
 
     # ── solve_ivp Radau 引擎（Phase 2: 替换 Euler 求解器）────────────────────────
 
@@ -1637,22 +1639,22 @@ class VirtualCreature:
         }
 
         if scenario_name not in scenarios:
-            print(f"未知场景：{scenario_name}")
-            print(f"可用场景：{list(scenarios.keys())}")
+            logger.warning("未知场景：%s", scenario_name)
+            logger.warning("可用场景：%s", list(scenarios.keys()))
             return
 
-        print(f"\n{'='*60}")
-        print(f"  场景：{scenario_name}")
-        print(f"{'='*60}")
+        logger.info("%s", f"{'='*60}")
+        logger.info("  场景：%s", scenario_name)
+        logger.info("%s", f"{'='*60}")
 
         # 重置
         self.__init__(body_weight_kg=self.w)
         scenarios[scenario_name]()
         self.simulate(T_MAX_MINUTES, verbose=True)
 
-        print(f"\n事件记录：")
+        logger.info("事件记录：")
         for event in self.event_log[-5:]:
-            print(f"  {event}")
+            logger.info("  %s", event)
 
         self.print_summary()
 
@@ -1756,26 +1758,25 @@ class VirtualCreature:
 
     def print_summary(self):
         """打印当前状态摘要"""
-        print(f"\n--- 当前状态 (t={self.current_time_s:.1f}s) ---")
-        print(f"心血管: HR={self.heart.heart_rate:.0f} bpm, "
-              f"CO={self.heart.cardiac_output:.0f} mL/min, "
-              f"MAP={self.heart.mean_arterial_pressure:.1f} mmHg")
-        print(f"  收缩力={self.heart.contractility_factor:.3f}, "
-              f"SVR={self.heart.SVR:.2f} (factor={self.toxicology.svr_factor:.2f})")
-        print(f"呼吸: RR={self.lung.respiratory_rate:.0f} /min, "
-              f"PaO2={self.blood.arterial_PO2_mmHg:.0f} mmHg, "
-              f"PaCO2={self.blood.arterial_PCO2_mmHg:.0f} mmHg")
-        print(f"肾脏: GFR={self.kidney.GFR:.1f} mL/min, "
-              f"尿量={self.kidney.urine_output:.3f} mL/min, "
-              f"BUN={self.blood.bun_mg_dL:.1f} mg/dL")
-        print(f"血液: 血糖={self.blood.glucose_mmol_L:.2f} mmol/L, "
-              f"血容量={self.heart.circulating_volume_ml:.0f} mL, "
-              f"pH={self.blood.arterial_pH:.3f}")
+        logger.info("--- 当前状态 (t=%.1fs) ---", self.current_time_s)
+        logger.info("心血管: HR=%.0f bpm, CO=%.0f mL/min, MAP=%.1f mmHg",
+                    self.heart.heart_rate, self.heart.cardiac_output, self.heart.mean_arterial_pressure)
+        logger.info("  收缩力=%.3f, SVR=%.2f (factor=%.2f)",
+                    self.heart.contractility_factor, self.heart.SVR, self.toxicology.svr_factor)
+        logger.info("呼吸: RR=%.0f /min, PaO2=%.0f mmHg, PaCO2=%.0f mmHg",
+                    self.lung.respiratory_rate, self.blood.arterial_PO2_mmHg, self.blood.arterial_PCO2_mmHg)
+        logger.info("肾脏: GFR=%.1f mL/min, 尿量=%.3f mL/min, BUN=%.1f mg/dL",
+                    self.kidney.GFR, self.kidney.urine_output, self.blood.bun_mg_dL)
+        logger.info("血液: 血糖=%.2f mmol/L, 血容量=%.0f mL, pH=%.3f",
+                    self.blood.glucose_mmol_L, self.heart.circulating_volume_ml, self.blood.arterial_pH)
         hh = self.organ_health
         if hh.heart_health < 0.95 or hh.lung_health < 0.95 or hh.kidney_health < 0.95:
-            print(f"器官健康: 心={hh.heart_health:.2f}  肺={hh.lung_health:.2f}  肾={hh.kidney_health:.2f}")
-        print(f"肝脏: 代谢={self.liver.metabolic_activity:.2f}  解毒={self.liver.detox_capacity:.2f}  糖原={self.liver.glycogen_fraction:.2f}")
-        print(f"肠道: 蠕动={self.gut.gut_motility:.2f}  屏障={self.gut.barrier_integrity:.2f}  菌群={self.gut.microbiome_activity:.2f}")
+            logger.info("器官健康: 心=%.2f  肺=%.2f  肾=%.2f",
+                        hh.heart_health, hh.lung_health, hh.kidney_health)
+        logger.info("肝脏: 代谢=%.2f  解毒=%.2f  糖原=%.2f",
+                    self.liver.metabolic_activity, self.liver.detox_capacity, self.liver.glycogen_fraction)
+        logger.info("肠道: 蠕动=%.2f  屏障=%.2f  菌群=%.2f",
+                    self.gut.gut_motility, self.gut.barrier_integrity, self.gut.microbiome_activity)
 
 
 # 参数导入已移至文件顶部
