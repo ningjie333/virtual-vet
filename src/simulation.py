@@ -793,6 +793,10 @@ class VirtualCreature:
         # 更新时间
         self.current_time_s += dt
 
+        # 8.5: ClinicalSignsEngine — 每步评估可观察体征（Euler 路径）
+        if hasattr(self, "clinical_signs_engine"):
+            self.clinical_signs_engine.compute(self.current_time_s)
+
         return {
             "heart": heart_state,
             "lung": lung_state,
@@ -808,6 +812,12 @@ class VirtualCreature:
             "toxicology": tox_state,
             "pharmacology": pharma_effects if (hasattr(self, "pharmacology") and self.pharmacology is not None) else {},
         }
+
+        # 8.5: ClinicalSignsEngine — 每步评估可观察体征（Euler 路径）
+        if hasattr(self, "clinical_signs_engine"):
+            import sys as _sys
+            _sys.stderr.write(f"[Euler] T={self.current_time_s} calling compute\n")
+            self.clinical_signs_engine.compute(self.current_time_s)
 
     def _step_radau(self):
         """
