@@ -204,7 +204,7 @@ class VirtualCreature:
         # 仿真时间
         self.current_time_s = 0.0
         self.dt = DT_SECONDS if dt is None else dt  # dt=None → 0.1s (production); dt=float → override (testing)
-        self._solver = "euler"  # "euler" | "radau" — set via solver= kwarg
+        self._solver = solver  # "euler" | "radau" — set via solver= kwarg
 
         # 事件系统
         self.events = []                            # 待处理事件列表
