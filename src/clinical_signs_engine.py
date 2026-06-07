@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
+@dataclass
 class SignInstance:
     """A clinical sign currently active on the creature."""
     sign_id: str
@@ -90,8 +90,8 @@ class ClinicalSignsEngine:
         )
         with open(thresholds_path, "r", encoding="utf-8") as f:
             all_thresholds: dict = json.load(f)
-        self._thresholds: dict = all_thresholds.get("species_thresholds", {}).get(
-            species, all_thresholds.get("species_thresholds", {}).get("dog", {})
+        self._thresholds: dict = all_thresholds.get(
+            species, all_thresholds.get("dog", {})
         )
 
         # Active sign instances
@@ -216,30 +216,19 @@ class ClinicalSignsEngine:
             return {"active": False, "severity": ""}
 
     def _eval_threshold(self, rule_def: dict, state: dict, disease: Any) -> dict:
-        """Single parameter threshold evaluation."""
-        param = rule_def.get("param", "")
-        if not param:
+        """Single parameter threshold evaluation — delegates to _eval_boolean_expr."""
+        rule_str = rule_def.get("rule", "")
+        if not rule_str:
             return {"active": False, "severity": ""}
-
-        value = self._resolve_param(param, state, disease)
-        if value is None:
-            return {"active": False, "severity": ""}
-
-        # Get species-aware threshold
-        threshold_ref = rule_def.get("threshold_ref")
-        if threshold_ref:
-            threshold = self._thresholds.get(threshold_ref, rule_def.get("threshold", 0.0))
-        else:
-            threshold = rule_def.get("threshold", 0.0)
-
-        active = value >= threshold
-
+        active = self._eval_boolean_expr(rule_str, state, disease)
         severity = ""
         if active and "severity_mapping" in rule_def:
-            severity = self._compute_severity(
-                rule_def["severity_mapping"], value, state, disease
-            )
-
+            param = rule_def.get("param", "")
+            value = self._resolve_param(param, state, disease)
+            if value is not None:
+                severity = self._compute_severity(
+                    rule_def["severity_mapping"], value, state, disease
+                )
         return {"active": active, "severity": severity or "mild"}
 
     def _eval_multi(self, rule_def: dict, state: dict, disease: Any) -> dict:
@@ -413,50 +402,87 @@ class ClinicalSignsEngine:
 
         expr = expr.strip()
 
-        # Handle OR at top level (respecting parentheses)
+        # ── OR handling ───────────────────────────────────────────
         or_result = False
+        any_or = False
         or_depth = 0
+        part_start = 0
+        i = 0
+        while i < len(expr):
+            # Lookahead: detect " OR " or "AND " at current position (before whitespace skip)
+            if i + 4 <= len(expr) and expr[i:i+4] == " OR ":
+                if or_depth == 0:
+                    any_or = True
+                    or_result = or_result or self._eval_boolean_expr(
+                        expr[part_start:i], state, disease
+                    )
+                    i += 4  # skip " OR "
+                    part_start = i
+                    continue
+            elif i + 5 <= len(expr) and expr[i:i+5] == " AND ":
+                pass  # AND is handled below; don't consume here
+            elif expr[i] == "(":
+                or_depth += 1
+            elif expr[i] == ")":
+                or_depth -= 1
+            i += 1
+
+        if any_or:
+            # Evaluate final segment and return
+            if part_start < len(expr):
+                or_result = or_result or self._eval_boolean_expr(
+                    expr[part_start:], state, disease
+                )
+            return or_result
+
+        # ── AND handling (only when no OR present) ────────────────
+        and_result = True
+        any_and = False
         and_depth = 0
         part_start = 0
-        for i, ch in enumerate(expr):
-            if ch == "(":
-                or_depth += 1
-            elif ch == ")":
-                or_depth -= 1
-            elif ch == " ":
-                continue
-            elif or_depth == 0 and and_depth == 0 and expr[i:i+3] == " OR":
-                or_result = or_result or self._eval_boolean_expr(
-                    expr[part_start:i], state, disease
-                )
-                part_start = i + 3
-        # Final segment after last OR
-        if part_start < len(expr):
-            or_result = or_result or self._eval_boolean_expr(
-                expr[part_start:], state, disease
-            )
-        if " OR " not in expr and not expr.startswith("("):
-            # No OR found at top level — evaluate as AND chain
-            and_result = True
-            and_depth = 0
-            part_start = 0
-            for i, ch in enumerate(expr):
-                if ch == "(":
-                    and_depth += 1
-                elif ch == ")":
-                    and_depth -= 1
-                elif and_depth == 0 and expr[i:i+5] == " AND ":
+        i = 0
+        while i < len(expr):
+            if i + 5 <= len(expr) and expr[i:i+5] == " AND ":
+                if and_depth == 0:
+                    any_and = True
                     and_result = and_result and self._eval_boolean_expr(
                         expr[part_start:i], state, disease
                     )
-                    part_start = i + 5
-            if part_start < len(expr):
-                and_result = and_result and self._eval_boolean_expr(
-                    expr[part_start:], state, disease
-                )
-            return and_result
+                    i += 5  # skip " AND "
+                    part_start = i
+                    continue
+            elif expr[i] == "(":
+                and_depth += 1
+            elif expr[i] == ")":
+                and_depth -= 1
+            i += 1
 
-        return or_result
+        if any_and and part_start < len(expr):
+            # Only evaluate final segment if we found at least one AND
+            and_result = and_result and self._eval_boolean_expr(
+                expr[part_start:], state, disease
+            )
+        elif not any_and:
+            # Single term (no AND): evaluate as one comparison
+            return self._eval_comparison_expr(expr, state, disease)
+
+        return and_result
+
+    def _eval_comparison_expr(self, expr: str, state: dict, disease: Any) -> bool:
+        """Evaluate a single comparison expression like 'BUN > 80' or 'K < 6.5'."""
+        # Split on comparison operators
+        for op in (">=", "<=", "!=", "==", ">", "<"):
+            idx = expr.find(op)
+            if idx != -1:
+                left = expr[:idx].strip()
+                right = expr[idx + len(op):].strip()
+                return self._eval_comparison(left, op, right, state, disease)
+        # No operator found — treat as boolean literal
+        if expr.strip() == "True":
+            return True
+        if expr.strip() == "False":
+            return False
+        return False
 
     def _eval_comparison(self, raw_left: str, op: str, raw_right: str, state: dict, disease: Any) -> bool:
         """Evaluate a single comparison: left op right."""
