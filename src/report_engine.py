@@ -123,6 +123,7 @@ def get_state(creature: VirtualCreature) -> dict:
         "PT": _last("coag_PT", b.PT_sec),
         "aPTT": _last("coag_aPTT", b.aPTT_sec),
         "Fibrinogen": _last("coag_fibrinogen", b.fibrinogen_mg_dL),
+        "pain_level": creature.neuro.pain_level,
     }
 
     # Coagulation state

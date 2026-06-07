@@ -2,7 +2,11 @@
   "_meta": {
     "version": "1.0",
     "description": "Observable clinical sign rules derived from physiological parameters. All thresholds are species-aware via symptom_thresholds.json. Rules marked 'instantaneous' fire on current parameter values; 'sustained' require a time window; 'cumulative' integrate over time.",
-    "evaluation_types": ["instantaneous", "sustained", "cumulative"],
+    "evaluation_types": [
+      "instantaneous",
+      "sustained",
+      "cumulative"
+    ],
     "note": "SymptomEngine reads ENGINE state (blood.xxx, heart.xxx, lung.xxx), NOT disease.xxx state variables. disease.xxx is used only when no engine parameter exists."
   },
   "symptoms": {
@@ -21,7 +25,13 @@
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
-      "params": ["BUN", "K", "pH", "Glu", "Na_K_ratio"],
+      "params": [
+        "BUN",
+        "K",
+        "pH",
+        "Glu",
+        "Na_K_ratio"
+      ],
       "rule": "BUN > bun_uremia OR K > k_hyperkalemia OR pH < ph_metabolic_acidosis OR Glu < glu_hypoglycemia_mg_dL",
       "compound_rule": "Na_K_ratio < na_k_ratio_addison AND K > k_hyperkalemia",
       "clue_id": "vomiting",
@@ -32,7 +42,17 @@
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
-      "params": ["HCT", "PaO2", "pH", "Glu", "Na", "K", "MAP", "Lactate", "Temp_C"],
+      "params": [
+        "HCT",
+        "PaO2",
+        "pH",
+        "Glu",
+        "Na",
+        "K",
+        "MAP",
+        "Lactate",
+        "Temp_C"
+      ],
       "rule": "HCT < hct_anemia OR PaO2 < pao2_hypoxemia OR Glu < glu_hypoglycemia_mg_dL OR Glu > glu_hyperglycemia_mg_dL OR Na < na_hyponatremia OR Na > na_hypernatremia OR K < k_hypokalemia OR K > k_hyperkalemia OR MAP < map_hypotension OR (Lactate > lactate_shock AND MAP < map_hypotension) OR Temp_C < hypothermia_temp_C OR Temp_C > fever_temp_C",
       "severity_spread": true,
       "clue_id": "weakness",
@@ -43,7 +63,12 @@
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
-      "params": ["disease_alveolar_exudate", "heart_la_ao_ratio", "lvedp", "tracheal_collapse_grade"],
+      "params": [
+        "disease_alveolar_exudate",
+        "heart_la_ao_ratio",
+        "lvedp",
+        "tracheal_collapse_grade"
+      ],
       "rule": "disease_alveolar_exudate > 0.3 OR heart_la_ao_ratio > la_ao_ratio_cardiomegaly OR lvedp > lvedp_pulmonary_edema OR tracheal_collapse_grade >= 2",
       "clue_id": "cough",
       "description": "下呼吸道刺激：肺泡渗出、左心房扩大导致气道压迫、肺静脉淤血、气管塌陷。RR>35不是咳嗽机制，已删除。"
@@ -53,7 +78,13 @@
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
-      "params": ["RR", "PaO2", "SpO2", "pleural_effusion", "upper_airway_obstruction"],
+      "params": [
+        "RR",
+        "PaO2",
+        "SpO2",
+        "pleural_effusion",
+        "upper_airway_obstruction"
+      ],
       "rule": "(RR > tachypnea_rr AND respiratory_effort >= 2) OR PaO2 < pao2_hypoxemia OR SpO2 < spo2_cyanosis OR pleural_effusion > pleural_effusion_mL_kg OR upper_airway_obstruction == True",
       "clue_id": "dyspnea",
       "description": "PaO2<70=低氧血症，不是呼吸困难。呼吸困难=呼吸做功增加+气体交换受损。复合规则：RR升高+呼吸费力，或严重低氧，或胸腔积液，或上呼吸道阻塞。"
@@ -95,7 +126,12 @@
       "evaluation_type": "sustained",
       "duration_s": 10,
       "rule_type": "multi_parameter",
-      "params": ["MAP", "HR", "CO", "sustained_vtach"],
+      "params": [
+        "MAP",
+        "HR",
+        "CO",
+        "sustained_vtach"
+      ],
       "rule": "MAP < map_syncope OR (sustained_vtach == True AND HR > vtach_rate) OR (HR < bradycardia_hr AND CO < co_reduction_syncope_percent)",
       "clue_id": "syncope",
       "description": "心输出量骤降导致脑灌注不足。MAP<45mmHg持续10秒以上，或持续性室性心动过速，或严重心动过缓伴心输出量下降。HR>180在正常犬不导致晕厥。"
@@ -105,7 +141,12 @@
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
-      "params": ["PLT", "PT", "Fibrinogen", "PT_control"],
+      "params": [
+        "PLT",
+        "PT",
+        "Fibrinogen",
+        "PT_control"
+      ],
       "rule": "PLT < plt_petechiae OR (PT > 1.5 * PT_control AND Fibrinogen < 100)",
       "clue_id": "petechiae",
       "description": "血小板减少(<5万)或DIC(PT延长1.5倍+纤维蛋白原<100)。disease.hemorrhage_risk是抽象值，不使用。"
@@ -148,7 +189,11 @@
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
-      "params": ["Glu", "USG", "Ca"],
+      "params": [
+        "Glu",
+        "USG",
+        "Ca"
+      ],
       "rule": "Glu > glu_pu_pd_mg_dL OR USG < usg_isosthenuria OR Ca > 12",
       "clue_id": "pu_pd",
       "description": "USG<阈值是临床检测多尿的标准方法，比GFR更直接。糖尿病(Calves>阈值)、甲亢、Cushing's均可导致。"
@@ -169,7 +214,10 @@
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
-      "params": ["PT", "upper_gi_bleed"],
+      "params": [
+        "PT",
+        "upper_gi_bleed"
+      ],
       "rule": "PT > 1.5 * PT_control AND upper_gi_bleed == True",
       "clue_id": "melena",
       "description": "上消化道出血+凝血障碍。见于肝衰竭凝血因子合成减少、NSAID溃疡、DIC。"
@@ -234,6 +282,42 @@
       "threshold": 0.2,
       "clue_id": "jugular_distension",
       "description": "静脉回流受阻导致颈静脉可见怒张。右心衰、心脏填塞、心包积液均可导致。"
+    },
+    "pain": {
+      "display_name": "疼痛表现",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "pain_level",
+      "threshold_ref": "pain_mild",
+      "rule": "pain_level > pain_mild",
+      "clue_id": "pain",
+      "description": "通用疼痛体征：呻吟、护痛、不愿移动、表情痛苦"
+    },
+    "neck_pain": {
+      "display_name": "颈部疼痛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "disease.disc_herniation"
+      ],
+      "rule": "pain_level > pain_mild AND disease.disc_herniation > 0.3",
+      "clue_id": "neck_pain",
+      "description": "IVDD 颈椎段：颈部僵硬、低头困难、抬颈疼痛"
+    },
+    "abdominal_pain": {
+      "display_name": "腹痛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level"
+      ],
+      "rule": "pain_level > pain_moderate",
+      "clue_id": "abdominal_pain",
+      "description": "祈祷姿势、腹肌紧张、不愿被触摸腹部"
     }
   }
 }

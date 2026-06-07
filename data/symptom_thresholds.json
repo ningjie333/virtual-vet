@@ -23,16 +23,19 @@
     "map_hypotension": 60,
     "map_syncope": 45,
     "lactate_shock": 4.0,
-    "ph_metabolic_acidosis": 7.20,
+    "ph_metabolic_acidosis": 7.2,
     "pao2_hypoxemia": 60,
     "spo2_cyanosis": 92,
     "na_k_ratio_addison": 23,
-    "usg_isosthenuria": 1.020,
+    "usg_isosthenuria": 1.02,
     "pleural_effusion_mL_kg": 2.0,
     "lvedp_pulmonary_edema": 25,
     "la_ao_ratio_cardiomegaly": 1.6,
     "vtach_rate": 250,
-    "co_reduction_syncope_percent": 50
+    "co_reduction_syncope_percent": 50,
+    "pain_mild": 3.0,
+    "pain_moderate": 5.0,
+    "pain_severe": 7.0
   },
   "cat": {
     "hct_anemia": 15,
@@ -54,7 +57,7 @@
     "map_hypotension": 60,
     "map_syncope": 45,
     "lactate_shock": 4.0,
-    "ph_metabolic_acidosis": 7.20,
+    "ph_metabolic_acidosis": 7.2,
     "pao2_hypoxemia": 60,
     "spo2_cyanosis": 92,
     "na_k_ratio_addison": 23,
@@ -63,6 +66,9 @@
     "lvedp_pulmonary_edema": 25,
     "la_ao_ratio_cardiomegaly": 1.6,
     "vtach_rate": 250,
-    "co_reduction_syncope_percent": 50
+    "co_reduction_syncope_percent": 50,
+    "pain_mild": 3.0,
+    "pain_moderate": 5.0,
+    "pain_severe": 7.0
   }
 }
