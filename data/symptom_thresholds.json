@@ -1,7 +1,8 @@
 {
   "_meta": {
     "version": "1.0",
-    "description": "Species-specific thresholds for clinical sign derivation. Sources: Weiss & Wardrop 2010 (hematology), Kittleson 1998 (cardio), Center 2007 (hepatobiliary), Polzin 2011 (nephrology), Stockham & Scott 2008 (clinical pathology), Rijnberk & Kooistra 2010 (endocrinology)"
+    "description": "Species-specific thresholds for clinical sign derivation. Sources: Weiss & Wardrop 2010 (hematology), Kittleson 1998 (cardio), Center 2007 (hepatobiliary), Polzin 2011 (nephrology), Stockham & Scott 2008 (clinical pathology), Rijnberk & Kooistra 2010 (endocrinology)",
+    "last_modified_by": "agent_b_symptom_rules_2026_06_07"
   },
   "dog": {
     "hct_anemia": 20,
@@ -35,7 +36,10 @@
     "co_reduction_syncope_percent": 50,
     "pain_mild": 3.0,
     "pain_moderate": 5.0,
-    "pain_severe": 7.0
+    "pain_severe": 7.0,
+    "hct_pale": 30,
+    "disc_herniation_moderate": 0.5,
+    "disc_herniation_severe": 0.7
   },
   "cat": {
     "hct_anemia": 15,
@@ -69,6 +73,9 @@
     "co_reduction_syncope_percent": 50,
     "pain_mild": 3.0,
     "pain_moderate": 5.0,
-    "pain_severe": 7.0
+    "pain_severe": 7.0,
+    "hct_pale": 30,
+    "disc_herniation_moderate": 0.5,
+    "disc_herniation_severe": 0.7
   }
 }

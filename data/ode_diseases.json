@@ -500,9 +500,26 @@
           "tau": 1800.0,
           "target_fn": "cellular_toxicity * 0.7"
         }
+      },
+      "pain_level": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          10
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 150.0,
+          "target_fn": "min(6.0, cellular_toxicity * 7.0)"
+        }
       }
     },
     "outputs": [
+      {
+        "target": "neuro.pain_level",
+        "op": "set",
+        "fn": "pain_level"
+      },
       {
         "target": "heart.contractility_factor",
         "op": "multiply",
@@ -578,6 +595,11 @@
           "type": "first_order_lag",
           "formula": "drenal_injury/dt = (target - renal_injury) / τ (τ=1800.0s)",
           "description": "肾损伤程度（一阶滞后）"
+        },
+        "pain_level": {
+          "type": "first_order_lag",
+          "formula": "dpain_level/dt = (target - pain_level) / τ (τ=150.0s)",
+          "description": "全身酸痛/代谢性酸中毒不适感（一阶滞后）"
         }
       }
     }
@@ -2145,9 +2167,26 @@
           "tau": 300.0,
           "target_fn": "cns_inflammation * 0.8"
         }
+      },
+      "pain_level": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          10
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 180.0,
+          "target_fn": "min(7.0, cns_inflammation * 8.0)"
+        }
       }
     },
     "outputs": [
+      {
+        "target": "neuro.pain_level",
+        "op": "set",
+        "fn": "pain_level"
+      },
       {
         "target": "neuro.consciousness",
         "op": "set",
@@ -2213,6 +2252,11 @@
           "type": "first_order_lag",
           "formula": "dseizure_activity/dt = (target - seizure_activity) / τ (τ=300.0s)",
           "description": "癫痫活动程度（一阶滞后）"
+        },
+        "pain_level": {
+          "type": "first_order_lag",
+          "formula": "dpain_level/dt = (target - pain_level) / τ (τ=180.0s)",
+          "description": "脑膜刺激/头痛程度（一阶滞后，跟随 CNS 炎症）"
         }
       }
     }
@@ -2411,9 +2455,26 @@
           "tau": 120.0,
           "target_fn": "hypovolemic_shock * 0.8"
         }
+      },
+      "pain_level": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          10
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 120.0,
+          "target_fn": "min(8.0, splenic_hemorrhage * 10.0)"
+        }
       }
     },
     "outputs": [
+      {
+        "target": "neuro.pain_level",
+        "op": "set",
+        "fn": "pain_level"
+      },
       {
         "target": "heart.blood_volume",
         "op": "multiply",
@@ -2490,6 +2551,11 @@
           "type": "first_order_lag",
           "formula": "dcompensatory_tachycardia/dt = (target - compensatory_tachycardia) / τ (τ=120.0s)",
           "description": "代偿性心动过速（一阶滞后）"
+        },
+        "pain_level": {
+          "type": "first_order_lag",
+          "formula": "dpain_level/dt = (target - pain_level) / τ (τ=120.0s)",
+          "description": "急性腹痛程度（一阶滞后，跟随脾出血量）"
         }
       }
     }
@@ -2777,9 +2843,26 @@
         ],
         "ode_type": "algebraic",
         "fn": "min(1.0, iron_deficiency * 0.45 + hemolysis * 0.3 + gi_bleeding * 0.25)"
+      },
+      "pain_level": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          10
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 200.0,
+          "target_fn": "min(5.0, hepatic_dysfunction * 4.0 + hemolysis * 3.0)"
+        }
       }
     },
     "outputs": [
+      {
+        "target": "neuro.pain_level",
+        "op": "set",
+        "fn": "pain_level"
+      },
       {
         "target": "blood.red_cell_volume_ml",
         "op": "set",
@@ -2866,6 +2949,11 @@
           "type": "algebraic",
           "formula": "anemia_severity = iron_deficiency×0.45 + hemolysis×0.3 + gi_bleeding×0.25",
           "description": "贫血严重程度（铁代谢紊乱为主）"
+        },
+        "pain_level": {
+          "type": "first_order_lag",
+          "formula": "dpain_level/dt = (target - pain_level) / τ (τ=200.0s)",
+          "description": "右上腹痛/肝包膜牵张痛（一阶滞后）"
         }
       }
     }

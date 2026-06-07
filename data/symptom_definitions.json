@@ -7,7 +7,9 @@
       "sustained",
       "cumulative"
     ],
-    "note": "SymptomEngine reads ENGINE state (blood.xxx, heart.xxx, lung.xxx), NOT disease.xxx state variables. disease.xxx is used only when no engine parameter exists."
+    "note": "SymptomEngine reads ENGINE state (blood.xxx, heart.xxx, lung.xxx), NOT disease.xxx state variables. disease.xxx is used only when no engine parameter exists. For 'consciousness', use blood.consciousness_level (resolved via blood.* path).",
+    "symptom_count": 49,
+    "last_modified_by": "agent_b_symptom_rules_2026_06_07"
   },
   "symptoms": {
     "icterus": {
@@ -318,6 +320,292 @@
       "rule": "pain_level > pain_moderate",
       "clue_id": "abdominal_pain",
       "description": "祈祷姿势、腹肌紧张、不愿被触摸腹部"
+    },
+    "back_pain": {
+      "display_name": "胸腰段疼痛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "disease.disc_herniation"
+      ],
+      "rule": "pain_level > pain_mild AND disease.disc_herniation > 0.4 AND disease.disc_herniation < 0.7",
+      "clue_id": "back_pain",
+      "description": "IVDD 胸腰段椎间盘突出：拱背、不愿跳跃、触诊胸腰部疼痛尖叫"
+    },
+    "throat_pain": {
+      "display_name": "咽喉/颈部僵硬",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "disease.cns_inflammation"
+      ],
+      "rule": "pain_level > pain_mild AND disease.cns_inflammation > 0.3",
+      "clue_id": "throat_pain",
+      "description": "脑膜炎/咽部疾病：颈部僵硬、低头抗拒、咽喉触痛"
+    },
+    "chest_pain": {
+      "display_name": "胸痛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "HR"
+      ],
+      "rule": "pain_level > pain_moderate AND HR > tachycardia_hr",
+      "clue_id": "chest_pain",
+      "description": "胸部疼痛伴心动过速：常见于可卡因中毒、严重贫血、心源性胸痛"
+    },
+    "limb_joint_pain": {
+      "display_name": "肢体/关节疼痛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "pain_level",
+      "threshold_ref": "pain_mild",
+      "rule": "pain_level > pain_mild",
+      "clue_id": "limb_joint_pain",
+      "description": "肢体或关节疼痛：跛行、关节肿胀、触诊疼痛。骨科疾病的通用兜底规则（优先级低于其他定位规则）"
+    },
+    "abdominal_tenderness": {
+      "display_name": "腹部压痛/膨隆",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "disease.splenic_hemorrhage"
+      ],
+      "rule": "pain_level > pain_mild AND disease.splenic_hemorrhage > 0.3",
+      "clue_id": "abdominal_tenderness",
+      "description": "腹部压痛伴膨隆：常见于脾破裂、胃扩张-扭转（GDV）、胰腺炎等需要外科干预的急腹症"
+    },
+    "pain_severity": {
+      "display_name": "剧痛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "pain_level",
+      "threshold_ref": "pain_severe",
+      "rule": "pain_level > pain_severe",
+      "clue_id": "pain_severe",
+      "description": "剧烈疼痛：持续呻吟、嚎叫、无法休息。游戏层可作为紧急度升级触发器"
+    },
+    "contractility_loss_sign": {
+      "display_name": "心肌收缩力下降",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.contractility_loss",
+      "threshold": 0.3,
+      "rule": "disease.contractility_loss > 0.3",
+      "clue_id": "contractility_loss_sign",
+      "description": "DCM: 心肌纤维化和收缩力损失导致心肌收缩功能下降（超声心动图/听诊可发现）"
+    },
+    "cardiomegaly_sign": {
+      "display_name": "心脏扩大/心音异常",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.ventricular_dilation",
+        "HR"
+      ],
+      "rule": "disease.ventricular_dilation > 0.3 AND HR > tachycardia_hr",
+      "clue_id": "cardiomegaly_sign",
+      "description": "DCM: 心室扩大 + 代偿性心动过速 → 听诊心音奔马律/移位，X线心脏轮廓增大"
+    },
+    "acute_phosphate_tox": {
+      "display_name": "急性代谢性酸中毒",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pH",
+        "disease.renal_injury"
+      ],
+      "rule": "pH < ph_metabolic_acidosis AND disease.renal_injury > 0.3",
+      "clue_id": "acute_phosphate_tox",
+      "description": "磷中毒: 磷酸盐蓄积+肾功能损伤 → 严重代谢性酸中毒（血气pH<7.2）"
+    },
+    "imha_sign": {
+      "display_name": "黏膜苍白/黄染",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "HCT",
+      "threshold_ref": "hct_pale",
+      "rule": "HCT < hct_pale",
+      "clue_id": "imha_sign",
+      "description": "IMHA: 红细胞破坏 → 贫血（HCT<30%），胆红素升高 → 黏膜苍白/黄染（IMHA 经典体征）"
+    },
+    "pericardial_effusion_sign": {
+      "display_name": "心包积液/心音低沉",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.pericardial_volume",
+      "threshold": 0.3,
+      "rule": "disease.pericardial_volume > 0.3",
+      "clue_id": "pericardial_effusion_sign",
+      "description": "心包积液: 心包腔液体积蓄 → 超声可见游离液体，心音因液体阻隔而低沉"
+    },
+    "jvd_sign": {
+      "display_name": "颈静脉怒张",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.venous_congestion",
+      "threshold": 0.3,
+      "rule": "disease.venous_congestion > 0.3",
+      "clue_id": "jvd_sign",
+      "description": "心包积液: 右心回流受阻 → 颈静脉怒张（区别于jugular_distension规则用阈值0.2，更严格0.3）"
+    },
+    "dic_sign": {
+      "display_name": "凝血功能障碍/出血倾向",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.coagulation_consumption",
+      "threshold": 0.3,
+      "rule": "disease.coagulation_consumption > 0.3",
+      "clue_id": "dic_sign",
+      "description": "DIC: 凝血因子消耗 → 广泛出血倾向（瘀点、瘀斑、注射部位渗血、消化道出血）"
+    },
+    "dic_shock_sign": {
+      "display_name": "DIC休克",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.shock_from_dIC",
+        "MAP"
+      ],
+      "rule": "disease.shock_from_dIC > 0.3 AND MAP < map_hypotension",
+      "clue_id": "dic_shock_sign",
+      "description": "DIC休克: 微血栓广泛形成+出血 → 循环衰竭（MAP<60mmHg），预后不良"
+    },
+    "coag_sign_hepatic": {
+      "display_name": "凝血酶原时间延长",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.factor_VII_decline",
+      "threshold": 0.3,
+      "rule": "disease.factor_VII_decline > 0.3",
+      "clue_id": "coag_sign_hepatic",
+      "description": "肝衰竭: 凝血因子VII合成减少（半衰期最短） → PT延长（外源性凝血通路最敏感指标）"
+    },
+    "hepatic_encephalopathy": {
+      "display_name": "肝性脑病",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.encephalopathy",
+        "blood.consciousness_level"
+      ],
+      "rule": "disease.encephalopathy > 0.3 AND blood.consciousness_level < 0.95",
+      "clue_id": "hepatic_encephalopathy",
+      "description": "肝性脑病: 氨代谢障碍 → 意识水平下降（从嗜睡到昏迷，HE分级I-IV）"
+    },
+    "thyrotoxicosis": {
+      "display_name": "甲状腺毒症",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.T3_excess",
+        "HR"
+      ],
+      "rule": "disease.T3_excess > 0.3 AND HR > tachycardia_hr",
+      "clue_id": "thyrotoxicosis",
+      "description": "甲亢: T3过量 → 基础代谢率↑ + 心脏β受体敏感性↑ → 持续心动过速（>160bpm犬/>220bpm猫）"
+    },
+    "sustained_tachycardia": {
+      "display_name": "持续性心动过速",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.tachycardia",
+      "threshold": 0.5,
+      "rule": "disease.tachycardia > 0.5",
+      "clue_id": "sustained_tachycardia",
+      "description": "甲亢: 疾病状态变量tachycardia>0.5 → 持续性窦性心动过速（区别于一过性应激性心动过速）"
+    },
+    "tl_neuro_deficit": {
+      "display_name": "胸腰段神经功能缺损",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.disc_herniation",
+      "threshold_ref": "disc_herniation_moderate",
+      "rule": "disease.disc_herniation > disc_herniation_moderate AND disease.disc_herniation < disc_herniation_severe",
+      "clue_id": "tl_neuro_deficit",
+      "description": "IVDD 胸腰段中度突出: 脊髓压迫 → 本体感受缺失、爪背侧着地、轻度瘫痪"
+    },
+    "hindlimb_paralysis": {
+      "display_name": "后肢瘫痪",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.disc_herniation",
+      "threshold_ref": "disc_herniation_severe",
+      "rule": "disease.disc_herniation > disc_herniation_severe",
+      "clue_id": "hindlimb_paralysis",
+      "description": "IVDD 胸腰段重度突出: 脊髓严重压迫 → 后肢瘫痪（截瘫）、尿潴留、痛觉消失"
+    },
+    "meningismus": {
+      "display_name": "脑膜刺激征",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.cns_inflammation",
+      "threshold": 0.3,
+      "rule": "disease.cns_inflammation > 0.3",
+      "clue_id": "meningismus",
+      "description": "脑膜炎: 脑膜炎症 → 颈项强直、克尼格征阳性、布鲁金斯基征阳性"
+    },
+    "altered_consciousness_men": {
+      "display_name": "意识障碍",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.cns_inflammation",
+        "blood.consciousness_level"
+      ],
+      "rule": "disease.cns_inflammation > 0.5 AND blood.consciousness_level < 0.85",
+      "clue_id": "altered_consciousness_men",
+      "description": "脑膜炎: 中枢炎症 → 意识水平下降（嗜睡→昏迷），可能进展为癫痫发作"
+    },
+    "hepatic_anemia_sign": {
+      "display_name": "肝性贫血",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "HCT",
+        "disease.anemia_severity"
+      ],
+      "rule": "HCT < hct_anemia AND disease.anemia_severity > 0.3",
+      "clue_id": "hepatic_anemia_sign",
+      "description": "肝性贫血: 慢性肝病 → 铁调素升高+GI出血+溶血 → 非再生性贫血（HCT<20%犬/15%猫）"
+    },
+    "gi_bleeding_sign": {
+      "display_name": "消化道出血",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.gi_bleeding",
+      "threshold": 0.3,
+      "rule": "disease.gi_bleeding > 0.3",
+      "clue_id": "gi_bleeding_sign",
+      "description": "肝性贫血: 门脉高压+凝血障碍 → 消化道出血（黑粪、便血、呕血）"
     }
   }
 }
