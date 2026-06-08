@@ -211,6 +211,18 @@
           "tau": 100.0,
           "target_fn": "gfr_decline * 0.8"
         }
+      },
+      "uremic_stomatitis": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "min(gfr_decline * 1.2, 1.0)"
+      },
+      "urine_output": {
+        "initial": 0.4,
+        "clamp": [0, 2.0],
+        "ode_type": "algebraic",
+        "fn": "max(0.05, 0.4 - gfr_decline * 0.35)"
       }
     },
     "outputs": [
@@ -512,6 +524,24 @@
           "tau": 150.0,
           "target_fn": "min(6.0, cellular_toxicity * 7.0)"
         }
+      },
+      "toxicity": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "cellular_toxicity"
+      },
+      "intravascular_hemolysis": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "min(cellular_toxicity * 0.5, 1.0)"
+      },
+      "upper_gi_hemorrhage": {
+        "initial": 0.0,
+        "clamp": [0, 1],
+        "ode_type": "algebraic",
+        "fn": "min(cellular_toxicity * 0.6, 1.0)"
       }
     },
     "outputs": [

@@ -7,37 +7,45 @@
       "sustained",
       "cumulative"
     ],
-    "note": "SymptomEngine reads ENGINE state (blood.xxx, heart.xxx, lung.xxx), NOT disease.xxx state variables. disease.xxx is used only when no engine parameter exists. For 'consciousness', use blood.consciousness_level (resolved via blood.* path).",
-    "symptom_count": 49,
-    "last_modified_by": "agent_b_symptom_rules_2026_06_07"
+    "note": "Rules can read engine state (HR, MAP, RR, BUN, K, pH, PaO2, etc.) or disease.* state variables (alveolar_exudate, disc_herniation, pain_level, etc.). For 'consciousness', use blood.consciousness_level. Pain level is the engine-level field `pain_level` (NOT disease.pain_level).",
+    "symptom_count": 110,
+    "last_modified_by": "falsepos_and_dka_fix_2026_06_08"
   },
   "symptoms": {
-    "icterus": {
-      "display_name": "黏膜黄染",
+    "depression": {
+      "display_name": "精神沉郁",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "threshold",
-      "param": "blood.bilirubin_mg_dL",
-      "threshold_ref": "bilirubin_icterus",
-      "clue_id": "icterus",
-      "description": "血清胆红素超过阈值时可见黏膜黄染。使用真实浓度而非disease.bilirubin_load。"
+      "param": "blood.consciousness_level",
+      "threshold": 0.9,
+      "rule": "blood.consciousness_level < 0.9",
+      "clue_id": "depression",
+      "description": "精神沉郁：对外界刺激反应减弱，不愿活动。见于感染、疼痛、休克、代谢紊乱。"
     },
-    "vomiting": {
-      "display_name": "呕吐",
+    "lethargy": {
+      "display_name": "嗜睡/迟钝",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "blood.consciousness_level",
+      "threshold": 0.75,
+      "rule": "blood.consciousness_level < 0.75",
+      "clue_id": "lethargy",
+      "description": "嗜睡至迟钝：意识模糊，对声音/触碰反应极弱。见于严重代谢性脑病、休克晚期。"
+    },
+    "collapse": {
+      "display_name": "虚脱/倒地",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
       "params": [
-        "BUN",
-        "K",
-        "pH",
-        "Glu",
-        "Na_K_ratio"
+        "MAP",
+        "HR"
       ],
-      "rule": "BUN > bun_uremia OR K > k_hyperkalemia OR pH < ph_metabolic_acidosis OR Glu < glu_hypoglycemia_mg_dL",
-      "compound_rule": "Na_K_ratio < na_k_ratio_addison AND K > k_hyperkalemia",
-      "clue_id": "vomiting",
-      "description": "CTZ激活：尿毒症(BUN>阈值)、高钾血症、酸中毒、低血糖。注：BUN>40是正常上限，>80才是尿毒症。"
+      "rule": "MAP < 50 OR (HR > 180 AND MAP < 60)",
+      "clue_id": "collapse",
+      "description": "急性虚脱：突然倒地无力。见于失血性休克、心脏压塞、肺栓塞。"
     },
     "weakness": {
       "display_name": "虚弱/乏力",
@@ -55,25 +63,63 @@
         "Lactate",
         "Temp_C"
       ],
-      "rule": "HCT < hct_anemia OR PaO2 < pao2_hypoxemia OR Glu < glu_hypoglycemia_mg_dL OR Glu > glu_hyperglycemia_mg_dL OR Na < na_hyponatremia OR Na > na_hypernatremia OR K < k_hypokalemia OR K > k_hyperkalemia OR MAP < map_hypotension OR (Lactate > lactate_shock AND MAP < map_hypotension) OR Temp_C < hypothermia_temp_C OR Temp_C > fever_temp_C",
+      "rule": "HCT < 20 OR PaO2 < 60 OR Glu < 60 OR Glu > 300 OR Na < 125 OR Na > 165 OR K < 2.5 OR K > 6.5 OR MAP < 60 OR (Lactate > 4.0 AND MAP < 60) OR Temp_C < 37.0 OR Temp_C > 39.5",
       "severity_spread": true,
       "clue_id": "weakness",
-      "description": "多因素：贫血+低氧+酸中毒+电解质紊乱+低灌注均可导致虚弱。触发条件越多越严重。"
+      "description": "多因素虚弱：贫血+低氧+酸中毒+电解质紊乱+低灌注均可导致。触发条件越多越严重。"
     },
-    "cough": {
-      "display_name": "咳嗽",
+    "anorexia": {
+      "display_name": "食欲减退/废绝",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.anorexia_level",
+      "threshold": 0.3,
+      "rule": "disease.anorexia_level > 0.3",
+      "clue_id": "anorexia",
+      "description": "食欲减退至完全废绝。见于感染、胃肠道疾病、代谢紊乱、疼痛。"
+    },
+    "weight_loss": {
+      "display_name": "体重下降/消瘦",
+      "type": "observable",
+      "evaluation_type": "cumulative",
+      "duration_s": 86400,
+      "rule_type": "multi_parameter",
+      "param": "disease.weight_loss_rate",
+      "rule": "disease.weight_loss_rate > 0.2 OR disease.T3_excess > 0.1",
+      "clue_id": "weight_loss",
+      "description": "慢性体重下降（几天到几周）。见于甲亢、糖尿病、慢性肾病、恶性肿瘤。",
+      "params": [
+        "disease.weight_loss_rate",
+        "disease.T3_excess"
+      ]
+    },
+    "exercise_intolerance": {
+      "display_name": "运动不耐受",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
       "params": [
-        "disease_alveolar_exudate",
-        "heart_la_ao_ratio",
-        "lvedp",
-        "tracheal_collapse_grade"
+        "HR",
+        "MAP",
+        "Lactate",
+        "disease.contractility_loss",
+        "disease.tamponade_severity"
       ],
-      "rule": "disease_alveolar_exudate > 0.3 OR heart_la_ao_ratio > la_ao_ratio_cardiomegaly OR lvedp > lvedp_pulmonary_edema OR tracheal_collapse_grade >= 2",
-      "clue_id": "cough",
-      "description": "下呼吸道刺激：肺泡渗出、左心房扩大导致气道压迫、肺静脉淤血、气管塌陷。RR>35不是咳嗽机制，已删除。"
+      "rule": "(HR > 160 AND MAP < 70) OR Lactate > 3.0 OR disease.contractility_loss > 0.1 OR disease.tamponade_severity > 0.15",
+      "clue_id": "exercise_intolerance",
+      "description": "运动耐力显著下降，轻微活动即喘粗气、乏力。见于心脏病、肺病、贫血。"
+    },
+    "polypnea": {
+      "display_name": "呼吸急促",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "RR",
+      "threshold": 40,
+      "rule": "RR > 40",
+      "clue_id": "polypnea",
+      "description": "呼吸频率超过物种阈值（犬>40，猫>50）。补偿性增快：低氧、疼痛、发热、代谢性酸中毒均可触发。"
     },
     "dyspnea": {
       "display_name": "呼吸困难",
@@ -84,32 +130,123 @@
         "RR",
         "PaO2",
         "SpO2",
-        "pleural_effusion",
-        "upper_airway_obstruction"
+        "pleural_effusion"
       ],
-      "rule": "(RR > tachypnea_rr AND respiratory_effort >= 2) OR PaO2 < pao2_hypoxemia OR SpO2 < spo2_cyanosis OR pleural_effusion > pleural_effusion_mL_kg OR upper_airway_obstruction == True",
+      "rule": "(RR > 40 AND respiratory_effort >= 2) OR PaO2 < 60 OR SpO2 < 92 OR pleural_effusion > 2.0",
       "clue_id": "dyspnea",
-      "description": "PaO2<70=低氧血症，不是呼吸困难。呼吸困难=呼吸做功增加+气体交换受损。复合规则：RR升高+呼吸费力，或严重低氧，或胸腔积液，或上呼吸道阻塞。"
+      "description": "呼吸困难：呼吸做功增加+气体交换受损。RR升高+呼吸费力，或严重低氧，或胸腔积液。"
     },
-    "tachypnea": {
-      "display_name": "呼吸急促",
+    "cough": {
+      "display_name": "咳嗽",
+      "type": "observable",
+      "evaluation_type": "sustained",
+      "rule_type": "threshold",
+      "params": [
+        "disease.alveolar_exudate"
+      ],
+      "rule": "disease.alveolar_exudate > 0.30",
+      "clue_id": "cough",
+      "description": "咳嗽：肺泡渗出、左心房扩大导致气道压迫、肺静脉淤血、气管塌陷均可触发。",
+      "duration_s": 60
+    },
+    "orthopnea": {
+      "display_name": "端坐呼吸",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "RR",
+        "pleural_effusion",
+        "lvedp"
+      ],
+      "rule": "(RR > 40 AND pleural_effusion > 1.0) OR lvedp > 20",
+      "clue_id": "orthopnea",
+      "description": "端坐呼吸：站立或坐姿才能顺畅呼吸，卧躺时呼吸困难加重。见于左心衰、肺水肿、胸腔积液。"
+    },
+    "open_mouth_breathing": {
+      "display_name": "张口呼吸",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "RR",
+        "PaO2",
+        "Temp_C"
+      ],
+      "rule": "(RR > 50 AND (PaO2 < 70 OR Temp_C > 40.0))",
+      "clue_id": "open_mouth_breathing",
+      "description": "张口呼吸（犬正常情况不应如此）。见于严重呼吸困难、肺水肿、发热。"
+    },
+    "cyanosis": {
+      "display_name": "黏膜发绀",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "threshold",
-      "param": "RR",
-      "threshold_ref": "tachypnea_rr",
-      "clue_id": "tachypnea",
-      "description": "呼吸频率超过物种阈值。补偿性增快：低氧、高热、疼痛、代谢性酸中毒均可触发。"
+      "param": "SpO2",
+      "threshold": 92,
+      "rule": "SpO2 < 92",
+      "clue_id": "cyanosis",
+      "description": "黏膜/皮肤呈青紫色。见于严重低氧血症（PaO2<60mmHg）、呼吸衰竭、休克晚期。"
+    },
+    "wheezing": {
+      "display_name": "哮鸣音/干啰音",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.bronchospasm",
+      "threshold": 0.4,
+      "rule": "disease.bronchospasm > 0.4",
+      "clue_id": "wheezing",
+      "description": "呼气时哮鸣音。见于支气管收缩、上呼吸道过敏、哮喘（猫）。"
+    },
+    "crackles": {
+      "display_name": "湿啰音/捻发音",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.pulmonary_edema",
+      "threshold": 0.3,
+      "rule": "disease.pulmonary_edema > 0.3",
+      "clue_id": "crackles",
+      "description": "听诊肺部湿啰音。见于肺水肿、肺炎、肺出血。左心衰典型体征。"
+    },
+    "hemoptysis": {
+      "display_name": "咯血",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.pulmonary_hemorrhage",
+      "threshold": 0.3,
+      "rule": "disease.pulmonary_hemorrhage > 0.3",
+      "clue_id": "hemoptysis",
+      "description": "咳出血性分泌物。见于肺栓塞、肺转移性肿瘤、肺出血、DIC。"
+    },
+    "epistaxis": {
+      "display_name": "鼻出血",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "PLT",
+        "PT",
+        "disease.nasal_inflammation"
+      ],
+      "rule": "PLT < 50000 OR (PT > 18 AND disease.nasal_inflammation > 0.3)",
+      "clue_id": "epistaxis",
+      "description": "自发性鼻出血。见于血小板减少、凝血障碍、DIC、高血压。"
     },
     "tachycardia": {
       "display_name": "心动过速",
       "type": "observable",
       "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "HR",
-      "threshold_ref": "tachycardia_hr",
+      "rule_type": "multi_parameter",
+      "params": [
+        "HR",
+        "disease.tachycardia"
+      ],
+      "rule": "HR > 160 OR disease.tachycardia > 0.05 OR disease.compensatory_tachycardia > 0.05",
       "clue_id": "tachycardia",
-      "description": "心率超过物种阈值。疼痛、血容量不足、发热、甲状腺功能亢进、休克均可导致。"
+      "description": "心率超过物种阈值（犬>160，猫>220）。疼痛、血容量不足、发热、甲状腺功能亢进、休克均可导致。"
     },
     "bradycardia": {
       "display_name": "心动过缓",
@@ -117,10 +254,85 @@
       "evaluation_type": "instantaneous",
       "rule_type": "threshold",
       "param": "HR",
-      "threshold_ref": "bradycardia_hr",
-      "rule": "HR < bradycardia_hr",
+      "threshold": 60,
+      "rule": "HR < 60",
       "clue_id": "bradycardia",
-      "description": "心率低于物种阈值。艾迪森病、高钾血症、颅内压升高均可导致。"
+      "description": "心率低于物种阈值（犬<60，猫<100）。艾迪森病、高钾血症、颅内压升高均可导致。"
+    },
+    "arrhythmia": {
+      "display_name": "心律失常",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.arrhythmia_severity",
+      "threshold": 0.5,
+      "rule": "disease.arrhythmia_severity > 0.5",
+      "clue_id": "arrhythmia",
+      "description": "心电图或听诊发现异常心律。室性早搏、房颤、心动过缓等均可触发。"
+    },
+    "gallop_rhythm": {
+      "display_name": "奔马律",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.contractility_loss",
+        "HR"
+      ],
+      "rule": "disease.contractility_loss > 0.1 AND HR > 90",
+      "clue_id": "gallop_rhythm",
+      "description": "第三心音或第四心音形成奔马律。见于DCM、心衰、心肌病。超声心动图可确认。"
+    },
+    "heart_murmur": {
+      "display_name": "心脏杂音",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.valve_regurgitation",
+        "HR"
+      ],
+      "rule": "disease.valve_regurgitation > 0.3 OR (HR > 160 AND disease.hemodynamic_instability > 0.3)",
+      "clue_id": "heart_murmur",
+      "description": "心脏听诊发现杂音。见于瓣膜病、DCM继发二尖瓣返流、甲亢继发功能性杂音。"
+    },
+    "pulsus_paradoxus": {
+      "display_name": "奇脉",
+      "type": "observable",
+      "evaluation_type": "sustained",
+      "rule_type": "threshold",
+      "params": [
+        "disease.tamponade_severity"
+      ],
+      "rule": "disease.tamponade_severity > 0.18",
+      "clue_id": "pulsus_paradoxus",
+      "description": "吸气时收缩压下降>10mmHg。心包填塞的特征性体征。",
+      "duration_s": 60
+    },
+    "weak_pulses": {
+      "display_name": "脉搏微弱",
+      "type": "observable",
+      "evaluation_type": "multi_parameter",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.tamponade_severity",
+        "MAP",
+        "CO"
+      ],
+      "rule": "disease.tamponade_severity > 0.18 OR (MAP < 65 AND CO < 1.5)",
+      "clue_id": "weak_pulses",
+      "description": "股动脉搏动微弱。见于心输出量下降、休克、心包填塞。"
+    },
+    "hypotension": {
+      "display_name": "低血压",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "MAP",
+      "threshold": 60,
+      "rule": "MAP < 60",
+      "clue_id": "hypotension",
+      "description": "平均动脉压低于60mmHg。休克、心衰、严重脱水均可导致。"
     },
     "syncope": {
       "display_name": "晕厥",
@@ -131,12 +343,53 @@
       "params": [
         "MAP",
         "HR",
-        "CO",
-        "sustained_vtach"
+        "CO"
       ],
-      "rule": "MAP < map_syncope OR (sustained_vtach == True AND HR > vtach_rate) OR (HR < bradycardia_hr AND CO < co_reduction_syncope_percent)",
+      "rule": "MAP < 45 OR (HR > 250 AND CO < 1.0) OR (HR < 40 AND CO < 1.0)",
       "clue_id": "syncope",
-      "description": "心输出量骤降导致脑灌注不足。MAP<45mmHg持续10秒以上，或持续性室性心动过速，或严重心动过缓伴心输出量下降。HR>180在正常犬不导致晕厥。"
+      "description": "心输出量骤降导致脑灌注不足。MAP<45mmHg持续10秒以上，或严重心律失常导致。"
+    },
+    "pale_mucous_membranes": {
+      "display_name": "黏膜苍白",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "HCT",
+        "disease.rbc_destruction",
+        "disease.anemia_severity"
+      ],
+      "rule": "HCT < 20 OR disease.rbc_destruction > 0.1 OR disease.anemia_severity > 0.05",
+      "clue_id": "pale_mm",
+      "description": "贫血导致黏膜苍白（牙龈、结膜）。HCT阈值：犬<20%，猫<15%。见于失血、溶血、骨髓抑制。"
+    },
+    "prolonged_capillary_refill": {
+      "display_name": "毛细血管再充盈时间延长",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "param": "disease.perfusion_deficit",
+      "rule": "disease.perfusion_deficit > 0.4 OR disease.organ_ischemia > 0.05",
+      "clue_id": "crt",
+      "description": "CRT>2秒。见于休克、脱水和低灌注状态。外周循环不良的早期指标。",
+      "params": [
+        "disease.perfusion_deficit",
+        "disease.organ_ischemia"
+      ]
+    },
+    "icterus": {
+      "display_name": "黏膜黄染",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "blood.bilirubin_mg_dL",
+        "disease.bilirubin_load",
+        "disease.hemolysis"
+      ],
+      "rule": "blood.bilirubin_mg_dL > 2.0 OR disease.bilirubin_load > 0.02 OR disease.hemolysis > 0.05",
+      "clue_id": "icterus",
+      "description": "血清胆红素超过阈值时可见黏膜黄染（巩膜、牙龈、耳廓）。"
     },
     "petechiae": {
       "display_name": "瘀点/瘀斑",
@@ -146,70 +399,54 @@
       "params": [
         "PLT",
         "PT",
-        "Fibrinogen",
-        "PT_control"
+        "Fibrinogen"
       ],
-      "rule": "PLT < plt_petechiae OR (PT > 1.5 * PT_control AND Fibrinogen < 100)",
+      "rule": "PLT < 50000 OR (PT > 18 AND Fibrinogen < 100)",
       "clue_id": "petechiae",
-      "description": "血小板减少(<5万)或DIC(PT延长1.5倍+纤维蛋白原<100)。disease.hemorrhage_risk是抽象值，不使用。"
+      "description": "血小板减少(<5万)或DIC(PT延长1.5倍+纤维蛋白原<100)。皮肤和黏膜均可出现。"
     },
-    "fever": {
-      "display_name": "发热",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "Temp_C",
-      "threshold_ref": "fever_temp_C",
-      "rule": "Temp_C > fever_temp_C",
-      "clue_id": "fever",
-      "description": "体温超过物种发热阈值。感染、炎症、热射病、肿瘤坏死均可导致。"
-    },
-    "hypothermia": {
-      "display_name": "低体温",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "Temp_C",
-      "threshold_ref": "hypothermia_temp_C",
-      "rule": "Temp_C < hypothermia_temp_C",
-      "clue_id": "hypothermia",
-      "description": "体温低于正常。见于休克、濒死状态、低温麻醉、甲状腺功能减退。"
-    },
-    "hypotension": {
-      "display_name": "低血压",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "MAP",
-      "threshold_ref": "map_hypotension",
-      "rule": "MAP < map_hypotension",
-      "clue_id": "hypotension",
-      "description": "平均动脉压低于60mmHg。休克、心衰、严重脱水均可导致。"
-    },
-    "polyuria_polydipsia": {
-      "display_name": "多尿/多饮",
+    "ecchymosis": {
+      "display_name": "大面积皮下出血/瘀青",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
       "params": [
-        "Glu",
-        "USG",
-        "Ca"
+        "PLT",
+        "disease.coagulation_consumption",
+        "disease.hemorrhage_risk"
       ],
-      "rule": "Glu > glu_pu_pd_mg_dL OR USG < usg_isosthenuria OR Ca > 12",
-      "clue_id": "pu_pd",
-      "description": "USG<阈值是临床检测多尿的标准方法，比GFR更直接。糖尿病(Calves>阈值)、甲亢、Cushing's均可导致。"
+      "rule": "PLT < 30000 OR disease.coagulation_consumption > 0.15 OR disease.hemorrhage_risk > 0.05",
+      "clue_id": "ecchymosis",
+      "description": "大面积皮下出血。见于严重血小板减少、DIC、凝血因子缺乏。"
     },
-    "pale_mucous_membranes": {
-      "display_name": "黏膜苍白",
+    "bleeding_gums": {
+      "display_name": "牙龈出血",
       "type": "observable",
       "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "HCT",
-      "threshold_ref": "hct_anemia",
-      "rule": "HCT < hct_anemia",
-      "clue_id": "pale_mm",
-      "description": "贫血导致黏膜苍白。见于失血、溶血、骨髓抑制。HCT阈值：犬<20%，猫<15%。"
+      "rule_type": "multi_parameter",
+      "params": [
+        "PLT",
+        "PT",
+        "disease.uremic_stomatitis"
+      ],
+      "rule": "PLT < 50000 OR PT > 18 OR disease.uremic_stomatitis > 0.4",
+      "clue_id": "bleeding_gums",
+      "description": "牙龈自发性出血。见于血小板减少、凝血障碍、尿毒症性口炎。"
+    },
+    "prolonged_bleeding": {
+      "display_name": "针刺/伤口渗血不止",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "PT",
+        "Fibrinogen",
+        "disease.coagulation_consumption",
+        "disease.factor_VII_decline"
+      ],
+      "rule": "(PT > 18 AND Fibrinogen < 100) OR disease.coagulation_consumption > 0.12 OR disease.factor_VII_decline > 0.1",
+      "clue_id": "prolonged_bleeding",
+      "description": "注射部位或小伤口持续渗血不止。DIC、严重凝血障碍的表现。"
     },
     "melena": {
       "display_name": "黑粪",
@@ -220,9 +457,285 @@
         "PT",
         "upper_gi_bleed"
       ],
-      "rule": "PT > 1.5 * PT_control AND upper_gi_bleed == True",
+      "rule": "PT > 18 AND upper_gi_bleed == True",
       "clue_id": "melena",
       "description": "上消化道出血+凝血障碍。见于肝衰竭凝血因子合成减少、NSAID溃疡、DIC。"
+    },
+    "hematemesis": {
+      "display_name": "呕血",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.upper_gi_hemorrhage",
+      "threshold": 0.3,
+      "rule": "disease.upper_gi_hemorrhage > 0.3",
+      "clue_id": "hematemesis",
+      "description": "呕出血液（可为鲜红或咖啡色）。见于胃溃疡、肿瘤、肝衰凝血障碍。"
+    },
+    "hemoglobinuria": {
+      "display_name": "酱油色尿/血红蛋白尿",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.intravascular_hemolysis",
+      "threshold": 0.4,
+      "rule": "disease.intravascular_hemolysis > 0.4",
+      "clue_id": "hemoglobinuria",
+      "description": "尿液呈酱油色或深红（血管内溶血时血红蛋白从尿排出）。IMHA、磷中毒溶血、输血反应的示病症状。"
+    },
+    "hematuria": {
+      "display_name": "血尿",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.urinary_tract_bleeding",
+      "threshold": 0.3,
+      "rule": "disease.urinary_tract_bleeding > 0.3",
+      "clue_id": "hematuria",
+      "description": "尿液含血（肉眼或镜检）。见于膀胱炎、结石、肿瘤、凝血障碍。"
+    },
+    "vomiting": {
+      "display_name": "呕吐",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "BUN",
+        "K",
+        "pH",
+        "Glu"
+      ],
+      "rule": "BUN > 80 OR K > 6.5 OR pH < 7.2 OR Glu < 60",
+      "clue_id": "vomiting",
+      "description": "呕吐：CTZ激活导致。尿毒症(BUN>80)、高钾血症、酸中毒、低血糖均可触发。"
+    },
+    "diarrhea": {
+      "display_name": "腹泻",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.diarrhea_severity",
+      "threshold": 0.3,
+      "rule": "disease.diarrhea_severity > 0.3",
+      "clue_id": "diarrhea",
+      "description": "腹泻（可为血性或水样）。见于感染、炎症性肠病、胰腺炎、甲亢。"
+    },
+    "constipation": {
+      "display_name": "便秘",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.gut_motility_decrease",
+      "threshold": 0.5,
+      "rule": "disease.gut_motility_decrease > 0.5",
+      "clue_id": "constipation",
+      "description": "排便困难或粪便干硬。见于肠道梗阻、疼痛（不愿排便）、脱水。"
+    },
+    "abdominal_distension": {
+      "display_name": "腹部膨隆",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.gastric_distension",
+      "threshold": 0.3,
+      "rule": "disease.gastric_distension > 0.3",
+      "clue_id": "abdominal_distension",
+      "description": "胃或腹部气体/液体积蓄导致可见膨隆。GDV、气腹、腹水均可导致。"
+    },
+    "abdominal_pain": {
+      "display_name": "腹痛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "disease.pain_level"
+      ],
+      "rule": "pain_level > 1.5 OR disease.pain_level > 1.5",
+      "clue_id": "abdominal_pain",
+      "description": "腹痛：祈祷姿势、腹肌紧张、不愿被触摸腹部。见于胰腺炎、肠梗阻、腹膜炎。"
+    },
+    "abdominal_tenderness": {
+      "display_name": "腹部压痛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "disease.splenic_hemorrhage"
+      ],
+      "rule": "pain_level > 3.0 AND disease.splenic_hemorrhage > 0.3",
+      "clue_id": "abdominal_tenderness",
+      "description": "腹部压痛伴膨隆：常见于脾破裂、GDV、胰腺炎等需要外科干预的急腹症。"
+    },
+    "splenomegaly": {
+      "display_name": "脾肿大",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "param": "disease.splenic_enlargement",
+      "rule": "disease.splenic_enlargement > 0.4 OR disease.antibody_activity > 0.3",
+      "clue_id": "splenomegaly",
+      "description": "脾脏肿大（触诊或影像）。见于IMHA、脾肿瘤、门脉高压。",
+      "params": [
+        "disease.splenic_enlargement",
+        "disease.antibody_activity"
+      ]
+    },
+    "hepatomegaly": {
+      "display_name": "肝脏肿大",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.liver_enlargement",
+      "threshold": 0.4,
+      "rule": "disease.liver_enlargement > 0.4",
+      "clue_id": "hepatomegaly",
+      "description": "肝脏肿大（触诊或影像）。见于心衰（肝淤血）、肝炎、肿瘤。"
+    },
+    "ascites": {
+      "display_name": "腹水",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "param": "disease.ascites_level",
+      "rule": "disease.ascites_level > 0.3 OR disease.hepatic_dysfunction > 0.3",
+      "clue_id": "ascites",
+      "description": "腹腔积液导致腹部膨胀、波动感。见于门脉高压、低白蛋白血症、心衰。",
+      "params": [
+        "disease.ascites_level",
+        "disease.hepatic_dysfunction"
+      ]
+    },
+    "hypersalivation": {
+      "display_name": "流涎/口腔分泌物过多",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.oral_inflammation",
+      "threshold": 0.3,
+      "rule": "disease.oral_inflammation > 0.3",
+      "clue_id": "hypersalivation",
+      "description": "口腔分泌物增多。见于口腔溃疡、牙周病、恶心（胃肠道疾病）。"
+    },
+    "oral_ulcers": {
+      "display_name": "口腔黏膜溃疡",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.uremic_stomatitis",
+        "pH"
+      ],
+      "rule": "disease.uremic_stomatitis > 0.4 OR pH < 7.15",
+      "clue_id": "oral_ulcers",
+      "description": "口腔黏膜溃疡、唇炎、舌炎。见于尿毒症性口炎（ARF）、严重代谢性酸中毒。"
+    },
+    "halitosis": {
+      "display_name": "口臭/口腔异味",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.uremic_stomatitis",
+        "blood.bun"
+      ],
+      "rule": "disease.uremic_stomatitis > 0.3 OR blood.bun > 100",
+      "clue_id": "halitosis",
+      "description": "口臭（含氨味或腐烂味）。见于尿毒症、胃肠道疾病、口腔感染。"
+    },
+    "ketotic_breath": {
+      "display_name": "酮臭味呼吸",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pH",
+        "blood.beta_hydroxybutyrate"
+      ],
+      "rule": "pH < 7.25 AND blood.beta_hydroxybutyrate > 3.0",
+      "clue_id": "ketotic_breath",
+      "description": "呼出气有烂苹果味（丙酮）。DKA的示病症状。"
+    },
+    "dysphagia": {
+      "display_name": "吞咽困难",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.swallowing_difficulty",
+      "threshold": 0.4,
+      "rule": "disease.swallowing_difficulty > 0.4",
+      "clue_id": "dysphagia",
+      "description": "吞咽困难或抗拒吞咽。见于脑干疾病、食道疾病、口腔溃疡。"
+    },
+    "borborygmus": {
+      "display_name": "肠鸣音亢进",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.gut_hyperactivity",
+      "threshold": 0.6,
+      "rule": "disease.gut_hyperactivity > 0.6",
+      "clue_id": "borborygmus",
+      "description": "腹部可闻及亢进的肠鸣音。见于急性胃肠炎、肠梗阻早期。"
+    },
+    "absent_bowel_sounds": {
+      "display_name": "肠鸣音消失",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.gut_motility_decrease",
+      "threshold": 0.7,
+      "rule": "disease.gut_motility_decrease > 0.7",
+      "clue_id": "absent_bowel_sounds",
+      "description": "腹部听诊无肠鸣音。见于肠梗阻晚期、腹膜炎、脓毒症。"
+    },
+    "gastric_retention": {
+      "display_name": "胃内容物排空延迟/干呕",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.gastric_outlet_obstruction",
+      "threshold": 0.5,
+      "rule": "disease.gastric_outlet_obstruction > 0.5",
+      "clue_id": "gastric_retention",
+      "description": "想吐却吐不出（干呕）。GDV的典型早期症状。"
+    },
+    "seizure": {
+      "display_name": "癫痫发作",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "blood.Glu",
+        "disease.cns_inflammation",
+        "blood.consciousness_level"
+      ],
+      "rule": "blood.Glu < 40 OR disease.cns_inflammation > 0.6 OR (blood.consciousness_level < 0.5 AND disease.encephalopathy > 0.3)",
+      "clue_id": "seizure",
+      "description": "癫痫大发作或局灶性发作。见于低血糖、肝性脑病、脑膜炎、脑炎。"
+    },
+    "head_tilt": {
+      "display_name": "头部倾斜",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.vestibular_sign",
+      "threshold": 0.3,
+      "rule": "disease.vestibular_sign > 0.3",
+      "clue_id": "head_tilt",
+      "description": "头部不自主向一侧倾斜。见于前庭疾病（内耳/中耳感染）、脑膜炎、脑干疾病。"
+    },
+    "nystagmus": {
+      "display_name": "眼球震颤",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.vestibular_sign",
+      "threshold": 0.4,
+      "rule": "disease.vestibular_sign > 0.4",
+      "clue_id": "nystagmus",
+      "description": "眼球不自主节律性运动（水平/垂直/旋转）。前庭疾病的典型体征。"
     },
     "ataxia": {
       "display_name": "共济失调",
@@ -231,8 +744,368 @@
       "rule_type": "threshold",
       "param": "disease.cns_inflammation",
       "threshold": 0.5,
+      "rule": "disease.cns_inflammation > 0.5",
       "clue_id": "ataxia",
-      "description": "中枢神经系统炎症导致运动协调障碍。见于脑膜炎、脑炎、肝性脑病。"
+      "description": "运动协调障碍，步态蹒跚。见于脑膜炎、脑炎、肝性脑病、小脑疾病。"
+    },
+    "circling": {
+      "display_name": "转圈运动",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.encephalopathy",
+      "threshold": 0.4,
+      "rule": "disease.encephalopathy > 0.4",
+      "clue_id": "circling",
+      "description": "持续向一侧转圈。见于肝性脑病、脑炎、脑脓肿、一侧脑肿瘤。"
+    },
+    "head_pressing": {
+      "display_name": "头部压地/贴地",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.encephalopathy",
+      "threshold": 0.5,
+      "rule": "disease.encephalopathy > 0.5",
+      "clue_id": "head_pressing",
+      "description": "头部持续压向地面。见于肝性脑病、颅内压升高。"
+    },
+    "neck_stiffness": {
+      "display_name": "颈部强直",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.cns_inflammation",
+      "threshold": 0.3,
+      "rule": "disease.cns_inflammation > 0.3",
+      "clue_id": "neck_stiffness",
+      "description": "颈部僵硬，低头困难或抗拒。见于脑膜炎、脑炎。"
+    },
+    "opistothotonus": {
+      "display_name": "角弓反张",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.cns_inflammation",
+      "threshold": 0.6,
+      "rule": "disease.cns_inflammation > 0.6",
+      "clue_id": "opistothotonus",
+      "description": "头部和颈部向后强直弯曲（脊柱后弯）。严重脑膜刺激征的表现。"
+    },
+    "paresis": {
+      "display_name": "轻瘫/四肢无力",
+      "type": "observable",
+      "evaluation_type": "sustained",
+      "rule_type": "multi_parameter",
+      "param": "disease.spinal_cord_compression",
+      "rule": "disease.disc_herniation > 0.32 OR (disease.spinal_cord_compression > 0.3 AND disease.disc_herniation > 0.25)",
+      "clue_id": "paresis",
+      "description": "四肢或后肢轻瘫，无力站立。见于IVDD、脊髓损伤。",
+      "params": [
+        "disease.disc_herniation",
+        "disease.spinal_cord_compression"
+      ],
+      "duration_s": 60
+    },
+    "paralysis": {
+      "display_name": "瘫痪/截瘫",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "param": "disease.spinal_cord_compression",
+      "rule": "disease.disc_herniation > 0.45 OR disease.spinal_cord_compression > 0.6",
+      "clue_id": "paralysis",
+      "description": "后肢完全瘫痪，无法站立。见于IVDD胸腰椎型重度突出。",
+      "params": [
+        "disease.disc_herniation",
+        "disease.spinal_cord_compression"
+      ]
+    },
+    "urinary_incontinence": {
+      "display_name": "尿失禁",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.bladder_dysfunction",
+      "threshold": 0.5,
+      "rule": "disease.bladder_dysfunction > 0.5",
+      "clue_id": "urinary_incontinence",
+      "description": "无法控制排尿（尿液不自主排出）。见于脊髓损伤（骶髓）、尿路感染。"
+    },
+    "urinary_retention": {
+      "display_name": "尿潴留",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.bladder_dysfunction",
+      "threshold": 0.6,
+      "rule": "disease.bladder_dysfunction > 0.6",
+      "clue_id": "urinary_retention",
+      "description": "膀胱充盈却无法排尿，需要人工辅助。见于IVDD骶髓损伤。"
+    },
+    "fecal_incontinence": {
+      "display_name": "排便失禁",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.sacral_reflex_loss",
+      "threshold": 0.5,
+      "rule": "disease.sacral_reflex_loss > 0.5",
+      "clue_id": "fecal_incontinence",
+      "description": "无法控制排便。见于骶髓损伤、严重神经功能障碍。"
+    },
+    "decreased_anal_tone": {
+      "display_name": "肛门括约肌松弛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.sacral_reflex_loss",
+      "threshold": 0.5,
+      "rule": "disease.sacral_reflex_loss > 0.5",
+      "clue_id": "decreased_anal_tone",
+      "description": "肛门张力下降，肛门反射消失。见于骶髓损伤。"
+    },
+    "consciousness_decreased": {
+      "display_name": "意识障碍/木僵",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "blood.consciousness_level",
+      "threshold": 0.6,
+      "rule": "blood.consciousness_level < 0.6",
+      "clue_id": "consciousness_decreased",
+      "description": "意识水平下降，从嗜睡到昏迷。见于颅内压升高、肝性脑病、休克。"
+    },
+    "tremor": {
+      "display_name": "肌肉震颤",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "blood.Glu",
+        "K",
+        "disease.toxicity"
+      ],
+      "rule": "blood.Glu < 50 OR K < 2.5 OR disease.toxicity > 0.4",
+      "clue_id": "tremor",
+      "description": "肌肉不自主震颤。见于低血糖、电解质紊乱、毒素中毒（磷中毒、有机磷）。"
+    },
+    "muscle_weakness": {
+      "display_name": "肌肉无力",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "K",
+        "blood.Glu",
+        "disease.myopathy"
+      ],
+      "rule": "K < 2.8 OR blood.Glu < 55 OR disease.myopathy > 0.3",
+      "clue_id": "muscle_weakness",
+      "description": "全身肌肉无力。见于低钾血症、低血糖、重症肌无力。"
+    },
+    "strabismus": {
+      "display_name": "斜视",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.vestibular_sign",
+      "threshold": 0.5,
+      "rule": "disease.vestibular_sign > 0.5",
+      "clue_id": "strabismus",
+      "description": "眼球位置异常（偏斜）。前庭疾病或颅神经麻痹的表现。"
+    },
+    "aggression": {
+      "display_name": "攻击性增强",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.behavioral_change",
+      "threshold": 0.5,
+      "rule": "disease.behavioral_change > 0.5",
+      "clue_id": "aggression",
+      "description": "对外界刺激反应过激或攻击性增强。见于肝性脑病、脑炎。"
+    },
+    "pain": {
+      "display_name": "疼痛表现",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "pain_level",
+      "threshold": 3.0,
+      "rule": "pain_level > 3.0",
+      "clue_id": "pain",
+      "description": "通用疼痛体征：呻吟、护痛、不愿移动、表情痛苦。"
+    },
+    "neck_pain": {
+      "display_name": "颈部疼痛",
+      "type": "observable",
+      "evaluation_type": "sustained",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "disease.pain_level",
+        "disease.disc_herniation"
+      ],
+      "rule": "(pain_level > 1.5 OR disease.pain_level > 1.5) AND disease.disc_herniation > 0.30",
+      "clue_id": "neck_pain",
+      "description": "IVDD颈椎段：颈部僵硬、低头困难、抬颈疼痛尖叫。",
+      "duration_s": 60
+    },
+    "thoracolumbar_pain": {
+      "display_name": "胸腰段疼痛",
+      "type": "observable",
+      "evaluation_type": "sustained",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "disease.pain_level",
+        "disease.disc_herniation"
+      ],
+      "rule": "(pain_level > 1.5 OR disease.pain_level > 1.5) AND disease.disc_herniation > 0.32",
+      "clue_id": "thoracolumbar_pain",
+      "description": "IVDD胸腰段：拱背、不愿跳跃、触诊胸腰部疼痛尖叫。",
+      "duration_s": 60
+    },
+    "limb_pain": {
+      "display_name": "肢体疼痛/跛行",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "pain_level",
+      "threshold": 3.0,
+      "rule": "pain_level > 3.0",
+      "clue_id": "limb_pain",
+      "description": "肢体或关节疼痛：跛行、关节肿胀、触诊疼痛。见于骨折、关节炎。"
+    },
+    "pain_severity": {
+      "display_name": "剧痛",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "pain_level",
+      "threshold": 7.0,
+      "rule": "pain_level > 7.0",
+      "clue_id": "pain_severe",
+      "description": "剧烈疼痛：持续呻吟、嚎叫、无法休息。见于急腹症、重度创伤。"
+    },
+    "spinal_pain": {
+      "display_name": "脊柱触诊疼痛",
+      "type": "observable",
+      "evaluation_type": "sustained",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.disc_herniation",
+        "disease.pain_level"
+      ],
+      "rule": "disease.disc_herniation > 0.32 OR (disease.pain_level > 2.0 AND disease.disc_herniation > 0.25)",
+      "clue_id": "spinal_pain",
+      "description": "脊柱触诊时动物尖叫或抗拒。见于IVDD、脊髓炎、骨折。",
+      "duration_s": 60
+    },
+    "pain_response_abnormal": {
+      "display_name": "疼痛感觉异常/减退",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "param": "disease.deep_pain_loss",
+      "rule": "disease.disc_herniation > 0.5 OR disease.deep_pain_loss > 0.5",
+      "clue_id": "pain_response_abnormal",
+      "description": "深层痛觉减退或消失（预后不良指征）。见于脊髓严重损伤。",
+      "params": [
+        "disease.disc_herniation",
+        "disease.deep_pain_loss"
+      ]
+    },
+    "oliguria": {
+      "display_name": "少尿/寡尿",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.urine_output",
+      "threshold": 0.3,
+      "rule": "disease.urine_output < 0.3",
+      "clue_id": "oliguria",
+      "description": "尿量显著减少。见于ARF寡尿期、休克、心衰。"
+    },
+    "anuria": {
+      "display_name": "无尿",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.urine_output",
+      "threshold": 0.05,
+      "rule": "disease.urine_output < 0.05",
+      "clue_id": "anuria",
+      "description": "完全无尿（严重肾衰或尿路梗阻）。公猫尿路梗阻的危急症状。"
+    },
+    "polyuria_polydipsia": {
+      "display_name": "多尿/多饮",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.polyuria",
+        "disease.T3_excess"
+      ],
+      "rule": "disease.polyuria > 0.4 OR disease.T3_excess > 0.15",
+      "clue_id": "pu_pd",
+      "description": "USG<1.020是临床检测多尿的标准方法。糖尿病、甲亢、CKD多尿期均可导致。"
+    },
+    "stranguria": {
+      "display_name": "排尿困难/努责",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.urethral_obstruction",
+      "threshold": 0.3,
+      "rule": "disease.urethral_obstruction > 0.3",
+      "clue_id": "stranguria",
+      "description": "排尿时用力、痛苦、滴尿。见于公猫尿路梗阻、膀胱炎、结石。"
+    },
+    "pollakiuria": {
+      "display_name": "尿频",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.bladder_inflammation",
+      "threshold": 0.4,
+      "rule": "disease.bladder_inflammation > 0.4",
+      "clue_id": "pollakiuria",
+      "description": "排尿次数增加但每次尿量少。见于膀胱炎、下泌尿道感染。"
+    },
+    "urinary_bladder_distended": {
+      "display_name": "膀胱充盈坚硬",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.bladder_distension",
+      "threshold": 0.6,
+      "rule": "disease.bladder_distension > 0.6",
+      "clue_id": "urinary_bladder_distended",
+      "description": "膀胱极度充盈、坚硬无法排尿。公猫尿路梗阻的示病症状。"
+    },
+    "fever": {
+      "display_name": "发热",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "Temp",
+      "threshold": 39.5,
+      "rule": "Temp > 39.5",
+      "clue_id": "fever",
+      "description": "体温超过物种发热阈值（犬>39.5°C，猫>39.2°C）。感染、炎症、热射病均可导致。"
+    },
+    "hypothermia": {
+      "display_name": "低体温",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "Temp",
+      "threshold": 37.0,
+      "rule": "Temp < 37.0",
+      "clue_id": "hypothermia",
+      "description": "体温低于正常（<37°C）。见于休克、濒死状态、低温麻醉、甲状腺功能减退。"
     },
     "dehydration": {
       "display_name": "脱水",
@@ -242,370 +1115,271 @@
       "rule_type": "threshold",
       "param": "bv_ratio",
       "threshold": 0.95,
+      "rule": "bv_ratio < 0.95",
       "clue_id": "dehydration",
       "description": "血容量比降至95%以下持续1小时。皮肤充盈时间>3秒是临床检查方法。"
     },
-    "abdominal_distension": {
-      "display_name": "腹部膨隆",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "disease.gastric_distension",
-      "threshold": 0.3,
-      "clue_id": "abdominal_distension",
-      "description": "胃或腹部气体/液体积蓄导致可见膨隆。GDV、气腹、腹水均可导致。"
-    },
-    "arrhythmia": {
-      "display_name": "心律失常",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "disease.arrhythmia_severity",
-      "threshold": 0.5,
-      "clue_id": "arrhythmia",
-      "description": "心电图或听诊发现异常心律。室性早搏、房颤、心动过缓等均可触发。"
-    },
-    "muffled_heart_sounds": {
-      "display_name": "心音遥远",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "disease.tamponade_severity",
-      "threshold": 0.3,
-      "clue_id": "muffled_heart_sounds",
-      "description": "心包积液导致心音被液体阻隔。心脏填塞的体征之一。"
-    },
-    "jugular_distension": {
-      "display_name": "颈静脉怒张",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "disease.venous_congestion",
-      "threshold": 0.2,
-      "clue_id": "jugular_distension",
-      "description": "静脉回流受阻导致颈静脉可见怒张。右心衰、心脏填塞、心包积液均可导致。"
-    },
-    "pain": {
-      "display_name": "疼痛表现",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "pain_level",
-      "threshold_ref": "pain_mild",
-      "rule": "pain_level > pain_mild",
-      "clue_id": "pain",
-      "description": "通用疼痛体征：呻吟、护痛、不愿移动、表情痛苦"
-    },
-    "neck_pain": {
-      "display_name": "颈部疼痛",
+    "shock": {
+      "display_name": "休克体征",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
       "params": [
-        "pain_level",
-        "disease.disc_herniation"
+        "MAP",
+        "Lactate",
+        "HR",
+        "disease.perfusion_deficit"
       ],
-      "rule": "pain_level > pain_mild AND disease.disc_herniation > 0.3",
-      "clue_id": "neck_pain",
-      "description": "IVDD 颈椎段：颈部僵硬、低头困难、抬颈疼痛"
+      "rule": "MAP < 50 OR (Lactate > 4.0 AND MAP < 60) OR (HR > 160 AND disease.perfusion_deficit > 0.5)",
+      "clue_id": "shock",
+      "description": "休克：低血压+高乳酸+外周灌注不良+心动过速。见于失血性、脓毒性、心源性休克。"
     },
-    "abdominal_pain": {
-      "display_name": "腹痛",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "multi_parameter",
-      "params": [
-        "pain_level"
-      ],
-      "rule": "pain_level > pain_moderate",
-      "clue_id": "abdominal_pain",
-      "description": "祈祷姿势、腹肌紧张、不愿被触摸腹部"
-    },
-    "back_pain": {
-      "display_name": "胸腰段疼痛",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "multi_parameter",
-      "params": [
-        "pain_level",
-        "disease.disc_herniation"
-      ],
-      "rule": "pain_level > pain_mild AND disease.disc_herniation > 0.4 AND disease.disc_herniation < 0.7",
-      "clue_id": "back_pain",
-      "description": "IVDD 胸腰段椎间盘突出：拱背、不愿跳跃、触诊胸腰部疼痛尖叫"
-    },
-    "throat_pain": {
-      "display_name": "咽喉/颈部僵硬",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "multi_parameter",
-      "params": [
-        "pain_level",
-        "disease.cns_inflammation"
-      ],
-      "rule": "pain_level > pain_mild AND disease.cns_inflammation > 0.3",
-      "clue_id": "throat_pain",
-      "description": "脑膜炎/咽部疾病：颈部僵硬、低头抗拒、咽喉触痛"
-    },
-    "chest_pain": {
-      "display_name": "胸痛",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "multi_parameter",
-      "params": [
-        "pain_level",
-        "HR"
-      ],
-      "rule": "pain_level > pain_moderate AND HR > tachycardia_hr",
-      "clue_id": "chest_pain",
-      "description": "胸部疼痛伴心动过速：常见于可卡因中毒、严重贫血、心源性胸痛"
-    },
-    "limb_joint_pain": {
-      "display_name": "肢体/关节疼痛",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "pain_level",
-      "threshold_ref": "pain_mild",
-      "rule": "pain_level > pain_mild",
-      "clue_id": "limb_joint_pain",
-      "description": "肢体或关节疼痛：跛行、关节肿胀、触诊疼痛。骨科疾病的通用兜底规则（优先级低于其他定位规则）"
-    },
-    "abdominal_tenderness": {
-      "display_name": "腹部压痛/膨隆",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "multi_parameter",
-      "params": [
-        "pain_level",
-        "disease.splenic_hemorrhage"
-      ],
-      "rule": "pain_level > pain_mild AND disease.splenic_hemorrhage > 0.3",
-      "clue_id": "abdominal_tenderness",
-      "description": "腹部压痛伴膨隆：常见于脾破裂、胃扩张-扭转（GDV）、胰腺炎等需要外科干预的急腹症"
-    },
-    "pain_severity": {
-      "display_name": "剧痛",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "pain_level",
-      "threshold_ref": "pain_severe",
-      "rule": "pain_level > pain_severe",
-      "clue_id": "pain_severe",
-      "description": "剧烈疼痛：持续呻吟、嚎叫、无法休息。游戏层可作为紧急度升级触发器"
-    },
-    "contractility_loss_sign": {
-      "display_name": "心肌收缩力下降",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "disease.contractility_loss",
-      "threshold": 0.3,
-      "rule": "disease.contractility_loss > 0.3",
-      "clue_id": "contractility_loss_sign",
-      "description": "DCM: 心肌纤维化和收缩力损失导致心肌收缩功能下降（超声心动图/听诊可发现）"
-    },
-    "cardiomegaly_sign": {
-      "display_name": "心脏扩大/心音异常",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "multi_parameter",
-      "params": [
-        "disease.ventricular_dilation",
-        "HR"
-      ],
-      "rule": "disease.ventricular_dilation > 0.3 AND HR > tachycardia_hr",
-      "clue_id": "cardiomegaly_sign",
-      "description": "DCM: 心室扩大 + 代偿性心动过速 → 听诊心音奔马律/移位，X线心脏轮廓增大"
-    },
-    "acute_phosphate_tox": {
-      "display_name": "急性代谢性酸中毒",
+    "kussmaul_breathing": {
+      "display_name": "深大呼吸/Kussmaul呼吸",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
       "params": [
         "pH",
-        "disease.renal_injury"
+        "RR"
       ],
-      "rule": "pH < ph_metabolic_acidosis AND disease.renal_injury > 0.3",
-      "clue_id": "acute_phosphate_tox",
-      "description": "磷中毒: 磷酸盐蓄积+肾功能损伤 → 严重代谢性酸中毒（血气pH<7.2）"
+      "rule": "pH < 7.2 AND RR > 25",
+      "clue_id": "kussmaul_breathing",
+      "description": "深而慢的大呼吸（代谢性酸中毒的代偿特征）。DKA、尿毒症性酸中毒的典型表现。"
     },
-    "imha_sign": {
-      "display_name": "黏膜苍白/黄染",
+    "halitosis_uremic": {
+      "display_name": "尿毒症口气",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "threshold",
-      "param": "HCT",
-      "threshold_ref": "hct_pale",
-      "rule": "HCT < hct_pale",
-      "clue_id": "imha_sign",
-      "description": "IMHA: 红细胞破坏 → 贫血（HCT<30%），胆红素升高 → 黏膜苍白/黄染（IMHA 经典体征）"
+      "param": "blood.bun",
+      "threshold": 80,
+      "rule": "blood.bun > 80",
+      "clue_id": "halitosis_uremic",
+      "description": "呼气有氨味或尿味。见于严重肾衰（ARF或CKD晚期）。"
     },
-    "pericardial_effusion_sign": {
-      "display_name": "心包积液/心音低沉",
+    "pruritus": {
+      "display_name": "皮肤瘙痒",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "threshold",
-      "param": "disease.pericardial_volume",
-      "threshold": 0.3,
-      "rule": "disease.pericardial_volume > 0.3",
-      "clue_id": "pericardial_effusion_sign",
-      "description": "心包积液: 心包腔液体积蓄 → 超声可见游离液体，心音因液体阻隔而低沉"
+      "param": "disease.bile_salt_itching",
+      "threshold": 0.4,
+      "rule": "disease.bile_salt_itching > 0.4",
+      "clue_id": "pruritus",
+      "description": "皮肤瘙痒（抓挠头部或全身）。见于胆汁淤积（肝衰）、尿毒症、过敏。"
     },
-    "jvd_sign": {
-      "display_name": "颈静脉怒张",
+    "skin_ulceration": {
+      "display_name": "皮肤溃疡/坏死",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "threshold",
-      "param": "disease.venous_congestion",
-      "threshold": 0.3,
-      "rule": "disease.venous_congestion > 0.3",
-      "clue_id": "jvd_sign",
-      "description": "心包积液: 右心回流受阻 → 颈静脉怒张（区别于jugular_distension规则用阈值0.2，更严格0.3）"
+      "param": "disease.skin_necrosis",
+      "threshold": 0.4,
+      "rule": "disease.skin_necrosis > 0.4",
+      "clue_id": "skin_ulceration",
+      "description": "皮肤破溃或坏死。见于坏死性筋膜炎、严重感染、冻伤。"
     },
-    "dic_sign": {
-      "display_name": "凝血功能障碍/出血倾向",
+    "alopecia": {
+      "display_name": "脱毛/被毛粗乱",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "threshold",
-      "param": "disease.coagulation_consumption",
-      "threshold": 0.3,
-      "rule": "disease.coagulation_consumption > 0.3",
-      "clue_id": "dic_sign",
-      "description": "DIC: 凝血因子消耗 → 广泛出血倾向（瘀点、瘀斑、注射部位渗血、消化道出血）"
+      "param": "disease.alopecia_level",
+      "threshold": 0.4,
+      "rule": "disease.alopecia_level > 0.4",
+      "clue_id": "alopecia",
+      "description": "对称性脱毛或被毛无光泽。见于甲亢、CKD、慢性疾病、营养不良。"
     },
-    "dic_shock_sign": {
-      "display_name": "DIC休克",
+    "peripheral_edema": {
+      "display_name": "外周水肿",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "rule_type": "threshold",
+      "param": "disease.edema_level",
+      "threshold": 0.4,
+      "rule": "disease.edema_level > 0.4",
+      "clue_id": "peripheral_edema",
+      "description": "后肢或腹部皮下水肿。见于低白蛋白血症、心衰、右心衰。"
+    },
+    "cold_extremities": {
+      "display_name": "四肢末端发凉",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
       "params": [
-        "disease.shock_from_dIC",
-        "MAP"
+        "MAP",
+        "disease.perfusion_deficit"
       ],
-      "rule": "disease.shock_from_dIC > 0.3 AND MAP < map_hypotension",
-      "clue_id": "dic_shock_sign",
-      "description": "DIC休克: 微血栓广泛形成+出血 → 循环衰竭（MAP<60mmHg），预后不良"
+      "rule": "MAP < 60 AND disease.perfusion_deficit > 0.4",
+      "clue_id": "cold_extremities",
+      "description": "四肢末端摸起来发凉（外周血管收缩）。见于休克、心输出量下降。"
     },
-    "coag_sign_hepatic": {
-      "display_name": "凝血酶原时间延长",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "disease.factor_VII_decline",
-      "threshold": 0.3,
-      "rule": "disease.factor_VII_decline > 0.3",
-      "clue_id": "coag_sign_hepatic",
-      "description": "肝衰竭: 凝血因子VII合成减少（半衰期最短） → PT延长（外源性凝血通路最敏感指标）"
-    },
-    "hepatic_encephalopathy": {
-      "display_name": "肝性脑病",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "multi_parameter",
-      "params": [
-        "disease.encephalopathy",
-        "blood.consciousness_level"
-      ],
-      "rule": "disease.encephalopathy > 0.3 AND blood.consciousness_level < 0.95",
-      "clue_id": "hepatic_encephalopathy",
-      "description": "肝性脑病: 氨代谢障碍 → 意识水平下降（从嗜睡到昏迷，HE分级I-IV）"
-    },
-    "thyrotoxicosis": {
-      "display_name": "甲状腺毒症",
+    "polyphagia": {
+      "display_name": "多食/食欲亢进",
       "type": "observable",
       "evaluation_type": "instantaneous",
       "rule_type": "multi_parameter",
       "params": [
         "disease.T3_excess",
-        "HR"
+        "disease.hypermetabolism"
       ],
-      "rule": "disease.T3_excess > 0.3 AND HR > tachycardia_hr",
-      "clue_id": "thyrotoxicosis",
-      "description": "甲亢: T3过量 → 基础代谢率↑ + 心脏β受体敏感性↑ → 持续心动过速（>160bpm犬/>220bpm猫）"
+      "rule": "disease.T3_excess > 0.05 OR disease.hypermetabolism > 0.4",
+      "clue_id": "polyphagia",
+      "description": "食欲异常增高（多食仍体重下降）。甲亢的典型表现。"
     },
-    "sustained_tachycardia": {
-      "display_name": "持续性心动过速",
+    "lethargy_chronic": {
+      "display_name": "慢性嗜睡/乏力",
       "type": "observable",
-      "evaluation_type": "instantaneous",
+      "evaluation_type": "cumulative",
+      "duration_s": 172800,
       "rule_type": "threshold",
-      "param": "disease.tachycardia",
-      "threshold": 0.5,
-      "rule": "disease.tachycardia > 0.5",
-      "clue_id": "sustained_tachycardia",
-      "description": "甲亢: 疾病状态变量tachycardia>0.5 → 持续性窦性心动过速（区别于一过性应激性心动过速）"
+      "param": "disease.chronic_inflammation",
+      "threshold": 0.4,
+      "rule": "disease.chronic_inflammation > 0.4",
+      "clue_id": "lethargy_chronic",
+      "description": "持续数天以上的嗜睡和乏力。见于慢性炎症、癌症、慢性感染。"
     },
-    "tl_neuro_deficit": {
-      "display_name": "胸腰段神经功能缺损",
+    "coagulopathy_signs": {
+      "display_name": "凝血功能障碍表现",
       "type": "observable",
       "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "disease.disc_herniation",
-      "threshold_ref": "disc_herniation_moderate",
-      "rule": "disease.disc_herniation > disc_herniation_moderate AND disease.disc_herniation < disc_herniation_severe",
-      "clue_id": "tl_neuro_deficit",
-      "description": "IVDD 胸腰段中度突出: 脊髓压迫 → 本体感受缺失、爪背侧着地、轻度瘫痪"
-    },
-    "hindlimb_paralysis": {
-      "display_name": "后肢瘫痪",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "disease.disc_herniation",
-      "threshold_ref": "disc_herniation_severe",
-      "rule": "disease.disc_herniation > disc_herniation_severe",
-      "clue_id": "hindlimb_paralysis",
-      "description": "IVDD 胸腰段重度突出: 脊髓严重压迫 → 后肢瘫痪（截瘫）、尿潴留、痛觉消失"
-    },
-    "meningismus": {
-      "display_name": "脑膜刺激征",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
-      "rule_type": "threshold",
-      "param": "disease.cns_inflammation",
-      "threshold": 0.3,
-      "rule": "disease.cns_inflammation > 0.3",
-      "clue_id": "meningismus",
-      "description": "脑膜炎: 脑膜炎症 → 颈项强直、克尼格征阳性、布鲁金斯基征阳性"
-    },
-    "altered_consciousness_men": {
-      "display_name": "意识障碍",
-      "type": "observable",
-      "evaluation_type": "instantaneous",
+      "clue_id": "coagulopathy_signs",
+      "description": "凝血时间延长（PT/PTT 升高）。见于肝衰、维生素K缺乏、DIC。",
       "rule_type": "multi_parameter",
       "params": [
-        "disease.cns_inflammation",
-        "blood.consciousness_level"
+        "PT",
+        "disease.factor_VII_decline"
       ],
-      "rule": "disease.cns_inflammation > 0.5 AND blood.consciousness_level < 0.85",
-      "clue_id": "altered_consciousness_men",
-      "description": "脑膜炎: 中枢炎症 → 意识水平下降（嗜睡→昏迷），可能进展为癫痫发作"
+      "rule": "PT > 14 OR disease.factor_VII_decline > 0.1"
     },
-    "hepatic_anemia_sign": {
-      "display_name": "肝性贫血",
+    "subclinical_jaundice": {
+      "display_name": "亚临床黄染/血清胆红素升高",
       "type": "observable",
       "evaluation_type": "instantaneous",
+      "clue_id": "subclinical_jaundice",
+      "description": "血清胆红素升高但黏膜尚未肉眼可见黄染（1.0-2.0 mg/dL）。见于早期溶血、肝病早期。",
       "rule_type": "multi_parameter",
       "params": [
-        "HCT",
-        "disease.anemia_severity"
+        "blood.bilirubin_mg_dL",
+        "disease.bilirubin_load"
       ],
-      "rule": "HCT < hct_anemia AND disease.anemia_severity > 0.3",
-      "clue_id": "hepatic_anemia_sign",
-      "description": "肝性贫血: 慢性肝病 → 铁调素升高+GI出血+溶血 → 非再生性贫血（HCT<20%犬/15%猫）"
+      "rule": "(blood.bilirubin_mg_dL > 1.0 AND blood.bilirubin_mg_dL < 2.0) OR (disease.bilirubin_load > 0.005 AND disease.bilirubin_load < 0.02)"
     },
-    "gi_bleeding_sign": {
-      "display_name": "消化道出血",
+    "hypoalbuminemia": {
+      "display_name": "低白蛋白血症",
       "type": "observable",
       "evaluation_type": "instantaneous",
+      "clue_id": "hypoalbuminemia",
+      "description": "血清白蛋白<2.6 g/dL。见于慢性肝病、蛋白丢失性肠病、严重消耗。",
       "rule_type": "threshold",
-      "param": "disease.gi_bleeding",
-      "threshold": 0.3,
-      "rule": "disease.gi_bleeding > 0.3",
-      "clue_id": "gi_bleeding_sign",
-      "description": "肝性贫血: 门脉高压+凝血障碍 → 消化道出血（黑粪、便血、呕血）"
+      "params": [
+        "blood.albumin_g_dL"
+      ],
+      "rule": "blood.albumin_g_dL < 2.6"
+    },
+    "drowsiness": {
+      "display_name": "精神倦怠/嗜睡",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "clue_id": "drowsiness",
+      "description": "活动减少、反应迟钝，但未达精神沉郁阈值。",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.T3_excess",
+        "disease.hepatic_dysfunction",
+        "disease.encephalopathy"
+      ],
+      "rule": "disease.T3_excess > 0.2 OR disease.hepatic_dysfunction > 0.25 OR disease.encephalopathy > 0.05"
+    },
+    "thrombus_signs": {
+      "display_name": "微血栓/末梢缺血征",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "clue_id": "thrombus_signs",
+      "description": "末梢凉、紫绀、花斑样黏膜。见于DIC、严重休克。",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.microthrombus_formation",
+        "disease.organ_ischemia"
+      ],
+      "rule": "disease.microthrombus_formation > 0.3 OR disease.organ_ischemia > 0.05"
+    },
+    "dysthermia": {
+      "display_name": "体温异常",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "clue_id": "dysthermia",
+      "description": "体温偏离正常（>39.0 或 <37.5°C）。",
+      "rule_type": "threshold",
+      "params": [
+        "Temp"
+      ],
+      "rule": "Temp > 39.0 OR Temp < 37.5"
+    },
+    "mild_pain": {
+      "display_name": "轻度疼痛/不适",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "clue_id": "mild_pain",
+      "description": "动物表现出轻度不适（躲避触摸、姿势异常），但未达明显疼痛。",
+      "rule_type": "multi_parameter",
+      "params": [
+        "pain_level",
+        "disease.pain_level"
+      ],
+      "rule": "pain_level > 0.5 OR disease.pain_level > 0.5"
+    },
+    "glycosuria": {
+      "display_name": "糖尿/渗透性利尿",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "clue_id": "glycosuria",
+      "description": "血糖超过肾阈值，尿中出现葡萄糖。见于糖尿病、DKA。",
+      "rule_type": "threshold",
+      "params": [
+        "disease.hyperglycemia"
+      ],
+      "rule": "disease.hyperglycemia > 0.25"
+    },
+    "ketosis_signs": {
+      "display_name": "酮症/酮血症表现",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "clue_id": "ketosis_signs",
+      "description": "酮体蓄积（呼吸有烂苹果味）。DKA 的核心特征。",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.ketone_accumulation",
+        "disease.anion_gap_acidosis"
+      ],
+      "rule": "disease.ketone_accumulation > 0.05 OR disease.anion_gap_acidosis > 0.005"
+    },
+    "anemia_signs": {
+      "display_name": "贫血体征",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "clue_id": "anemia_signs",
+      "description": "轻度贫血表现：黏膜偏淡、精神倦怠。",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.anemia_severity",
+        "disease.hemolysis"
+      ],
+      "rule": "disease.anemia_severity > 0.05 OR disease.hemolysis > 0.02"
+    },
+    "muscle_tremor": {
+      "display_name": "肌肉震颤",
+      "type": "observable",
+      "evaluation_type": "instantaneous",
+      "clue_id": "muscle_tremor",
+      "description": "肌肉细颤/粗颤。见于中毒、低钙、神经损伤。",
+      "rule_type": "multi_parameter",
+      "params": [
+        "disease.cellular_toxicity",
+        "disease.pain_level"
+      ],
+      "rule": "disease.cellular_toxicity > 0.3 OR disease.pain_level > 1.5"
     }
   }
 }

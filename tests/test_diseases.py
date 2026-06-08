@@ -237,6 +237,8 @@ class TestAcuteRenalFailure:
             "gfr_decline",
             "potassium_shift",
             "metabolic_acidosis",
+            "uremic_stomatitis",
+            "urine_output",
         }
         assert set(s.keys()) == expected_keys
         assert s["name"] == "acute_renal_failure"
@@ -445,6 +447,10 @@ class TestPhosphorusPoisoning:
             "myocardial_depression",
             "metabolic_acidosis",
             "renal_injury",
+            "pain_level",
+            "toxicity",
+            "intravascular_hemolysis",
+            "upper_gi_hemorrhage",
         }
         assert set(s.keys()) == expected_keys
         assert s["name"] == "phosphorus_poisoning"
