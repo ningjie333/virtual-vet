@@ -11,6 +11,7 @@ import pytest
 
 from src.config_validation import (
     ValidationError,
+    validate_clue_catalog,
     validate_ode_diseases,
     validate_examinations,
     validate_exam_templates,
@@ -59,6 +60,22 @@ def real_diseases() -> dict:
 def real_coupling_rules() -> dict:
     """Load the real coupling_rules.json from the data directory."""
     path = Path(__file__).resolve().parents[1] / "data" / "coupling_rules.json"
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@pytest.fixture
+def real_symptom_definitions() -> dict:
+    """Load the real symptom_definitions.json from the data directory."""
+    path = Path(__file__).resolve().parents[1] / "data" / "symptom_definitions.json"
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@pytest.fixture
+def real_clue_catalog() -> dict:
+    """Load the real clue_catalog.json from the data directory."""
+    path = Path(__file__).resolve().parents[1] / "data" / "clue_catalog.json"
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -472,8 +489,8 @@ def test_diseases_validates_correct_structure(real_diseases, real_examinations):
     assert errors == [], f"Unexpected errors: {errors}"
 
 
-def test_diseases_clue_to_test_must_reference_valid_exam(real_diseases):
-    """A clue_to_test entry referencing a non-existent exam should fail."""
+def test_diseases_rejects_legacy_clue_to_test_field(real_diseases):
+    """The legacy clue_to_test field should no longer be accepted in diseases.json."""
     bad_config = {
         "disease_names": {"test_disease": "Test Disease"},
         "clues": {"test_disease": ["some_clue"]},
@@ -482,14 +499,9 @@ def test_diseases_clue_to_test_must_reference_valid_exam(real_diseases):
         "treatment_protocols": {"test_disease": []},
         "messages": {"win": {}, "loss": {}}
     }
-    errors = validate_diseases(bad_config, None)  # no examinations config
-    assert errors == []  # no cross-check with None
-
-    # With examinations config but missing exam:
-    examinations_config = {"real_exam": {"name": "Real", "category": "基础检查", "tier": 1, "time_cost_min": 5, "latency_min": 0, "description": "d", "params": []}}
-    errors = validate_diseases(bad_config, examinations_config)
+    errors = validate_diseases(bad_config, None)
     assert len(errors) > 0
-    assert any("nonexistent_exam_type" in e.message for e in errors)
+    assert any("Additional properties are not allowed" in e.message for e in errors)
 
 
 def test_diseases_treatment_protocols_must_have_drug_name(real_diseases, real_examinations):
@@ -498,7 +510,6 @@ def test_diseases_treatment_protocols_must_have_drug_name(real_diseases, real_ex
         "disease_names": {"test_disease": "Test Disease"},
         "clues": {"test_disease": []},
         "clue_descriptions": {},
-        "clue_to_test": {},
         "treatment_protocols": {
             "test_disease": [
                 {"dose_mg_kg": 0.25}  # missing drug_name
@@ -510,6 +521,64 @@ def test_diseases_treatment_protocols_must_have_drug_name(real_diseases, real_ex
     assert len(errors) > 0
 
 
+def test_clue_catalog_validates_current_structure(
+    real_clue_catalog,
+    real_symptom_definitions,
+    real_exam_templates,
+    real_diseases,
+):
+    """The real clue catalog should satisfy the project-level clue contract."""
+    errors = validate_clue_catalog(
+        real_clue_catalog,
+        real_symptom_definitions,
+        real_exam_templates,
+        real_diseases,
+    )
+    assert errors == [], f"Unexpected errors: {errors}"
+
+
+def test_clue_catalog_rejects_missing_emitted_clue(
+    real_clue_catalog,
+    real_symptom_definitions,
+    real_exam_templates,
+    real_diseases,
+):
+    """If a live-emitted clue is removed from the catalog, validation should fail."""
+    bad_catalog = dict(real_clue_catalog)
+    bad_catalog.pop("PaO2_low", None)
+
+    errors = validate_clue_catalog(
+        bad_catalog,
+        real_symptom_definitions,
+        real_exam_templates,
+        real_diseases,
+    )
+    assert len(errors) > 0
+    assert any("PaO2_low" in e.message for e in errors)
+
+
+def test_clue_catalog_rejects_diagnosis_clue_without_diagnosis_permission(
+    real_clue_catalog,
+    real_symptom_definitions,
+    real_exam_templates,
+    real_diseases,
+):
+    """A clue used by diagnosis must remain diagnosis_allowed in the catalog."""
+    bad_catalog = dict(real_clue_catalog)
+    bad_entry = dict(bad_catalog["PaO2_low"])
+    bad_entry["diagnosis_allowed"] = False
+    bad_catalog["PaO2_low"] = bad_entry
+
+    errors = validate_clue_catalog(
+        bad_catalog,
+        real_symptom_definitions,
+        real_exam_templates,
+        real_diseases,
+    )
+    assert len(errors) > 0
+    assert any("diagnosis_allowed" in e.message and "PaO2_low" in e.message for e in errors)
+
+
 # ── validate_all Tests ─────────────────────────────────────────────────────────
 
 def test_validate_all_returns_errors_by_file(real_ode_diseases, real_examinations, real_exam_templates, real_diseases):
@@ -517,7 +586,14 @@ def test_validate_all_returns_errors_by_file(real_ode_diseases, real_examination
     # Use the real configs — should have no errors
     results = validate_all()
     assert isinstance(results, dict)
-    assert set(results.keys()) == {"ode_diseases.json", "examinations.json", "exam_templates.json", "diseases.json", "coupling_rules.json"}
+    assert set(results.keys()) == {
+        "ode_diseases.json",
+        "examinations.json",
+        "exam_templates.json",
+        "diseases.json",
+        "coupling_rules.json",
+        "clue_catalog.json",
+    }
     for filename, errors in results.items():
         assert isinstance(errors, list)
         assert all(isinstance(e, ValidationError) for e in errors)

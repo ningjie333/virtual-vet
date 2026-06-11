@@ -609,6 +609,18 @@ class TestDiagnosisHelpers:
         suggested = get_suggested_tests(matches)
         assert "physical" in suggested
 
+    def test_get_suggested_tests_uses_clue_catalog(self, monkeypatch):
+        """Suggested-test routing should come from the clue catalog."""
+        import game.diagnosis_engine as diagnosis_engine
+
+        monkeypatch.setitem(diagnosis_engine._CATALOG_SUGGESTED_TESTS, "PaO2_low", ["blood_gas_catalog"])
+
+        matches = [
+            {"disease": "pneumonia", "confidence": 0.6, "missed_clues": ["PaO2_low"]},
+        ]
+        suggested = diagnosis_engine.get_suggested_tests(matches)
+        assert "blood_gas_catalog" in suggested
+
 
 # =============================================================================
 #  SECTION 6: Treatment

@@ -10,7 +10,6 @@ Validates:
 Programmatic rules (not expressible in JSON Schema):
   - outputs[].target must be a valid key in _PARAM_PATHS
   - severity preset keys referenced by rate_key/K_key must exist in the preset
-  - exam IDs in diseases.json.clue_to_test must exist in examinations.json
 """
 
 from __future__ import annotations
@@ -24,6 +23,7 @@ from typing import Any
 import jsonschema
 from jsonschema import Draft202012Validator
 
+from .clue_catalog_validation import validate_clue_catalog_consistency
 from .logger_config import get_logger
 
 logger = get_logger(__name__)
@@ -344,12 +344,11 @@ def validate_diseases(
       - disease_names is object string->string
       - clues is object string->array of strings
       - clue_descriptions is object string->string
-      - clue_to_test is object string->string
       - treatment_protocols[disease][] has drug_name (string), dose_mg_kg or volume_ml (number)
       - messages.win and messages.loss are object string->string
 
     Programmatic checks:
-      - exam IDs in clue_to_test values must exist in examinations.json (if provided)
+      - no additional programmatic rules beyond schema for this config
     """
     errors: list[ValidationError] = []
     schema = _load_schema("diseases.schema.json")
@@ -359,23 +358,32 @@ def validate_diseases(
         path = ".".join(str(p) for p in err.path) if err.path else "root"
         errors.append(ValidationError("diseases.json", path, err.message))
 
-    # Programmatic: clue_to_test values must reference valid exam IDs
-    if examinations_config:
-        exam_ids = set(examinations_config.keys())
-        clue_to_test = config.get("clue_to_test", {})
-        for clue_id, exam_type in clue_to_test.items():
-            # Wave 1 (2026-06-11): clue_to_test values are lists of suggested exams
-            # (per clue-trigger-plan Q3 decision). Accept legacy string form too.
-            exam_types = exam_type if isinstance(exam_type, list) else [exam_type]
-            for et in exam_types:
-                if et and et not in exam_ids:
-                    errors.append(ValidationError(
-                        "diseases.json",
-                        f"clue_to_test.{clue_id}",
-                        f"exam type '{et}' does not exist in examinations.json",
-                    ))
-
     return errors
+
+
+def validate_clue_catalog(
+    config: dict,
+    symptom_definitions_config: dict,
+    exam_templates_config: dict,
+    diseases_config: dict,
+) -> list[ValidationError]:
+    """
+    Validate data/clue_catalog.json against the current symptom, exam, and diagnosis surfaces.
+
+    This is the project-level contract that keeps clue ownership, diagnosis
+    eligibility, and registration completeness aligned with the runtime-facing
+    configs.
+    """
+    issues = validate_clue_catalog_consistency(
+        config,
+        symptom_definitions_config,
+        exam_templates_config,
+        diseases_config,
+    )
+    return [
+        ValidationError("clue_catalog.json", issue.path, f"[{issue.severity}] {issue.message}")
+        for issue in issues
+    ]
 
 
 def validate_coupling_rules(config: dict) -> list[ValidationError]:
@@ -497,7 +505,7 @@ def validate_coupling_rules(config: dict) -> list[ValidationError]:
 
 def validate_all() -> dict[str, list[ValidationError]]:
     """
-    Load all four JSON config files and run all validations.
+    Load all project config files and run all validations.
 
     Returns:
         Dict mapping filename -> list of ValidationErrors (empty list = pass)
@@ -508,6 +516,7 @@ def validate_all() -> dict[str, list[ValidationError]]:
         "exam_templates.json": [],
         "diseases.json": [],
         "coupling_rules.json": [],
+        "clue_catalog.json": [],
     }
 
     data_dir = _get_data_dir()
@@ -516,6 +525,8 @@ def validate_all() -> dict[str, list[ValidationError]]:
     _tmpl_file = data_dir / "exam_templates.json"
     _dz_file = data_dir / "diseases.json"
     _cr_file = data_dir / "coupling_rules.json"
+    _sym_file = data_dir / "symptom_definitions.json"
+    _catalog_file = data_dir / "clue_catalog.json"
 
     try:
         ode_diseases_config = _load_json(_ode_file)
@@ -547,6 +558,20 @@ def validate_all() -> dict[str, list[ValidationError]]:
         results["coupling_rules.json"].append(ValidationError("coupling_rules.json", "root", str(e)))
         coupling_rules_config = {}
 
+    try:
+        symptom_definitions_config = _load_json(_sym_file)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        results["clue_catalog.json"].append(
+            ValidationError("clue_catalog.json", "root", f"dependency symptom_definitions.json could not be loaded: {e}")
+        )
+        symptom_definitions_config = {}
+
+    try:
+        clue_catalog_config = _load_json(_catalog_file)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        results["clue_catalog.json"].append(ValidationError("clue_catalog.json", "root", str(e)))
+        clue_catalog_config = {}
+
     results["ode_diseases.json"].extend(validate_ode_diseases(ode_diseases_config))
     results["examinations.json"].extend(validate_examinations(examinations_config))
     results["exam_templates.json"].extend(
@@ -556,6 +581,15 @@ def validate_all() -> dict[str, list[ValidationError]]:
         validate_diseases(diseases_config, examinations_config, exam_templates_config)
     )
     results["coupling_rules.json"].extend(validate_coupling_rules(coupling_rules_config))
+    if clue_catalog_config and symptom_definitions_config and exam_templates_config and diseases_config:
+        results["clue_catalog.json"].extend(
+            validate_clue_catalog(
+                clue_catalog_config,
+                symptom_definitions_config,
+                exam_templates_config,
+                diseases_config,
+            )
+        )
 
     return results
 
@@ -583,6 +617,7 @@ def main() -> int:
             "exam_templates.json": ("exam_templates.json", _load_json(data_dir / "exam_templates.json")),
             "diseases.json": ("diseases.json", _load_json(data_dir / "diseases.json")),
             "coupling_rules.json": ("coupling_rules.json", _load_json(data_dir / "coupling_rules.json")),
+            "clue_catalog.json": ("clue_catalog.json", _load_json(data_dir / "clue_catalog.json")),
         }
         if args.file not in file_map:
             logger.warning("Unknown file: %s", args.file)
@@ -615,14 +650,25 @@ def _run_validators_for_file(filename: str, config: dict) -> list[ValidationErro
     """Run appropriate validators for a single file."""
     if filename == "ode_diseases.json":
         return validate_ode_diseases(config)
-    elif filename == "examinations.json":
+    if filename == "examinations.json":
         return validate_examinations(config)
-    elif filename == "exam_templates.json":
+    if filename == "exam_templates.json":
         return validate_exam_templates(config, None)
-    elif filename == "diseases.json":
+    if filename == "diseases.json":
         return validate_diseases(config, None, None)
-    elif filename == "coupling_rules.json":
+    if filename == "coupling_rules.json":
         return validate_coupling_rules(config)
+    if filename == "clue_catalog.json":
+        data_dir = _get_data_dir()
+        symptom_definitions_config = _load_json(data_dir / "symptom_definitions.json")
+        exam_templates_config = _load_json(data_dir / "exam_templates.json")
+        diseases_config = _load_json(data_dir / "diseases.json")
+        return validate_clue_catalog(
+            config,
+            symptom_definitions_config,
+            exam_templates_config,
+            diseases_config,
+        )
     return []
 
 

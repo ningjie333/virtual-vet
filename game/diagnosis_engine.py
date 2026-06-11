@@ -23,10 +23,7 @@ with open(os.path.join(_DATA_DIR, "diseases.json"), encoding="utf-8") as _f:
 
 _DISEASE_CLUES: dict[str, list[str]] = _DISEASE_DATA["clues"]
 CLUE_DESCRIPTIONS: dict[str, str] = _DISEASE_DATA["clue_descriptions"]
-# Wave 4 (2026-06-11): clue_to_test values may be a list of suggested exams
-# (per Q3 decision in clue-trigger-plan.md). Normalize on load so consumers
-# can always iterate.
-_CLUE_TO_TEST_RAW: dict = _DISEASE_DATA["clue_to_test"]
+_CLUE_CATALOG_PATH = os.path.join(_DATA_DIR, "clue_catalog.json")
 
 
 def _normalize_suggested_tests(val) -> list[str]:
@@ -36,10 +33,16 @@ def _normalize_suggested_tests(val) -> list[str]:
         return [val]
     return []
 
+if os.path.exists(_CLUE_CATALOG_PATH):
+    with open(_CLUE_CATALOG_PATH, encoding="utf-8") as _f:
+        _CLUE_CATALOG: dict = json.load(_f)
+else:
+    _CLUE_CATALOG = {}
 
-_CLUE_TO_TEST: dict[str, list[str]] = {
-    cid: _normalize_suggested_tests(val)
-    for cid, val in _CLUE_TO_TEST_RAW.items()
+_CATALOG_SUGGESTED_TESTS: dict[str, list[str]] = {
+    cid: _normalize_suggested_tests(entry.get("suggested_tests", []))
+    for cid, entry in _CLUE_CATALOG.items()
+    if not cid.startswith("_") and isinstance(entry, dict)
 }
 
 # 线索特异性权重：出现在越少疾病中的线索权重越高
@@ -186,7 +189,7 @@ def get_suggested_tests(matches: list[dict]) -> list[str]:
 
     for m in matches[:2]:
         for clue in m.get("missed_clues", []):
-            tests = _CLUE_TO_TEST.get(clue, [])
+            tests = _CATALOG_SUGGESTED_TESTS.get(clue, [])
             for test in tests:
                 if test and test not in seen_tests:
                     seen_tests.add(test)

@@ -718,3 +718,30 @@ The safest default is:
 - do not add new abstraction layers until the current clue owners are clean
 - keep modality-specific evidence separate for now  ← confirmed by Q2 decision
 - treat the clue catalog as the future home of ownership metadata  ← confirmed by Q3 decision
+
+## Residual Ambiguities
+
+After the high-confidence alias and category cleanup, a small set of
+diagnosis-facing clue IDs still remain intentionally unresolved.
+
+These are not being force-migrated yet because the current codebase does not
+contain a sufficiently precise one-to-one canonical replacement.
+
+### Reviewed 2026-06-11
+
+| clue ID | Current state | Why not force-convert yet | Recommended next move |
+| --- | --- | --- | --- |
+| `hemorrhage` | diagnosis-only placeholder | Too broad. Current symptom layer has specific manifestations such as `hemoptysis`, `melena`, `hematemesis`, `petechiae`, `ecchymosis`, `bleeding_gums`, but no single canonical clue equal to generic "hemorrhage". | Either introduce a deliberate synthesis clue with explicit semantics, or replace disease clue usage with a disease-appropriate set of specific bleeding findings. |
+| `pain_mobility` | diagnosis-only placeholder | No exact canonical symptom exists. `pain`, `weakness`, `neck_pain`, `thoracolumbar_pain`, and `limb_pain` overlap, but none is a guaranteed synonym of "pain causing reduced mobility". | Keep temporarily. Later decide whether this should become a new canonical bedside clue or be rewritten into existing symptom combinations. |
+| `perfusion_poor` | diagnosis-only placeholder | Overlaps with `crt`, `cold_extremities`, `hypotension`, and `shock`, but not cleanly enough to alias without changing meaning. | Keep temporarily. Later either define a canonical perfusion clue explicitly or rewrite disease clue lists to use existing lower-level findings. |
+| `splenic_mass` | diagnosis-only placeholder with ultrasound recommendation | Semantically this looks exam-evidence-like, probably future `splenic_mass_us`, but no current exam template emits such a clue. Reclassifying it now would create a modality-bound clue with no producer. | Keep temporarily. The right long-term fix is to add an emitting ultrasound finding clue, then alias or migrate `splenic_mass` to that canonical ID. |
+
+### Rule
+
+For these residual items:
+
+- do not auto-convert them just to reduce the unresolved count
+- do not invent new canonical IDs unless a real producer exists
+- prefer explicit disease-clue rewrites over vague aliases
+
+This is a deliberate pause, not unfinished bookkeeping.
