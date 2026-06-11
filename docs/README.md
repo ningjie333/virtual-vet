@@ -21,6 +21,7 @@ Recommended first-pass reading order:
 
 ## Testing
 
+- [harness-engineering.md](harness-engineering.md): repeatable validation profiles for API, app, frontend, and core confidence
 - [test-command-guide.md](test-command-guide.md): first choice if you just want to know what test command to run right now
 - [testing.md](testing.md): testing policy, lane semantics, and why the suite is split this way
 - [test-runbook.md](test-runbook.md): detailed timing inventory, bundle list, and hotspot ledger

@@ -286,3 +286,49 @@ export const api = {
 
         assert check_api_consistency.run() == 1
         assert "GET 请求不应传 request body" in capsys.readouterr().out
+
+
+class TestHarnessProfiles:
+    """Project harness profiles should stay available and layer-oriented."""
+
+    def test_expected_harness_profiles_exist(self):
+        from tools.dev import harness_check
+
+        assert set(harness_check.PROFILES) >= {
+            "quick",
+            "contract",
+            "api",
+            "frontend",
+            "app",
+            "core",
+            "release",
+        }
+
+    def test_core_harness_includes_gate_core_and_frontend_typecheck(self):
+        from tools.dev import harness_check
+
+        names = [step.name for step in harness_check.PROFILES["core"]]
+        assert names == ["gate quick", "core channel"]
+
+    def test_release_harness_includes_core_and_frontend_typecheck(self):
+        from tools.dev import harness_check
+
+        names = [step.name for step in harness_check.PROFILES["release"]]
+        assert names == ["gate quick", "core channel", "frontend typecheck"]
+
+    def test_harness_dry_run_writes_report(self, tmp_path):
+        import json
+        from tools.dev import harness_check
+
+        report_path = tmp_path / "harness-report.json"
+        code = harness_check.run_profile("quick", dry_run=True, report_path=report_path)
+
+        assert code == 0
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report["profile"] == "quick"
+        assert report["dry_run"] is True
+        assert report["exit_code"] == 0
+        assert report["budget_s"] == harness_check.PROFILE_BUDGET_SECONDS["quick"]
+        assert report["over_budget"] is False
+        assert report["steps"][0]["name"] == "gate quick"
+        assert "git" in report
