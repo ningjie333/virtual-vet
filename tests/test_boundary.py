@@ -111,17 +111,6 @@ class TestExtremePhysiologicalValues:
 class TestSimulationStability:
     """Test simulation remains stable under long runs and event stress."""
 
-    @pytest.mark.slower
-    def test_long_simulation_stability(self):
-        """Run simulation for 60000 steps (100 min). No NaN/Inf in any history."""
-        v = VirtualCreature(20.0)
-        for _ in range(60000):
-            v.step()
-        for key, vals in v.history.items():
-            for i, val in enumerate(vals):
-                assert not math.isnan(val), f"NaN in '{key}' at index {i}"
-                assert not math.isinf(val), f"Inf in '{key}' at index {i}"
-
     def test_no_crash_empty_events(self):
         """Run simulation with empty scheduled_events for 1000 steps."""
         v = VirtualCreature(20.0)

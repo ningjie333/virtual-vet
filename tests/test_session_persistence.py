@@ -143,10 +143,10 @@ def test_action_log_cascade_on_session_delete(conn: sqlite3.Connection) -> None:
     assert actions == []
 
 
-# ── VirtualCreature.to_minimal_snapshot ─────────────────────────────────────
+# ── VirtualCreature persistence snapshot ────────────────────────────────────
 
 def test_engine_snapshot_preserves_key_vitals(tmp_path: Path) -> None:
-    """to_minimal_snapshot produces a JSON-serializable dict with expected keys."""
+    """to_persistence_snapshot produces a JSON-serializable dict with expected keys."""
     import sys
     # Add project root so 'from src.simulation import ...' works
     project_root = str(Path(__file__).resolve().parents[1])
@@ -163,7 +163,7 @@ def test_engine_snapshot_preserves_key_vitals(tmp_path: Path) -> None:
     vc = VirtualCreature(body_weight_kg=20.0)
     vc.simulate(5.0)  # run a few simulation steps so history is populated
 
-    snapshot = vc.to_minimal_snapshot()
+    snapshot = vc.to_persistence_snapshot()
 
     # Check top-level keys
     assert "time_s" in snapshot
@@ -201,11 +201,25 @@ def test_snapshot_without_disease(tmp_path: Path) -> None:
     vc = VirtualCreature(body_weight_kg=20.0)
     vc.simulate(1.0)
 
-    snapshot = vc.to_minimal_snapshot()
+    snapshot = vc.to_persistence_snapshot()
     assert snapshot["disease_state"] is None
 
     json_str = json.dumps(snapshot)  # must not raise
     assert "HR_bpm" in json_str
+
+
+def test_minimal_snapshot_alias_matches_persistence_snapshot(tmp_path: Path) -> None:
+    """Legacy alias remains available for older callers."""
+    import sys
+    project_root = str(Path(__file__).resolve().parents[1])
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from src.simulation import VirtualCreature
+
+    vc = VirtualCreature(body_weight_kg=20.0)
+    vc.simulate(1.0)
+
+    assert vc.to_minimal_snapshot() == vc.to_persistence_snapshot()
 
 
 # ── Foreign-key constraint ───────────────────────────────────────────────────

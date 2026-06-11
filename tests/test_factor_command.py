@@ -146,6 +146,14 @@ class TestApplyFactor:
         v.apply_factor(cmd)
         assert v.blood.arterial_pH == pytest.approx(7.15, rel=1e-4)
 
+    def test_legacy_gut_motility_alias_still_applies(self):
+        """Legacy gut target alias should keep working during interface cleanup."""
+        v = VirtualCreature(body_weight_kg=20.0)
+        initial = v.gut.gut_motility
+        cmd = FactorCommand(target="gut.gut_motility", op="multiply", value=0.5)
+        v.apply_factor(cmd)
+        assert v.gut.gut_motility == pytest.approx(initial * 0.5, rel=1e-4)
+
     def test_unknown_target_does_not_crash(self):
         """Unknown target should log warning and return without error."""
         v = VirtualCreature(body_weight_kg=20.0)

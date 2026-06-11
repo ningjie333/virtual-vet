@@ -39,6 +39,21 @@ class TestGFR:
         assert kidney_20kg.GFR > 0, "GFR must be positive at normal MAP"
         assert 50.0 < kidney_20kg.GFR < 80.0, f"GFR should be ~60-63 mL/min for 20kg, got {kidney_20kg.GFR}"
 
+    def test_GFR_normal_MAP_matches_healthy_dog_reference_interval(self, kidney_20kg):
+        """Normalized GFR should sit inside a healthy-dog reference interval.
+
+        Bexfield et al. reported plasma iohexol clearance reference intervals
+        for healthy dogs by body-weight quartile. For dogs in the 13.2-25.5 kg
+        quartile, the reported interval was 1.29-3.50 mL/min/kg
+        (PMID 18289291).
+        """
+        kidney_20kg._update_GFR(MAP=100.0, CVP=4.0)
+        gfr_per_kg = kidney_20kg.GFR / 20.0
+        assert 1.29 <= gfr_per_kg <= 3.50, (
+            f"GFR normalized by body weight should match healthy-dog reference interval: "
+            f"{gfr_per_kg:.2f} mL/min/kg"
+        )
+
     def test_GFR_low_MAP(self, kidney_20kg):
         """MAP=50 (low) should give lower GFR than MAP=100."""
         kidney_20kg._update_GFR(MAP=100.0, CVP=4.0)

@@ -31,5 +31,21 @@ data/game_sessions_test.db-wal
 experiments/debug_scripts/
 _tools_dev/
 
+# Ad-hoc diagnostic / sync scripts at repo root (prefixed with _)
+_*.py
+
+# Diagnostic helpers in tests/ (ignored from pytest collection per docs/testing.md)
+tests/debug_symptoms.py
+
+# Paper-writing outputs (generated artifacts, not source)
+paper_rewriting_output/
+
+# SQLite WAL files (paired with .db; the .db itself is also gitignored)
+data/game_sessions.db-shm
+data/game_sessions.db-wal
+
+# External dev cache on D: drive (uv/npm/pip caches outside repo)
+D:/
+
 # External references (downloaded docs, not project-owned)
 cvs-reference/

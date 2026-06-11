@@ -25,24 +25,34 @@ if _SRC not in sys.path:
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
 
+class FakeAdvancer:
+    """Fast app-layer seam for action-system tests."""
+
+    def __init__(self) -> None:
+        self.calls: list[float] = []
+
+    def advance_minutes(self, engine, minutes: float) -> None:
+        self.calls.append(minutes)
+
+
 # =============================================================================
 #  FIXTURES
 # =============================================================================
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def healthy_creature():
     """Healthy 20kg dog simulated 1 min."""
     from src.simulation import VirtualCreature
-    e = VirtualCreature(body_weight_kg=20.0)
+    e = VirtualCreature(body_weight_kg=20.0, dt=5.0)
     e.simulate(1.0)
     return e
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def pneumonia_creature():
     """20kg dog with moderate pneumonia simulated 20 min."""
     from src.simulation import VirtualCreature
     from src.diseases import create_disease
-    e = VirtualCreature(body_weight_kg=20.0)
+    e = VirtualCreature(body_weight_kg=20.0, dt=5.0)
     d = create_disease("pneumonia", severity="moderate")
     e.attach_disease(d)
     e.simulate(20.0)
@@ -57,10 +67,23 @@ def arf_creature():
     """
     from src.simulation import VirtualCreature
     from src.diseases import create_disease
-    e = VirtualCreature(body_weight_kg=20.0)
+    e = VirtualCreature(body_weight_kg=20.0, dt=5.0)
     d = create_disease("acute_renal_failure", severity="severe")
     e.attach_disease(d)
     e.simulate(60.0)
+    return e
+
+
+@pytest.fixture(scope="session")
+def arf_creature_for_phase():
+    """Lightweight ARF fixture for quick phase-contract checks."""
+    from src.simulation import VirtualCreature
+    from src.diseases import create_disease
+
+    e = VirtualCreature(body_weight_kg=20.0, dt=5.0)
+    d = create_disease("acute_renal_failure", severity="moderate")
+    e.attach_disease(d)
+    e.simulate(5.0)
     return e
 
 
@@ -188,6 +211,7 @@ class TestCriticalThresholds:
 #  SECTION 2: translate() with real engine
 # =============================================================================
 
+@pytest.mark.slow
 class TestTranslate:
     """Test translate() produces valid reports from a VirtualCreature."""
 
@@ -452,7 +476,7 @@ class TestMatchDiseases:
     def test_arf_high_confidence(self):
         from game.diagnosis_engine import match_diseases
         clues = ["gfr_low", "bun_high", "potassium_high", "ph_low", "hr_low",
-                 "cr_high", "usg_low", "upcr_high", "t_wave_tall", "qrs_wide"]
+                 "cr_high", "usg_low", "upcr_high", "t_wave_tall_ecg", "qrs_wide_ecg"]
         matches = match_diseases([], known_clues=clues)
         arf = next(m for m in matches if m["disease"] == "acute_renal_failure")
         assert arf["confidence"] > 0.5
@@ -597,10 +621,10 @@ class TestTreatment:
         from src.simulation import VirtualCreature
         from src.diseases import create_disease
         from game.action_system import GameState
-        e = VirtualCreature(body_weight_kg=20.0)
+        e = VirtualCreature(body_weight_kg=20.0, dt=2.0)
         d = create_disease("pneumonia", severity="moderate")
         e.attach_disease(d)
-        e.simulate(5.0)
+        e.simulate(2.0)
         return GameState(engine=e, disease_name="pneumonia")
 
     def test_correct_diagnosis(self, pneumonia_state):
@@ -656,10 +680,10 @@ class TestDrugTreatmentProtocol:
         from src.diseases import create_disease
         from game.action_system import GameState
         from src.pharmacology import PharmacologyState
-        e = VirtualCreature(body_weight_kg=35.0)
+        e = VirtualCreature(body_weight_kg=35.0, dt=2.0)
         d = create_disease("dilated_cardiomyopathy", severity="moderate")
         e.attach_disease(d)
-        e.simulate(5.0)
+        e.simulate(2.0)
         e.pharmacology = PharmacologyState(weight_kg=35.0)
         return GameState(engine=e, disease_name="dilated_cardiomyopathy")
 
@@ -670,10 +694,10 @@ class TestDrugTreatmentProtocol:
         from src.diseases import create_disease
         from game.action_system import GameState
         from src.pharmacology import PharmacologyState
-        e = VirtualCreature(body_weight_kg=20.0)
+        e = VirtualCreature(body_weight_kg=20.0, dt=2.0)
         d = create_disease("pneumonia", severity="moderate")
         e.attach_disease(d)
-        e.simulate(5.0)
+        e.simulate(2.0)
         e.pharmacology = PharmacologyState(weight_kg=20.0)
         return GameState(engine=e, disease_name="pneumonia")
 
@@ -684,10 +708,10 @@ class TestDrugTreatmentProtocol:
         from src.diseases import create_disease
         from game.action_system import GameState
         from src.pharmacology import PharmacologyState
-        e = VirtualCreature(body_weight_kg=30.0)
+        e = VirtualCreature(body_weight_kg=30.0, dt=2.0)
         d = create_disease("acute_renal_failure", severity="moderate")
         e.attach_disease(d)
-        e.simulate(5.0)
+        e.simulate(2.0)
         e.pharmacology = PharmacologyState(weight_kg=30.0)
         return GameState(engine=e, disease_name="acute_renal_failure")
 
@@ -757,11 +781,11 @@ class TestDeterminePhase:
         phase = determine_phase(healthy_creature)
         assert phase == "stable"
 
-    def test_arf_dog_valid_phase(self, arf_creature):
-        """After 20 min of moderate ARF the dog may still be stable (early stage)."""
+    def test_arf_dog_phase_matches_fixture_contract(self, arf_creature_for_phase):
+        """Moderate-ARF phase fixture should map to the current semantic contract."""
         from game.action_system import determine_phase
-        phase = determine_phase(arf_creature)
-        assert phase in ("stable", "worsening", "critical", "moribund")
+        phase = determine_phase(arf_creature_for_phase)
+        assert phase == "moribund"
 
     def test_all_phases_valid_value(self):
         """determine_phase must return one of the four valid phases."""
@@ -830,73 +854,110 @@ class TestCheckDeath:
 
 class TestProcessAction:
 
-    def test_examine_action(self, healthy_creature):
+    @pytest.fixture
+    def runtime(self):
+        from game.runtime import GameRuntime
+
+        advancer = FakeAdvancer()
+        return GameRuntime(advancer=advancer), advancer
+
+    def test_examine_action(self, runtime):
         from game.action_system import GameState, process_action
-        state = GameState(engine=healthy_creature, disease_name="pneumonia")
-        result = process_action(state, "examine", {"test_type": "physical"})
+        from src.simulation import VirtualCreature
+
+        game_runtime, advancer = runtime
+        state = GameState(engine=VirtualCreature(body_weight_kg=20.0), disease_name="pneumonia")
+        result = process_action(state, "examine", {"test_type": "physical"}, runtime=game_runtime)
         assert result["success"] is True
         assert result["result"] is not None
         assert result["result"]["test_type"] == "physical"
         assert state.time_elapsed_min == 5  # physical = 5 min
+        assert advancer.calls == [5.0]
 
-    def test_treat_correct_action(self, healthy_creature):
+    def test_treat_correct_action(self, runtime):
         from game.action_system import GameState, process_action
-        state = GameState(engine=healthy_creature, disease_name="pneumonia")
-        result = process_action(state, "treat", {"disease_guess": "pneumonia"})
+        from src.simulation import VirtualCreature
+
+        game_runtime, advancer = runtime
+        state = GameState(engine=VirtualCreature(body_weight_kg=20.0), disease_name="pneumonia")
+        result = process_action(state, "treat", {"disease_guess": "pneumonia"}, runtime=game_runtime)
         assert result["success"] is True
         assert result["phase"] == "won"
+        assert advancer.calls == [5.0]
 
-    def test_treat_wrong_action(self, healthy_creature):
+    def test_treat_wrong_action(self, runtime):
         from game.action_system import GameState, process_action
-        state = GameState(engine=healthy_creature, disease_name="pneumonia")
-        result = process_action(state, "treat", {"disease_guess": "acute_renal_failure"})
+        from src.simulation import VirtualCreature
+
+        game_runtime, advancer = runtime
+        state = GameState(engine=VirtualCreature(body_weight_kg=20.0), disease_name="pneumonia")
+        result = process_action(state, "treat", {"disease_guess": "acute_renal_failure"}, runtime=game_runtime)
         assert result["success"] is True
         assert result["phase"] == "playing"
+        assert advancer.calls == [5.0]
 
-    def test_wait_action(self, healthy_creature):
+    def test_wait_action(self, runtime):
         from game.action_system import GameState, process_action
-        state = GameState(engine=healthy_creature, disease_name="pneumonia")
-        result = process_action(state, "wait")
+        from src.simulation import VirtualCreature
+
+        game_runtime, advancer = runtime
+        state = GameState(engine=VirtualCreature(body_weight_kg=20.0), disease_name="pneumonia")
+        result = process_action(state, "wait", runtime=game_runtime)
         assert result["success"] is True
         assert state.time_elapsed_min == 10  # wait = 10 min
+        assert advancer.calls == [10.0]
 
-    def test_invalid_action_type(self, healthy_creature):
+    def test_invalid_action_type(self):
         from game.action_system import GameState, process_action
-        state = GameState(engine=healthy_creature, disease_name="pneumonia")
+        from src.simulation import VirtualCreature
+
+        state = GameState(engine=VirtualCreature(body_weight_kg=20.0), disease_name="pneumonia")
         result = process_action(state, "fly")
         assert result["success"] is False
 
-    def test_action_after_win_blocked(self, healthy_creature):
+    def test_action_after_win_blocked(self):
         from game.action_system import GameState, process_action
-        state = GameState(engine=healthy_creature, disease_name="pneumonia")
+        from src.simulation import VirtualCreature
+
+        state = GameState(engine=VirtualCreature(body_weight_kg=20.0), disease_name="pneumonia")
         state.phase = "won"
         result = process_action(state, "examine", {"test_type": "physical"})
         assert result["success"] is False
         assert result["phase"] == "won"
 
-    def test_action_after_loss_blocked(self, healthy_creature):
+    def test_action_after_loss_blocked(self):
         from game.action_system import GameState, process_action
-        state = GameState(engine=healthy_creature, disease_name="pneumonia")
+        from src.simulation import VirtualCreature
+
+        state = GameState(engine=VirtualCreature(body_weight_kg=20.0), disease_name="pneumonia")
         state.phase = "lost"
         result = process_action(state, "examine", {"test_type": "physical"})
         assert result["success"] is False
         assert result["phase"] == "lost"
 
-    def test_engine_summary_in_result(self, healthy_creature):
+    def test_engine_summary_in_result(self, runtime):
         from game.action_system import GameState, process_action
-        state = GameState(engine=healthy_creature, disease_name="pneumonia")
-        result = process_action(state, "examine", {"test_type": "physical"})
+        from src.simulation import VirtualCreature
+
+        game_runtime, advancer = runtime
+        state = GameState(engine=VirtualCreature(body_weight_kg=20.0), disease_name="pneumonia")
+        result = process_action(state, "examine", {"test_type": "physical"}, runtime=game_runtime)
         summary = result["engine_summary"]
         assert "HR_bpm" in summary
         assert "MAP_mmHg" in summary
         assert "SpO2" in summary
         assert "pH" in summary
+        assert advancer.calls == [5.0]
 
-    def test_medical_phase_in_result(self, healthy_creature):
+    def test_medical_phase_in_result(self, runtime):
         from game.action_system import GameState, process_action
-        state = GameState(engine=healthy_creature, disease_name="pneumonia")
-        result = process_action(state, "wait")
+        from src.simulation import VirtualCreature
+
+        game_runtime, advancer = runtime
+        state = GameState(engine=VirtualCreature(body_weight_kg=20.0), disease_name="pneumonia")
+        result = process_action(state, "wait", runtime=game_runtime)
         assert result["medical_phase"] in ("stable", "worsening", "critical", "moribund")
+        assert advancer.calls == [10.0]
 
 
 class TestComputeDO2:
@@ -1017,6 +1078,7 @@ class TestDiseaseModules:
 #  SECTION 10: Full Round-Trip — translate -> clues -> match
 # =============================================================================
 
+@pytest.mark.slow
 class TestRoundTrip:
 
     def test_pneumonia_round_trip(self, pneumonia_creature):

@@ -109,6 +109,14 @@ def test_hepatic_flow_scales_with_CO(liver):
     assert liver.hepatic_blood_flow == 0.25 * 1700.0
 
 
+def test_hepatic_flow_clamps_when_cardiac_output_nonpositive(liver):
+    """非正 CO 应视为无灌注，而不是抛异常。"""
+    liver._update_hepatic_flow(0.0)
+    assert liver.hepatic_blood_flow == 0.0
+    liver._update_hepatic_flow(-10.0)
+    assert liver.hepatic_blood_flow == 0.0
+
+
 def test_summary(liver, blood):
     """summary() 返回肝脏状态"""
     s = liver.summary()

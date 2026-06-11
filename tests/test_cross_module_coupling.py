@@ -72,23 +72,28 @@ class TestRAASCoupling:
 
     @pytest.mark.slow
     def test_low_map_activates_raas(self):
-        """Blood loss → MAP drop → RAAS activation (renin rises)."""
+        """Severe blood loss should produce a strong RAAS renin response."""
         vc = VirtualCreature(body_weight_kg=20.0, species="canine", dt=0.1)
-        vc.schedule_event(5.0, "blood_loss", {"volume_ml": 400.0})
-        for _ in range(1000):
+        vc.schedule_event(1.0, "blood_loss", {"volume_ml": 1200.0})
+        for _ in range(800):
             vc.step()
-        assert vc.kidney.renin_activity > 0.007, \
-            f"Blood loss should activate RAAS, renin={vc.kidney.renin_activity}"
+        assert vc.heart.mean_arterial_pressure < 75.0, \
+            f"Scenario should remain hypotensive, MAP={vc.heart.mean_arterial_pressure}"
+        assert vc.kidney.renin_activity > 0.2, \
+            f"Severe blood loss should strongly activate RAAS, renin={vc.kidney.renin_activity}"
 
     @pytest.mark.slow
     def test_raas_increases_svr(self):
-        """RAAS activation → SVR factor > 1.0."""
+        """Severe blood loss should drive a materially elevated SVR via RAAS."""
         vc = VirtualCreature(body_weight_kg=20.0, species="canine", dt=0.1)
-        vc.schedule_event(5.0, "blood_loss", {"volume_ml": 400.0})
-        for _ in range(2000):
+        baseline_svr = vc.heart.SVR
+        vc.schedule_event(1.0, "blood_loss", {"volume_ml": 1200.0})
+        for _ in range(800):
             vc.step()
-        assert vc.heart.SVR > 1.0, \
-            f"RAAS should increase SVR above 1.0, got {vc.heart.SVR}"
+        assert vc.kidney.renin_activity > 0.2, \
+            f"Scenario should activate RAAS before checking SVR, renin={vc.kidney.renin_activity}"
+        assert vc.heart.SVR > baseline_svr * 1.3, \
+            f"RAAS should materially increase SVR; baseline={baseline_svr}, current={vc.heart.SVR}"
 
 
 class TestOrganFailureSpiral:
@@ -98,9 +103,12 @@ class TestOrganFailureSpiral:
     def test_cardiorenal_low_co_depresses_gfr(self):
         """Low CO → GFR drops → kidney stress."""
         vc = VirtualCreature(body_weight_kg=20.0, species="canine", dt=0.1)
+        baseline_gfr = vc.kidney.GFR
         vc.schedule_event(1.0, "blood_loss", {"volume_ml": 1200.0})
-        for _ in range(2000):
+        for _ in range(800):
             vc.step()
         # GFR should be reduced compared to baseline
-        assert vc.kidney.GFR < 60.0, \
-            f"Blood loss should reduce GFR below 60, got {vc.kidney.GFR}"
+        assert vc.heart.mean_arterial_pressure < 75.0, \
+            f"Cardiorenal collapse scenario should remain hypotensive, MAP={vc.heart.mean_arterial_pressure}"
+        assert vc.kidney.GFR < baseline_gfr * 0.2, \
+            f"Blood loss should severely reduce GFR; baseline={baseline_gfr}, current={vc.kidney.GFR}"

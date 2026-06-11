@@ -109,6 +109,26 @@ def test_initial_values_in_normal_range():
     )
 
 
+def test_canine_default_arterial_blood_gases_match_merck_reference_ranges():
+    """Merck canine arterial blood gas reference windows should hold at baseline.
+
+    Source:
+    - Merck Veterinary Manual, blood gas analysis reference ranges
+      https://www.merckvetmanual.com/multimedia/table/blood-gas-analysis-reference-ranges
+    """
+    blood = BloodCompartment(total_volume_ml=86.0 * 20.0)
+
+    assert 85.0 <= blood.arterial_PO2_mmHg <= 95.0, (
+        f"PaO2 {blood.arterial_PO2_mmHg} outside Merck canine arterial range 85-95 mmHg"
+    )
+    assert 29.0 <= blood.arterial_PCO2_mmHg <= 42.0, (
+        f"PaCO2 {blood.arterial_PCO2_mmHg} outside Merck canine arterial range 29-42 mmHg"
+    )
+    assert 7.35 <= blood.arterial_pH <= 7.46, (
+        f"pH {blood.arterial_pH} outside Merck canine arterial range 7.35-7.46"
+    )
+
+
 def test_custom_volume():
     """Custom total_volume_ml should set plasma/red_cell volumes (55/45 split)"""
     blood = BloodCompartment(total_volume_ml=2000)

@@ -109,6 +109,22 @@ def test_baroreceptor_high_map():
     )
 
 
+def test_baroreceptor_coarse_dt_stays_bounded():
+    """Coarse outer dt should not blow autonomic state into non-physiologic oscillation."""
+    heart = _make_heart(weight_kg=20.0)
+    _stabilize(heart, steps=50)
+
+    for map_input in (140.0, 60.0, 140.0, 60.0, 140.0):
+        heart._baroreceptor_feedback(MAP=map_input, dt=10.0)
+
+    assert 0.0 <= heart.sympathetic <= 1.0, (
+        f"Sympathetic tone should remain bounded under coarse dt: {heart.sympathetic:.3f}"
+    )
+    assert 0.0 <= heart.parasympathetic <= 1.0, (
+        f"Parasympathetic tone should remain bounded under coarse dt: {heart.parasympathetic:.3f}"
+    )
+
+
 def test_blood_volume_change_negative():
     """blood_volume_change(-200) should reduce circulating_volume_ml."""
     heart = _make_heart(weight_kg=20.0)

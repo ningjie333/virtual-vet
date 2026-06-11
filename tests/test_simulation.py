@@ -78,6 +78,7 @@ class TestOrganHealth:
 class TestToxicology:
     """Test cocaine two-pathway kinetics (Liu et al. 1993)."""
 
+    @pytest.mark.slower
     def test_cocaine_contractility_decay(self):
         """Cocaine => contractility_factor < 1.0 initially, recovers to 1.0."""
         v = VirtualCreature(20.0)
@@ -107,6 +108,7 @@ class TestToxicology:
         svr = v.history["svr_factor"][-1]
         assert svr > 1.0, f"SVR factor should increase, got {svr}"
 
+    @pytest.mark.slower
     def test_cocaine_SVR_persists_longer_than_contractility(self):
         """
         At t=15 min post-injection, SVR effect > contractility effect.

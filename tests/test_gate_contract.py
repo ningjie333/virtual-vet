@@ -4,7 +4,9 @@ Gate contract tests: enforce minimum coverage thresholds and no-smoke-only files
 This file verifies the test suite itself is healthy:
   - No file contains only smoke tests (test_* that just call step() without assertions)
   - Critical modules all have at least one non-smoke test
-  - @pytest.mark.slow tests are excluded from --quick gate
+  - @pytest.mark.slow tests are promoted out of the normal fast/core channels
+  - every collected test file belongs to an explicit channel lane
+  - every collected test file belongs to an explicit thematic bundle
 """
 
 import sys
@@ -93,7 +95,7 @@ class TestCriticalModulesHaveTests:
 
 
 class TestSlowMarkerExcludedFromQuick:
-    """@pytest.mark.slow tests are properly registered and excluded from quick gate."""
+    """@pytest.mark.slow tests are properly registered and promoted out of fast/core."""
 
     def test_slow_marker_registered(self):
         """pytest.ini or conftest registers 'slow' marker."""
@@ -122,3 +124,122 @@ class TestSlowMarkerExcludedFromQuick:
                             slow_count += 1
         assert slow_count >= 3, \
             f"Only {slow_count} @slow tests found (expected ≥ 3)"
+
+
+class TestChannelCoverage:
+    """Every collected test file should belong to an explicit channel lane."""
+
+    def test_manifest_file_is_valid(self):
+        import json
+        import pathlib
+
+        manifest_path = pathlib.Path(__file__).parent / "test_manifest.json"
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        files = data.get("files")
+
+        assert isinstance(files, dict), "Manifest must contain a top-level 'files' object"
+        assert files, "Manifest files map must not be empty"
+
+        valid_lanes = {"fast", "core", "heavy", "benchmark", "research"}
+        for filename, meta in files.items():
+            assert filename.startswith("test_"), f"Unexpected manifest key: {filename}"
+            assert filename.endswith(".py"), f"Unexpected manifest key: {filename}"
+            assert isinstance(meta, dict), f"Manifest entry for {filename} must be an object"
+            assert meta.get("lane") in valid_lanes, (
+                f"Manifest lane for {filename} must be one of {sorted(valid_lanes)}"
+            )
+            bundle = meta.get("bundle")
+            assert isinstance(bundle, str) and bundle, (
+                f"Manifest bundle for {filename} must be a non-empty string"
+            )
+
+    def test_all_collected_test_files_have_channel_lane(self):
+        import pathlib
+        from tests.conftest import CHANNEL_FILE_LANES, collect_ignore
+
+        tests_dir = pathlib.Path(__file__).parent
+        ignored = set(collect_ignore)
+        missing = []
+        for path in tests_dir.glob("test_*.py"):
+            if path.name in ignored:
+                continue
+            if path.name not in CHANNEL_FILE_LANES:
+                missing.append(path.name)
+
+        assert not missing, (
+            "Collected test files missing channel lane mapping: "
+            + ", ".join(sorted(missing))
+        )
+
+    def test_all_collected_test_files_have_bundle_mapping(self):
+        import pathlib
+        from tests.conftest import FILE_BUNDLES, collect_ignore
+
+        tests_dir = pathlib.Path(__file__).parent
+        ignored = set(collect_ignore)
+        missing = []
+        for path in tests_dir.glob("test_*.py"):
+            if path.name in ignored:
+                continue
+            if path.name not in FILE_BUNDLES:
+                missing.append(path.name)
+
+        assert not missing, (
+            "Collected test files missing bundle mapping: "
+            + ", ".join(sorted(missing))
+        )
+
+    def test_manifest_is_the_only_source_of_lane_and_bundle_ownership(self):
+        from tests.conftest import _base_lane_for_item, _bundle_for_item
+
+        class DummyItem:
+            fspath = "tests/test_missing_manifest_entry.py"
+
+        with pytest.raises(KeyError, match="missing lane mapping"):
+            _base_lane_for_item(DummyItem())
+        with pytest.raises(KeyError, match="missing bundle mapping"):
+            _bundle_for_item(DummyItem())
+
+    def test_generated_manifest_summary_is_current(self):
+        import importlib.util
+        import pathlib
+
+        repo_root = pathlib.Path(__file__).parent.parent
+        script_path = repo_root / "tools" / "dev" / "generate_test_manifest_report.py"
+        output_path = repo_root / "docs" / "test-manifest-summary.md"
+
+        spec = importlib.util.spec_from_file_location("generate_test_manifest_report", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        expected = module.render_manifest_report()
+        actual = output_path.read_text(encoding="utf-8")
+        assert actual == expected, (
+            "docs/test-manifest-summary.md is out of date; "
+            "run `python tools/dev/generate_test_manifest_report.py`"
+        )
+
+    def test_slow_marker_promotes_item_out_of_core_lane(self):
+        from tests.conftest import _effective_lane_for_item
+
+        class DummyItem:
+            fspath = "tests/test_time_management.py"
+
+            @staticmethod
+            def get_closest_marker(name):
+                return object() if name == "slow" else None
+
+        assert _effective_lane_for_item(DummyItem()) == "heavy"
+
+    def test_slower_marker_promotes_item_to_benchmark_lane(self):
+        from tests.conftest import _effective_lane_for_item
+
+        class DummyItem:
+            fspath = "tests/test_blood_volume_conservation.py"
+
+            @staticmethod
+            def get_closest_marker(name):
+                return object() if name == "slower" else None
+
+        assert _effective_lane_for_item(DummyItem()) == "benchmark"

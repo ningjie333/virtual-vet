@@ -14,6 +14,7 @@ Run with:
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import sys
@@ -32,35 +33,56 @@ if _SRC not in sys.path:
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
 
+class _FastAdvancer:
+    """Interface-test seam: keep API workflow tests out of real long engine runs."""
+
+    def advance_minutes(self, engine, minutes: float) -> None:
+        return None
+
+
+def _make_fast_virtual_creature_factory():
+    from src.simulation import VirtualCreature as _RealVirtualCreature
+
+    def _factory(**kwargs):
+        kwargs.setdefault("dt", 5.0)
+        return _RealVirtualCreature(**kwargs)
+
+    return _factory
+
+
 # ─────────────────────────────────────────────────────────────
 #  SECTION 1: Fixtures
 # ─────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="session")
-def app():
-    """Create Flask app with test config. Session-scoped: initialized once."""
+def app(tmp_path_factory):
+    """Create Flask app with test config and fast runtime defaults."""
     import gui_app as gui
     gui.app.config["TESTING"] = True
     gui._game_sessions.clear()
+    gui._session_runtimes.clear()
+    gui._session_locks.clear()
+    gui._action_seq.clear()
 
+    from game.runtime_composition import build_external_interpretation_bundle as _real_build_bundle
     from src.db.conn import connect
     from src.db.schema import init_db
 
-    test_db_path = os.path.join(PROJECT_ROOT, "data", "game_sessions_test.db")
-    if hasattr(gui, '_db_conn') and gui._db_conn is not None:
+    def _fast_bundle(engine, **kwargs):
+        return _real_build_bundle(engine, advancer=_FastAdvancer(), **kwargs)
+
+    gui.build_external_interpretation_bundle = _fast_bundle
+    gui.VirtualCreature = _make_fast_virtual_creature_factory()
+
+    test_db_dir = tmp_path_factory.mktemp("interface_db")
+    test_db_path = test_db_dir / "game_sessions_test.db"
+    if hasattr(gui, "_db_conn") and gui._db_conn is not None:
         try:
             gui._db_conn.close()
         except Exception:
             pass
     gui._db_conn = connect(test_db_path)
     init_db(gui._db_conn)
-
-    try:
-        gui._db_conn.execute("DELETE FROM action_log")
-        gui._db_conn.execute("DELETE FROM sessions")
-        gui._db_conn.commit()
-    except Exception:
-        pass
     return gui.app
 
 
@@ -71,31 +93,38 @@ def client(app):
 
 
 @pytest.fixture(autouse=True)
-def clean_sessions():
-    """Ensure each test starts with clean game sessions and DB."""
+def clean_sessions(tmp_path):
+    """Ensure each test starts with isolated in-memory state and a fresh DB."""
     import gui_app as gui
     gui._game_sessions.clear()
-    # Also clear the session DB so repeat test runs don't get UNIQUE violations
-    # Use a timeout to avoid database locked errors
+    gui._session_runtimes.clear()
+    gui._session_locks.clear()
+    gui._action_seq.clear()
+
+    from src.db.conn import connect
+    from src.db.schema import init_db
+
+    gui.VirtualCreature = _make_fast_virtual_creature_factory()
     try:
-        import gui_app as _gui
-        if hasattr(_gui, '_db_conn') and _gui._db_conn is not None:
-            _gui._db_conn.execute("PRAGMA busy_timeout = 5000")
-            _gui._db_conn.execute("DELETE FROM action_log")
-            _gui._db_conn.execute("DELETE FROM sessions")
-            _gui._db_conn.commit()
+        if hasattr(gui, "_db_conn") and gui._db_conn is not None:
+            gui._db_conn.close()
     except Exception:
         pass
+
+    gui._db_conn = connect(tmp_path / "game_sessions_test.db")
+    init_db(gui._db_conn)
+
     yield
+
     try:
-        import gui_app as _gui
-        if hasattr(_gui, '_db_conn') and _gui._db_conn is not None:
-            _gui._db_conn.execute("PRAGMA busy_timeout = 5000")
-            _gui._db_conn.execute("DELETE FROM action_log")
-            _gui._db_conn.execute("DELETE FROM sessions")
-            _gui._db_conn.commit()
+        if hasattr(gui, "_db_conn") and gui._db_conn is not None:
+            gui._db_conn.close()
     except Exception:
         pass
+    gui._game_sessions.clear()
+    gui._session_runtimes.clear()
+    gui._session_locks.clear()
+    gui._action_seq.clear()
 
 
 def _start_game(client, case_id="case_001"):
@@ -144,7 +173,9 @@ class TestStaticApiEndpoints:
         else:
             cases_list = data
         assert isinstance(cases_list, list)
-        assert len(cases_list) > 0
+        case_ids = {case["id"] for case in cases_list}
+        assert "case_001" in case_ids
+        assert "case_002" in case_ids
 
     def test_api_examinations(self, client):
         """GET /api/examinations should return exam definitions."""
@@ -158,7 +189,8 @@ class TestStaticApiEndpoints:
         resp = client.get("/api/treatments")
         assert resp.status_code == 200
         data = json.loads(resp.data)
-        assert len(data) > 0
+        assert "pneumonia" in data
+        assert "acute_renal_failure" in data
 
 
 # ─────────────────────────────────────────────────────────────
@@ -242,8 +274,13 @@ class TestExamine:
         assert data["success"] is True
         assert data["report"] is not None
         assert data["report"]["test_type"] == "physical"
+        assert data["report"]["report_basis"] == "pre_advance"
+        assert "observed_at_s" in data["report"]
+        assert "available_at_s" in data["report"]
         assert "vitals" in data
         assert "phase" in data
+        assert "action_started_at_s" in data
+        assert "state_time_s" in data
 
     def test_api_examine_default_test_type(self, client):
         """POST /api/examine with no test_type should default to 'physical'."""
@@ -433,7 +470,8 @@ class TestWait:
             content_type="application/json",
         )
         data = json.loads(resp.data)
-        assert data["time_elapsed_min"] > 0
+        assert data["time_elapsed_min"] == 10
+        assert data["phase"] == "playing"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -513,8 +551,10 @@ class TestHint:
         data = json.loads(resp.data)
         assert "matches" in data
         assert isinstance(data["matches"], list)
-        assert len(data["matches"]) > 0
+        assert len(data["matches"]) >= 2
         top = data["matches"][0]
+        assert top["disease"] == "pneumonia"
+        assert top["confidence"] > 0.0
         assert "disease" in top
         assert "confidence" in top
         assert "matched_clues" in top
@@ -812,6 +852,7 @@ class TestCLI:
     """
 
     @staticmethod
+    @functools.lru_cache(maxsize=1)
     def _extract_cli_constants():
         """Extract SCENARIOS, NORMAL_RANGES, HISTORY_METRICS by running
         cli_daemon.py constants module via runpy with patched imports.
@@ -881,21 +922,22 @@ class TestCLI:
     def test_blood_loss_scenario_events(self):
         """Blood loss scenarios should have blood_loss event type."""
         data = self._extract_cli_constants()
-        for key in ("blood_loss_100", "blood_loss_200"):
-            events = data["scenarios"][key]["events"]
-            assert len(events) >= 1
-            assert events[0]["type"] == "blood_loss"
-            assert "vol" in events[0]
-            assert events[0]["vol"] > 0
+        assert data["scenarios"]["blood_loss_100"]["events"] == [
+            {"t": 60.0, "type": "blood_loss", "vol": 100},
+        ]
+        assert data["scenarios"]["blood_loss_200"]["events"] == [
+            {"t": 60.0, "type": "blood_loss", "vol": 200},
+        ]
 
     def test_cocaine_scenario_events(self):
         """Cocaine scenarios should have cocaine event type with dose."""
         data = self._extract_cli_constants()
-        for key in ("cocaine", "cocaine_high"):
-            events = data["scenarios"][key]["events"]
-            assert len(events) >= 1
-            assert events[0]["type"] == "cocaine"
-            assert "dose_mg_kg" in events[0]
+        assert data["scenarios"]["cocaine"]["events"] == [
+            {"t": 30.0, "type": "cocaine", "dose_mg_kg": 3.0},
+        ]
+        assert data["scenarios"]["cocaine_high"]["events"] == [
+            {"t": 30.0, "type": "cocaine", "dose_mg_kg": 6.0},
+        ]
 
     def test_all_scenarios_have_label_en(self):
         """Each scenario should have a label_en field."""

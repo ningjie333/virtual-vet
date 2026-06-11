@@ -1,0 +1,196 @@
+{
+  "files": {
+    "test_action_runtime_seam.py": {
+      "bundle": "fast-runtime",
+      "lane": "fast"
+    },
+    "test_blood.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_blood_volume_conservation.py": {
+      "bundle": "core-engine",
+      "lane": "core"
+    },
+    "test_boundary.py": {
+      "bundle": "heavy-engine",
+      "lane": "heavy"
+    },
+    "test_coagulation.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_config_validation.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_coupling.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_coupling_lag_state.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_cross_module_coupling.py": {
+      "bundle": "heavy-engine",
+      "lane": "heavy"
+    },
+    "test_debug_params.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_disease_endurance.py": {
+      "bundle": "research-disease",
+      "lane": "research"
+    },
+    "test_phosphorus_endurance.py": {
+      "bundle": "research-disease-phosphorus",
+      "lane": "research"
+    },
+    "test_diseases.py": {
+      "bundle": "core-engine",
+      "lane": "core"
+    },
+    "test_endocrine.py": {
+      "bundle": "core-engine",
+      "lane": "core"
+    },
+    "test_engine_stability.py": {
+      "bundle": "core-engine",
+      "lane": "core"
+    },
+    "test_factor_command.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_fluid.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_game.py": {
+      "bundle": "core-runtime",
+      "lane": "core"
+    },
+    "test_gate_contract.py": {
+      "bundle": "fast-runtime",
+      "lane": "fast"
+    },
+    "test_gut.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_heart.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_immune.py": {
+      "bundle": "core-engine",
+      "lane": "core"
+    },
+    "test_interface.py": {
+      "bundle": "core-runtime",
+      "lane": "core"
+    },
+    "test_kidney.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_lifecycle.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_lifecycle_literature.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_lifecycle_v2.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_liver.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_lung.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_lymphatic.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_neuro.py": {
+      "bundle": "core-engine",
+      "lane": "core"
+    },
+    "test_organ_health.py": {
+      "bundle": "core-engine",
+      "lane": "core"
+    },
+    "test_performance.py": {
+      "bundle": "benchmark-performance",
+      "lane": "benchmark"
+    },
+    "test_performance_observational.py": {
+      "bundle": "benchmark-performance-observational",
+      "lane": "benchmark"
+    },
+    "test_pharmacology.py": {
+      "bundle": "heavy-runtime",
+      "lane": "heavy"
+    },
+    "test_pharmacology_factor_commands.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_presentation_state.py": {
+      "bundle": "fast-runtime",
+      "lane": "fast"
+    },
+    "test_scenarios.py": {
+      "bundle": "heavy-runtime",
+      "lane": "heavy"
+    },
+    "test_session_persistence.py": {
+      "bundle": "fast-runtime",
+      "lane": "fast"
+    },
+    "test_simulation.py": {
+      "bundle": "heavy-engine",
+      "lane": "heavy"
+    },
+    "test_solver_endurance.py": {
+      "bundle": "benchmark-solver",
+      "lane": "benchmark"
+    },
+    "test_solver_drift.py": {
+      "bundle": "research-solver-drift",
+      "lane": "research"
+    },
+    "test_solver_fallback.py": {
+      "bundle": "core-solver",
+      "lane": "core"
+    },
+    "test_solver_numerics.py": {
+      "bundle": "research-solver-parity",
+      "lane": "research"
+    },
+    "test_solver_radau_endurance.py": {
+      "bundle": "research-solver-radau",
+      "lane": "research"
+    },
+    "test_species_specific.py": {
+      "bundle": "heavy-engine",
+      "lane": "heavy"
+    },
+    "test_untreated_deterioration.py": {
+      "bundle": "benchmark-deterioration",
+      "lane": "benchmark"
+    },
+    "test_time_management.py": {
+      "bundle": "core-runtime",
+      "lane": "core"
+    }
+  }
+}

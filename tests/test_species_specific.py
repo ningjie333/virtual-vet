@@ -50,18 +50,27 @@ class TestSpeciesAgnosticDisease:
     """Disease affects all species regardless of species-specific parameters."""
 
     @pytest.mark.slow
-    def test_pneumonia_raises_hr_in_all_species(self):
-        """Pneumonia raises HR in canine, feline, and equine."""
+    def test_pneumonia_reduces_oxygenation_in_all_species(self):
+        """Pneumonia should worsen oxygenation versus matched healthy controls."""
         from src.diseases import create_disease
 
         for species, weight in [("canine", 20.0), ("feline", 5.0), ("equine", 500.0)]:
-            vc = VirtualCreature(body_weight_kg=weight, species=species, dt=0.1)
-            dis = create_disease("pneumonia", severity="moderate")
-            vc.attach_disease(dis)
+            healthy = VirtualCreature(body_weight_kg=weight, species=species, dt=0.1)
+            sick = VirtualCreature(body_weight_kg=weight, species=species, dt=0.1)
+            sick.attach_disease(create_disease("pneumonia", severity="moderate"))
             for _ in range(100):
-                vc.step()
-            # Disease should cause elevated HR above species baseline
-            assert vc.heart.heart_rate > 0
+                healthy.step()
+                sick.step()
+            assert sick.blood.arterial_saturation < healthy.blood.arterial_saturation, (
+                f"{species}: pneumonia should reduce SpO2-like saturation; "
+                f"healthy={healthy.blood.arterial_saturation:.4f}, "
+                f"sick={sick.blood.arterial_saturation:.4f}"
+            )
+            assert sick.blood.arterial_PO2_mmHg < healthy.blood.arterial_PO2_mmHg, (
+                f"{species}: pneumonia should reduce arterial PO2; "
+                f"healthy={healthy.blood.arterial_PO2_mmHg:.2f}, "
+                f"sick={sick.blood.arterial_PO2_mmHg:.2f}"
+            )
 
 
 class TestSpeciesDeathCurve:

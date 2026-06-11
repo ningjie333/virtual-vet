@@ -74,8 +74,11 @@ class TestCouplingEngineResolve:
         ctx["heart"].publish(PhysiologicalSignal("cardiac_output", 1700.0, "", "heart", 0.0))
 
         cmds = engine.resolve(ctx, dt=0.1)
-        # Should have commands from RAAS rule with high renin
-        assert len(cmds) >= 1
+        assert len(cmds) == 1
+        cmd = cmds[0]
+        assert cmd.target == "heart.SVR"
+        assert cmd.op == "multiply"
+        assert cmd.value == pytest.approx(1.4, rel=1e-6)
 
 
 class TestCouplingIntegration:
@@ -133,10 +136,39 @@ class TestCouplingIntegration:
 
         ctx = c._organ_contexts
         cmds = c.coupling_engine.resolve(ctx, c.dt)
-        svr_cmds = [c for c in cmds if "SVR" in c.target and "RAAS" in c._source]
-        assert len(svr_cmds) >= 1
+        svr_cmds = [cmd for cmd in cmds if cmd.target == "heart.SVR"]
+        assert len(svr_cmds) == 1
+        cmd = svr_cmds[0]
+        baseline_svr = c.heart.SVR
+        assert cmd.value == pytest.approx(1.4, rel=1e-6)
 
-    def test_aldosterone_coupling_modifies_fluid(self):
+        c.apply_factor(cmd)
+        assert c.heart.SVR == pytest.approx(baseline_svr * 1.4, rel=1e-6)
+
+    def test_low_map_coupling_emits_gfr_command(self):
+        from src.simulation import VirtualCreature
+        from src.organs.coupling import PhysiologicalSignal
+
+        c = VirtualCreature(body_weight_kg=20.0)
+        c.step()
+
+        c._organ_contexts["heart"].publish(
+            PhysiologicalSignal("MAP", 70.0, "mmHg", "heart", c.current_time_s)
+        )
+
+        ctx = c._organ_contexts
+        cmds = c.coupling_engine.resolve(ctx, c.dt)
+        gfr_cmds = [cmd for cmd in cmds if cmd.target == "kidney.GFR"]
+        assert len(gfr_cmds) == 1
+        cmd = gfr_cmds[0]
+        baseline_gfr = c.kidney.GFR
+        expected_multiplier = (70.0 - 40.0) / 41.0
+        assert cmd.value == pytest.approx(expected_multiplier, rel=1e-6)
+
+        c.apply_factor(cmd)
+        assert c.kidney.GFR == pytest.approx(baseline_gfr * expected_multiplier, rel=1e-6)
+
+    def test_aldosterone_coupling_stays_disabled_until_volume_rate_model_exists(self):
         from src.simulation import VirtualCreature
         from src.organs.coupling import PhysiologicalSignal
 
@@ -151,8 +183,8 @@ class TestCouplingIntegration:
 
         ctx = c._organ_contexts
         cmds = c.coupling_engine.resolve(ctx, c.dt)
-        fluid_cmds = [c for c in cmds if "vascular_volume" in c.target]
-        assert len(fluid_cmds) >= 1
+        aldosterone_cmds = [c for c in cmds if "aldosterone" in c._source.lower()]
+        assert len(aldosterone_cmds) == 0
 
     def test_liver_metabolic_activity_affects_albumin(self):
         """Liver metabolic activity coupling is disabled by default (unsafe baseline drift).

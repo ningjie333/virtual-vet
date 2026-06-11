@@ -10,6 +10,7 @@ from __future__ import annotations
 import sys
 import os
 import math
+import logging
 
 # Path setup — same pattern as conftest.py
 _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,6 +19,48 @@ sys.path.insert(0, os.path.join(_project_root, "src"))
 
 import threading
 import pytest
+
+
+class FakeAdvancer:
+    """Fast app-layer seam for drug action tests."""
+
+    def __init__(self) -> None:
+        self.calls: list[float] = []
+
+    def advance_minutes(self, engine, minutes: float) -> None:
+        self.calls.append(minutes)
+
+
+@pytest.fixture(autouse=True)
+def _quiet_noisy_loggers():
+    noisy = (
+        "src.organs.coupling",
+        "src.engine.factor_pipeline",
+    )
+    originals = []
+    for name in noisy:
+        logger = logging.getLogger(name)
+        originals.append((logger, logger.level))
+        logger.setLevel(logging.ERROR)
+    yield
+    for logger, level in originals:
+        logger.setLevel(level)
+
+
+def _reset_gui_test_db(tmp_path) -> None:
+    """Recreate gui_app's global test DB so cross-file runs stay isolated."""
+    import gui_app as gui
+    from src.db.conn import connect
+    from src.db.schema import init_db
+
+    try:
+        if hasattr(gui, "_db_conn") and gui._db_conn is not None:
+            gui._db_conn.close()
+    except Exception:
+        pass
+
+    gui._db_conn = connect(tmp_path / "game_sessions_test.db")
+    init_db(gui._db_conn)
 
 
 # =============================================================================
@@ -245,28 +288,36 @@ class TestPharmacologyIntegration:
 # =============================================================================
 
 
+@pytest.mark.slow
 class TestGameLayerDrugAdministration:
     """
     Drugs administered through game.action_system.process_action
     with action_type='administer_drug' should affect ODE parameters.
     """
 
-    def _make_state(self):
+    def _make_state(self, dt: float = 1.0):
         """Helper: create a GameState with pharmacology attached."""
         from src.simulation import VirtualCreature
         from src.pharmacology import PharmacologyState
         from game.action_system import GameState
 
-        vc = VirtualCreature(body_weight_kg=20.0)
+        vc = VirtualCreature(body_weight_kg=20.0, dt=dt)
         vc.pharmacology = PharmacologyState(weight_kg=20.0)
         state = GameState(engine=vc, disease_name="pneumonia")
         return state
+
+    def _runtime(self):
+        from game.runtime import GameRuntime
+
+        advancer = FakeAdvancer()
+        return GameRuntime(advancer=advancer), advancer
 
     def test_administer_drug_action_pimobendan(self):
         """process_action('administer_drug', {drug_name='pimobendan'}) should work."""
         from game.action_system import process_action
 
         state = self._make_state()
+        runtime, advancer = self._runtime()
         result = process_action(
             state,
             "administer_drug",
@@ -274,10 +325,12 @@ class TestGameLayerDrugAdministration:
                 "drug_name": "pimobendan",
                 "dose_mg_kg": 0.25,
             },
+            runtime=runtime,
         )
         assert result["success"] is True
         assert state.engine.pharmacology is not None
         assert len(state.engine.pharmacology.active_drugs) == 1
+        assert advancer.calls == [5.0]
 
     def test_administer_drug_then_step_increases_contractility(self):
         """After administering pimobendan + step, contractility_factor ↑.
@@ -301,6 +354,7 @@ class TestGameLayerDrugAdministration:
         from game.action_system import process_action
 
         state = self._make_state()
+        runtime, advancer = self._runtime()
         baseline_bv = state.engine.heart.circulating_volume_ml
         process_action(
             state,
@@ -309,16 +363,18 @@ class TestGameLayerDrugAdministration:
                 "drug_name": "fluid_bolus",
                 "volume_ml": 200.0,
             },
+            runtime=runtime,
         )
-        # After one step, the fluid should be added
-        process_action(state, "wait", {})
+        state.engine.step()
         assert state.engine.heart.circulating_volume_ml > baseline_bv
+        assert advancer.calls == [5.0]
 
     def test_administer_epinephrine_increases_svr(self):
         """Epinephrine through game action should increase SVR during step."""
         from game.action_system import process_action
 
         state = self._make_state()
+        runtime, advancer = self._runtime()
         admin_result = process_action(
             state,
             "administer_drug",
@@ -326,21 +382,24 @@ class TestGameLayerDrugAdministration:
                 "drug_name": "epinephrine",
                 "dose_mg_kg": 0.02,
             },
+            runtime=runtime,
         )
         assert admin_result["success"] is True
         assert len(state.engine.pharmacology.active_drugs) == 1
-        process_action(state, "wait", {})
+        state.engine.step()
         # SVR is modulated during step(); check history for the effect
         svr_history = state.engine.history.get("svr_factor", [])
         if svr_history:
             # At least one step should have svr_factor > 1.0 (epinephrine effect)
             assert max(svr_history) > 1.0
+        assert advancer.calls == [5.0]
 
     def test_administer_multiple_drugs(self):
         """Multiple drugs can be administered and all remain active."""
         from game.action_system import process_action
 
         state = self._make_state()
+        runtime, advancer = self._runtime()
         process_action(
             state,
             "administer_drug",
@@ -348,6 +407,7 @@ class TestGameLayerDrugAdministration:
                 "drug_name": "pimobendan",
                 "dose_mg_kg": 0.25,
             },
+            runtime=runtime,
         )
         process_action(
             state,
@@ -356,14 +416,17 @@ class TestGameLayerDrugAdministration:
                 "drug_name": "furosemide",
                 "dose_mg_kg": 1.0,
             },
+            runtime=runtime,
         )
         assert len(state.engine.pharmacology.active_drugs) == 2
+        assert advancer.calls == [5.0, 5.0]
 
     def test_administer_unknown_drug_returns_error(self):
         """Administering an unregistered drug should return success=False."""
         from game.action_system import process_action
 
         state = self._make_state()
+        runtime, _ = self._runtime()
         result = process_action(
             state,
             "administer_drug",
@@ -371,6 +434,7 @@ class TestGameLayerDrugAdministration:
                 "drug_name": "nonexistent_drug",
                 "dose_mg_kg": 1.0,
             },
+            runtime=runtime,
         )
         assert result["success"] is False
 
@@ -379,6 +443,7 @@ class TestGameLayerDrugAdministration:
         from game.action_system import process_action
 
         state = self._make_state()
+        runtime, advancer = self._runtime()
         process_action(
             state,
             "administer_drug",
@@ -386,12 +451,11 @@ class TestGameLayerDrugAdministration:
                 "drug_name": "pimobendan",
                 "dose_mg_kg": 0.25,
             },
+            runtime=runtime,
         )
-        result = process_action(state, "wait", {})
-        assert result["success"] is True
-        # step() return includes pharmacology key in its dict
         step_result = state.engine.step()
         assert "pharmacology" in step_result
+        assert advancer.calls == [5.0]
 
 
 # =============================================================================
@@ -399,6 +463,7 @@ class TestGameLayerDrugAdministration:
 # =============================================================================
 
 
+@pytest.mark.slow
 class TestApiAdministerDrug:
     """
     Flask API endpoint /api/administer-drug should administer drugs
@@ -406,19 +471,20 @@ class TestApiAdministerDrug:
     """
 
     @pytest.fixture(autouse=True)
-    def _setup_app(self):
+    def _setup_app(self, tmp_path):
         """Create Flask test client and seed a game session."""
         from gui_app import app, _game_sessions, _session_locks, CASES_DATA
         from src.simulation import VirtualCreature
         from src.diseases import create_disease
         from game.action_system import GameState
 
+        _reset_gui_test_db(tmp_path)
         self.app = app
         self.client = app.test_client()
 
         # Create a game session
         case = CASES_DATA["cases"][0]
-        vc = VirtualCreature(body_weight_kg=case["animal"]["weight_kg"])
+        vc = VirtualCreature(body_weight_kg=case["animal"]["weight_kg"], dt=5.0)
         disease = create_disease(case["disease"])
         vc.attach_disease(disease)
         state = GameState(engine=vc, disease_name=case["disease"])
@@ -580,6 +646,7 @@ class TestApiDrugs:
 # =============================================================================
 
 
+@pytest.mark.slow
 class TestE2EGameFlow:
     """
     Full game flow: new-game → examine → wait → administer-drug → treat.
@@ -587,7 +654,7 @@ class TestE2EGameFlow:
     """
 
     @pytest.fixture(autouse=True)
-    def _setup(self):
+    def _setup(self, tmp_path):
         """Create Flask test client and seed game sessions for all cases."""
         import json
         from gui_app import app, _game_sessions, _session_locks, CASES_DATA
@@ -595,13 +662,14 @@ class TestE2EGameFlow:
         from src.diseases import create_disease
         from game.action_system import GameState
 
+        _reset_gui_test_db(tmp_path)
         self.app = app
         self.client = app.test_client()
 
         # Create a session for each case
         self.session_ids: dict[str, str] = {}
         for case in CASES_DATA["cases"]:
-            vc = VirtualCreature(body_weight_kg=case["animal"]["weight_kg"])
+            vc = VirtualCreature(body_weight_kg=case["animal"]["weight_kg"], dt=5.0)
             disease = create_disease(case["disease"])
             vc.attach_disease(disease)
             state = GameState(engine=vc, disease_name=case["disease"])

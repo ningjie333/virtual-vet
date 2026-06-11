@@ -15,8 +15,10 @@ from src.config_validation import (
     validate_examinations,
     validate_exam_templates,
     validate_diseases,
+    validate_coupling_rules,
     validate_all,
 )
+from src.report_engine import get_allowed_exam_disease_markers
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -49,6 +51,14 @@ def real_exam_templates() -> dict:
 def real_diseases() -> dict:
     """Load the real diseases.json from the data directory."""
     path = Path(__file__).resolve().parents[1] / "data" / "diseases.json"
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@pytest.fixture
+def real_coupling_rules() -> dict:
+    """Load the real coupling_rules.json from the data directory."""
+    path = Path(__file__).resolve().parents[1] / "data" / "coupling_rules.json"
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -161,6 +171,82 @@ def test_ode_diseases_rate_key_must_exist_in_preset():
     assert any("damage_rate" in e.message for e in errors)
 
 
+def test_coupling_rules_validates_correct_structure(real_coupling_rules):
+    """Load real coupling_rules.json and expect zero validation errors."""
+    errors = validate_coupling_rules(real_coupling_rules)
+    assert errors == [], f"Unexpected errors: {errors}"
+
+
+def test_coupling_target_must_be_in_param_paths():
+    """A coupling target path outside _PARAM_PATHS should fail validation."""
+    bad_config = {
+        "_schema": "coupling_rules v1",
+        "couplings": [
+            {
+                "name": "bad target",
+                "loop": "test",
+                "source": {"module": "kidney", "signal": "renin_activity"},
+                "target": {
+                    "module": "fluid",
+                    "param": "fluid.does_not_exist",
+                    "op": "multiply",
+                    "fn": "1.0",
+                },
+            }
+        ],
+    }
+    errors = validate_coupling_rules(bad_config)
+    assert len(errors) > 0
+    assert any("fluid.does_not_exist" in e.message for e in errors)
+
+
+def test_coupling_source_signal_must_exist_in_runtime_registry():
+    """A coupling source signal not published by the runtime should fail."""
+    bad_config = {
+        "_schema": "coupling_rules v1",
+        "couplings": [
+            {
+                "name": "bad source signal",
+                "loop": "test",
+                "source": {"module": "heart", "signal": "mean_arterial_pressure"},
+                "target": {
+                    "module": "kidney",
+                    "param": "kidney.GFR",
+                    "op": "multiply",
+                    "fn": "1.0",
+                },
+            }
+        ],
+    }
+    errors = validate_coupling_rules(bad_config)
+    assert len(errors) > 0
+    assert any("heart.mean_arterial_pressure" in e.message for e in errors)
+
+
+def test_coupling_expression_identifiers_must_exist_in_signal_map():
+    """A coupling fn/condition identifier typo should fail validation."""
+    bad_config = {
+        "_schema": "coupling_rules v1",
+        "couplings": [
+            {
+                "name": "bad expr identifier",
+                "loop": "test",
+                "source": {"module": "kidney", "signal": "GFR"},
+                "target": {
+                    "module": "blood",
+                    "param": "blood.BUN",
+                    "op": "set",
+                    "fn": "20.0 + 40.0 * max(0, 1.0 - gfr / 100.0)",
+                },
+                "condition": "gfr < 90.0",
+            }
+        ],
+    }
+    errors = validate_coupling_rules(bad_config)
+    assert len(errors) > 0
+    assert any("Unknown expression identifier 'gfr'" in e.message for e in errors)
+
+
 def test_ode_diseases_clamp_must_be_two_elements():
     """A clamp with wrong number of elements should fail schema validation."""
     bad_config = {
@@ -264,6 +350,53 @@ def test_exam_templates_validates_correct_structure(real_exam_templates, real_ex
     """Load real exam_templates.json and expect zero validation errors."""
     errors = validate_exam_templates(real_exam_templates, real_examinations)
     assert errors == [], f"Unexpected errors: {errors}"
+
+
+def test_exam_templates_do_not_reach_directly_into_creature(real_exam_templates):
+    """Report templates should consume explicit interpretation inputs, not raw creature paths."""
+
+    def _find_creature_refs(node, path="root"):
+        hits = []
+        if isinstance(node, dict):
+            for key, value in node.items():
+                hits.extend(_find_creature_refs(value, f"{path}.{key}"))
+        elif isinstance(node, list):
+            for idx, value in enumerate(node):
+                hits.extend(_find_creature_refs(value, f"{path}[{idx}]"))
+        elif isinstance(node, str) and "creature." in node:
+            hits.append((path, node))
+        return hits
+
+    hits = _find_creature_refs(real_exam_templates)
+    assert hits == [], f"Unexpected raw creature references in exam templates: {hits}"
+
+
+def test_exam_templates_disease_marker_surface_matches_template_usage(real_exam_templates):
+    """The report-layer disease marker surface should match template references."""
+
+    refs = set()
+
+    def _walk(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "requires" and isinstance(value, str) and value.startswith("disease."):
+                    refs.add(value.split(".", 1)[1])
+                _walk(value)
+            return
+        if isinstance(node, list):
+            for value in node:
+                _walk(value)
+            return
+        if isinstance(node, str):
+            import re
+
+            refs.update(
+                re.findall(r"disease\.([A-Za-z_][A-Za-z0-9_]*)", node)
+            )
+
+    _walk(real_exam_templates)
+
+    assert get_allowed_exam_disease_markers(reload=True) == refs
 
 
 def test_exam_templates_condition_must_be_non_empty_string(real_exam_templates, real_examinations):
