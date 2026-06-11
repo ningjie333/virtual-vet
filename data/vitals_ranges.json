@@ -3,8 +3,14 @@
   "_version": "1.1",
   "HR": {
     "unit": "bpm",
-    "normal": [60, 120],
-    "critical": [40, 180],
+    "normal": [
+      60,
+      120
+    ],
+    "critical": [
+      40,
+      180
+    ],
     "clue_flags": {
       "high": "hr_high",
       "low": "hr_low"
@@ -12,8 +18,14 @@
   },
   "MAP": {
     "unit": "mmHg",
-    "normal": [80, 120],
-    "critical": [50, 160],
+    "normal": [
+      80,
+      120
+    ],
+    "critical": [
+      50,
+      160
+    ],
     "clue_flags": {
       "high": "map_high",
       "low": "map_low"
@@ -21,7 +33,10 @@
   },
   "CVP": {
     "unit": "mmHg",
-    "normal": [0, 5],
+    "normal": [
+      0,
+      5
+    ],
     "critical": null,
     "clue_flags": {
       "high": "cvp_high"
@@ -29,7 +44,10 @@
   },
   "RR": {
     "unit": "/min",
-    "normal": [10, 30],
+    "normal": [
+      10,
+      30
+    ],
     "critical": null,
     "clue_flags": {
       "high": "rr_high"
@@ -37,32 +55,56 @@
   },
   "SpO2": {
     "unit": "%",
-    "normal": [95, 100],
-    "critical": [85, 100],
+    "normal": [
+      95,
+      100
+    ],
+    "critical": [
+      85,
+      100
+    ],
     "clue_flags": {
       "low": "SpO2_low"
     }
   },
   "PaO2": {
     "unit": "mmHg",
-    "normal": [80, 110],
-    "critical": [50, 150],
+    "normal": [
+      80,
+      110
+    ],
+    "critical": [
+      50,
+      150
+    ],
     "clue_flags": {
       "low": "PaO2_low"
     }
   },
   "PaCO2": {
     "unit": "mmHg",
-    "normal": [35, 45],
-    "critical": [25, 65],
+    "normal": [
+      35,
+      45
+    ],
+    "critical": [
+      25,
+      65
+    ],
     "clue_flags": {
       "high": "PaCO2_high"
     }
   },
   "pH": {
     "unit": "",
-    "normal": [7.35, 7.45],
-    "critical": [7.1, 7.6],
+    "normal": [
+      7.35,
+      7.45
+    ],
+    "critical": [
+      7.1,
+      7.6
+    ],
     "clue_flags": {
       "low": "ph_low",
       "high": "ph_high"
@@ -70,7 +112,10 @@
   },
   "GFR": {
     "unit": "mL/min",
-    "normal": [60, 120],
+    "normal": [
+      60,
+      120
+    ],
     "critical": null,
     "clue_flags": {
       "low": "gfr_low"
@@ -78,7 +123,10 @@
   },
   "BUN": {
     "unit": "mg/dL",
-    "normal": [10, 30],
+    "normal": [
+      10,
+      30
+    ],
     "critical": null,
     "clue_flags": {
       "high": "bun_high"
@@ -86,13 +134,19 @@
   },
   "Na": {
     "unit": "mEq/L",
-    "normal": [140, 155],
+    "normal": [
+      140,
+      155
+    ],
     "critical": null,
     "clue_flags": {}
   },
   "K": {
     "unit": "mEq/L",
-    "normal": [3.5, 5.5],
+    "normal": [
+      3.5,
+      5.5
+    ],
     "critical": null,
     "clue_flags": {
       "high": "potassium_high",
@@ -101,21 +155,35 @@
   },
   "Glu": {
     "unit": "mmol/L",
-    "normal": [3.3, 6.1],
-    "critical": [2.0, 15.0],
-    "clue_flags": {}
+    "normal": [
+      3.3,
+      6.1
+    ],
+    "critical": [
+      2.0,
+      15.0
+    ]
   },
   "Lactate": {
     "unit": "mmol/L",
-    "normal": [0.5, 2.5],
-    "critical": [0.0, 5.0],
+    "normal": [
+      0.5,
+      2.5
+    ],
+    "critical": [
+      0.0,
+      5.0
+    ],
     "clue_flags": {
       "high": "lactate_high"
     }
   },
   "HCT": {
     "unit": "%",
-    "normal": [37, 55],
+    "normal": [
+      37,
+      55
+    ],
     "critical": null,
     "clue_flags": {
       "low": "hct_low"
@@ -123,7 +191,10 @@
   },
   "WBC": {
     "unit": "×10⁹/L",
-    "normal": [6.0, 17.0],
+    "normal": [
+      6.0,
+      17.0
+    ],
     "critical": null,
     "clue_flags": {
       "high": "wbc_high"
@@ -131,7 +202,10 @@
   },
   "PLT": {
     "unit": "×10⁹/L",
-    "normal": [150, 500],
+    "normal": [
+      150,
+      500
+    ],
     "critical": null,
     "clue_flags": {
       "low": "plt_low"
@@ -139,23 +213,38 @@
   },
   "Temp": {
     "unit": "°C",
-    "normal": [38.0, 39.2],
-    "critical": [37.0, 41.0],
+    "normal": [
+      38.0,
+      39.2
+    ],
+    "critical": [
+      37.0,
+      41.0
+    ],
     "clue_flags": {
       "high": "temp_high"
     }
   },
   "Cr": {
     "unit": "mg/dL",
-    "normal": [0.5, 1.5],
-    "critical": [0.2, 5.0],
+    "normal": [
+      0.5,
+      1.5
+    ],
+    "critical": [
+      0.2,
+      5.0
+    ],
     "clue_flags": {
       "high": "cr_high"
     }
   },
   "ALT": {
     "unit": "U/L",
-    "normal": [10, 100],
+    "normal": [
+      10,
+      100
+    ],
     "critical": null,
     "clue_flags": {
       "high": "alt_high"
@@ -163,7 +252,10 @@
   },
   "USG": {
     "unit": "",
-    "normal": [1.015, 1.040],
+    "normal": [
+      1.015,
+      1.04
+    ],
     "critical": null,
     "clue_flags": {
       "low": "usg_low",
@@ -172,7 +264,10 @@
   },
   "UPCR": {
     "unit": "",
-    "normal": [0.0, 0.5],
+    "normal": [
+      0.0,
+      0.5
+    ],
     "critical": null,
     "clue_flags": {
       "high": "upcr_high"
@@ -180,8 +275,14 @@
   },
   "SBP": {
     "unit": "mmHg",
-    "normal": [110, 160],
-    "critical": [70, 200],
+    "normal": [
+      110,
+      160
+    ],
+    "critical": [
+      70,
+      200
+    ],
     "clue_flags": {
       "high": "sbp_high",
       "low": "sbp_low"
@@ -189,8 +290,14 @@
   },
   "DBP": {
     "unit": "mmHg",
-    "normal": [60, 90],
-    "critical": [40, 120],
+    "normal": [
+      60,
+      90
+    ],
+    "critical": [
+      40,
+      120
+    ],
     "clue_flags": {
       "high": "dbp_high",
       "low": "dbp_low"
@@ -198,48 +305,81 @@
   },
   "HCO3": {
     "unit": "mmol/L",
-    "normal": [18, 26],
-    "critical": [8, 40],
+    "normal": [
+      18,
+      26
+    ],
+    "critical": [
+      8,
+      40
+    ],
     "clue_flags": {
       "low": "hco3_low"
     }
   },
   "Bilirubin": {
     "unit": "mg/dL",
-    "normal": [0.0, 0.5],
-    "critical": [0.0, 5.0],
+    "normal": [
+      0.0,
+      0.5
+    ],
+    "critical": [
+      0.0,
+      5.0
+    ],
     "clue_flags": {
       "high": "bilirubin_high"
     }
   },
   "Ketone": {
     "unit": "mmol/L",
-    "normal": [0.0, 0.5],
-    "critical": [0.0, 6.0],
+    "normal": [
+      0.0,
+      0.5
+    ],
+    "critical": [
+      0.0,
+      6.0
+    ],
     "clue_flags": {
       "high": "ketone_high"
     }
   },
   "PT": {
     "unit": "sec",
-    "normal": [10.0, 15.0],
-    "critical": [8.0, 25.0],
-    "clue_flags": {
-      "high": "pt_high"
-    }
+    "normal": [
+      10.0,
+      15.0
+    ],
+    "critical": [
+      8.0,
+      25.0
+    ]
   },
   "aPTT": {
     "unit": "sec",
-    "normal": [25.0, 35.0],
-    "critical": [20.0, 50.0],
+    "normal": [
+      25.0,
+      35.0
+    ],
+    "critical": [
+      20.0,
+      50.0
+    ],
     "clue_flags": {
       "high": "aptt_high"
     }
   },
   "Fibrinogen": {
     "unit": "mg/dL",
-    "normal": [200.0, 400.0],
-    "critical": [50.0, 800.0],
+    "normal": [
+      200.0,
+      400.0
+    ],
+    "critical": [
+      50.0,
+      800.0
+    ],
     "clue_flags": {
       "high": "fibrinogen_high",
       "low": "fibrinogen_low"
@@ -247,16 +387,28 @@
   },
   "CRP": {
     "unit": "mg/L",
-    "normal": [0.0, 10.0],
-    "critical": [10.0, 200.0],
+    "normal": [
+      0.0,
+      10.0
+    ],
+    "critical": [
+      10.0,
+      200.0
+    ],
     "clue_flags": {
       "high": "crp_high"
     }
   },
   "Cortisol": {
     "unit": "ug/dL",
-    "normal": [2.0, 10.0],
-    "critical": [0.5, 25.0],
+    "normal": [
+      2.0,
+      10.0
+    ],
+    "critical": [
+      0.5,
+      25.0
+    ],
     "clue_flags": {
       "high": "cortisol_high",
       "low": "cortisol_low"
@@ -264,8 +416,14 @@
   },
   "T3": {
     "unit": "ng/dL",
-    "normal": [80.0, 120.0],
-    "critical": [50.0, 150.0],
+    "normal": [
+      80.0,
+      120.0
+    ],
+    "critical": [
+      50.0,
+      150.0
+    ],
     "clue_flags": {
       "high": "t3_high",
       "low": "t3_low"
@@ -273,8 +431,14 @@
   },
   "T4": {
     "unit": "ug/dL",
-    "normal": [1.0, 3.0],
-    "critical": [0.5, 5.0],
+    "normal": [
+      1.0,
+      3.0
+    ],
+    "critical": [
+      0.5,
+      5.0
+    ],
     "clue_flags": {
       "high": "t4_high",
       "low": "t4_low"

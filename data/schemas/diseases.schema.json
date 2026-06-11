@@ -29,8 +29,20 @@
     },
     "clue_to_test": {
       "type": "object",
+      "deprecated": true,
+      "description": "DEPRECATED as of Wave 4 (2026-06-11). The clue-to-test mapping is migrating into data/clue_catalog.json::suggested_tests. This field is retained during the migration period so that game/diagnosis_engine.py still has the diagnostic-side recommendations; once the catalog becomes the runtime source, this field will be removed and the diseases.schema.json will reject it. Per Q3 decision in docs/clue-trigger-plan.md, no override mechanism is permitted.",
       "additionalProperties": {
-        "type": "string"
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "treatment_protocols": {

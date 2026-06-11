@@ -23,7 +23,24 @@ with open(os.path.join(_DATA_DIR, "diseases.json"), encoding="utf-8") as _f:
 
 _DISEASE_CLUES: dict[str, list[str]] = _DISEASE_DATA["clues"]
 CLUE_DESCRIPTIONS: dict[str, str] = _DISEASE_DATA["clue_descriptions"]
-_CLUE_TO_TEST: dict[str, str] = _DISEASE_DATA["clue_to_test"]
+# Wave 4 (2026-06-11): clue_to_test values may be a list of suggested exams
+# (per Q3 decision in clue-trigger-plan.md). Normalize on load so consumers
+# can always iterate.
+_CLUE_TO_TEST_RAW: dict = _DISEASE_DATA["clue_to_test"]
+
+
+def _normalize_suggested_tests(val) -> list[str]:
+    if isinstance(val, list):
+        return [str(v) for v in val if v]
+    if isinstance(val, str):
+        return [val]
+    return []
+
+
+_CLUE_TO_TEST: dict[str, list[str]] = {
+    cid: _normalize_suggested_tests(val)
+    for cid, val in _CLUE_TO_TEST_RAW.items()
+}
 
 # 线索特异性权重：出现在越少疾病中的线索权重越高
 # weight = 1.0 / freq，freq=1 时权重最高（唯一线索）
@@ -169,10 +186,11 @@ def get_suggested_tests(matches: list[dict]) -> list[str]:
 
     for m in matches[:2]:
         for clue in m.get("missed_clues", []):
-            test = _CLUE_TO_TEST.get(clue)
-            if test and test not in seen_tests:
-                seen_tests.add(test)
-                suggested.append(test)
+            tests = _CLUE_TO_TEST.get(clue, [])
+            for test in tests:
+                if test and test not in seen_tests:
+                    seen_tests.add(test)
+                    suggested.append(test)
 
     return suggested
 

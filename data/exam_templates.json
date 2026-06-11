@@ -103,7 +103,7 @@
     },
     "tag_rules": [
       {
-        "clue_id": "crackles",
+        "clue_id": "crackles_auscultation",
         "condition": "state.PaO2 < thresholds.pao2_crackles_mild"
       },
       {
@@ -115,12 +115,12 @@
         "condition": "state.RR > thresholds.rr_high"
       },
       {
-        "clue_id": "muffled_heart_sounds",
+        "clue_id": "muffled_heart_sounds_auscultation",
         "condition": "disease.tamponade_severity > thresholds.pericardial_muffled",
         "requires": "disease.tamponade_severity"
       },
       {
-        "clue_id": "arrhythmia",
+        "clue_id": "arrhythmia_auscultation",
         "condition": "disease.arrhythmia_severity > thresholds.arrhythmia_severe",
         "requires": "disease.arrhythmia_severity"
       }
@@ -274,21 +274,16 @@
         "condition": "state.SpO2 < thresholds.spo2_cyanosis_mild"
       },
       {
-        "clue_id": "dehydration",
+        "clue_id": "dehydration_inspection",
         "condition": "bv_ratio < thresholds.bv_dehydration_moderate"
       },
       {
-        "clue_id": "icterus",
-        "condition": "disease.bilirubin_load > thresholds.icterus_mild",
-        "requires": "disease.bilirubin_load"
-      },
-      {
-        "clue_id": "jugular_distension",
+        "clue_id": "jugular_distension_inspection",
         "condition": "disease.venous_congestion > thresholds.jvd_mild",
         "requires": "disease.venous_congestion"
       },
       {
-        "clue_id": "petechiae",
+        "clue_id": "petechiae_inspection",
         "condition": "disease.hemorrhage_risk > thresholds.dic_hemorrhage_mild",
         "requires": "disease.hemorrhage_risk"
       }
@@ -423,7 +418,7 @@
         "param": "PLT",
         "unit": "×10⁹/L",
         "normal_range": "150-500",
-        "source": "creature.blood.PLT"
+        "source": "state.PLT"
       }
     ],
     "thresholds": {
@@ -456,19 +451,19 @@
         "param": "PT",
         "unit": "秒",
         "normal_range": "10-14",
-        "source": "creature.blood.PT_sec"
+        "source": "state.PT"
       },
       {
         "param": "aPTT",
         "unit": "秒",
         "normal_range": "25-35",
-        "source": "creature.blood.aPTT_sec"
+        "source": "state.aPTT"
       },
       {
         "param": "Fibrinogen",
         "unit": "mg/dL",
         "normal_range": "200-400",
-        "source": "creature.blood.fibrinogen_mg_dL"
+        "source": "state.Fibrinogen"
       }
     ],
     "thresholds": {
@@ -554,7 +549,7 @@
         "param": "Cr",
         "unit": "mg/dL",
         "normal_range": "0.5-1.5",
-        "source": "creature.blood.creatinine_mg_dL"
+        "source": "state.Cr"
       },
       {
         "param": "ALT",
@@ -567,13 +562,13 @@
         "param": "Bilirubin",
         "unit": "mg/dL",
         "normal_range": "<0.5",
-        "source": "creature.blood.bilirubin_mg_dL"
+        "source": "state.Bilirubin"
       },
       {
         "param": "Ketone",
         "unit": "mmol/L",
         "normal_range": "<0.5",
-        "source": "creature.blood.ketone_mmol_L"
+        "source": "state.Ketone"
       }
     ],
     "thresholds": {},
@@ -597,7 +592,7 @@
       },
       {
         "clue_id": "cr_high",
-        "condition": "creature.blood.creatinine_mg_dL > 1.5"
+        "condition": "state.Cr > 1.5"
       },
       {
         "clue_id": "glucose_high",
@@ -605,11 +600,11 @@
       },
       {
         "clue_id": "bilirubin_high",
-        "condition": "creature.blood.bilirubin_mg_dL > 0.5"
+        "condition": "state.Bilirubin > 0.5"
       },
       {
         "clue_id": "ketone_high",
-        "condition": "creature.blood.ketone_mmol_L > 0.5"
+        "condition": "state.Ketone > 0.5"
       }
     ]
   },
@@ -840,8 +835,8 @@
       "dcm_contractility_loss": 0.3,
       "pneumonia_exudate": 0.3,
       "dcm_fluid": 0.3,
-      "urine_oliguria": "0.008 * creature.w",
-      "urine_anuria": "0.002 * creature.w",
+      "urine_oliguria": "0.008 * weight_kg",
+      "urine_anuria": "0.002 * weight_kg",
       "bladder_severe": 0.7,
       "bladder_moderate": 0.4,
       "bladder_mild": 0.1,
@@ -870,13 +865,9 @@
         "requires": "disease.ventricular_dilation"
       },
       {
-        "clue_id": "bladder_distension",
+        "clue_id": "bladder_distension_us",
         "condition": "disease.bladder_distension > thresholds.bladder_mild",
         "requires": "disease.bladder_distension"
-      },
-      {
-        "clue_id": "anuria",
-        "condition": "state.Urine < thresholds.urine_anuria"
       }
     ],
     "findings_rules": {
@@ -1130,15 +1121,15 @@
         "condition": "state.K < thresholds.k_low"
       },
       {
-        "clue_id": "t_wave_tall",
+        "clue_id": "t_wave_tall_ecg",
         "condition": "state.T波 == 'tall' or state.T波 == 'tall_peaked'"
       },
       {
-        "clue_id": "qrs_wide",
+        "clue_id": "qrs_wide_ecg",
         "condition": "state.QRS宽度 == 'wide' or state.QRS宽度 == 'very_wide'"
       },
       {
-        "clue_id": "p_wave_absent",
+        "clue_id": "p_wave_absent_ecg",
         "condition": "state.P波 == 'absent'"
       }
     ],
@@ -1292,7 +1283,7 @@
         "condition": "state.MAP < thresholds.map_normal_low"
       },
       {
-        "clue_id": "pulsus_paradoxus",
+        "clue_id": "pulsus_paradoxus_blood_pressure",
         "condition": "disease.pulsus_paradoxus > thresholds.pulsus_paradoxus_severe",
         "requires": "disease.pulsus_paradoxus"
       }
@@ -1589,7 +1580,7 @@
     },
     "tag_rules": [
       {
-        "clue_id": "crackles",
+        "clue_id": "crackles_endoscopy",
         "condition": "disease.alveolar_exudate > thresholds.exudate_significant",
         "requires": "disease.alveolar_exudate"
       }

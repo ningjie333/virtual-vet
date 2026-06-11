@@ -298,7 +298,19 @@
     "altered_consciousness": "意识状态改变",
     "seizure": "癫痫发作",
     "neck_pain": "颈部疼痛",
-    "pain_mobility": "运动疼痛/活动受限"
+    "pain_mobility": "运动疼痛/活动受限",
+    "bladder_distension_us": "Bladder Distension Us",
+    "muffled_heart_sounds_auscultation": "Muffled Heart Sounds Auscultation",
+    "jugular_distension_inspection": "Jugular Distension Inspection",
+    "t_wave_tall_ecg": "T波高尖",
+    "qrs_wide_ecg": "QRS增宽",
+    "p_wave_absent_ecg": "P波消失",
+    "crackles_auscultation": "听诊湿啰音",
+    "crackles_endoscopy": "内镜下气道渗出",
+    "arrhythmia_auscultation": "听诊心律不齐",
+    "pulsus_paradoxus_blood_pressure": "血压测量奇脉",
+    "petechiae_inspection": "视诊瘀点",
+    "dehydration_inspection": "视诊脱水征"
   },
   "clue_to_test": {
     "PaO2_low": "blood_gas",
@@ -331,15 +343,15 @@
     "hct_low": "blood_routine",
     "bilirubin_high": "blood_biochem",
     "icterus": "inspection",
-    "bladder_distension": "ultrasound",
+    "bladder_distension_us": "ultrasound",
     "anuria": "physical",
     "glucose_high": "blood_biochem",
     "hco3_low": "blood_gas",
     "kussmaul_respiration": "physical",
     "dehydration": "inspection",
     "pulsus_paradoxus": "blood_pressure",
-    "muffled_heart_sounds": "auscultation",
-    "jugular_distension": "inspection",
+    "muffled_heart_sounds_auscultation": "auscultation",
+    "jugular_distension_inspection": "inspection",
     "plt_low": "blood_routine",
     "hemorrhage": "inspection",
     "petechiae": "inspection",
@@ -347,9 +359,9 @@
     "cr_high": "blood_biochem",
     "ketone_high": "blood_biochem",
     "ph_high": "blood_gas",
-    "t_wave_tall": "ecg",
-    "qrs_wide": "ecg",
-    "p_wave_absent": "ecg",
+    "t_wave_tall_ecg": "ecg",
+    "qrs_wide_ecg": "ecg",
+    "p_wave_absent_ecg": "ecg",
     "usg_low": "urinalysis",
     "upcr_high": "urinalysis",
     "pt_prolonged": "blood_coagulation",
@@ -370,7 +382,25 @@
     "altered_consciousness": "physical",
     "seizure": "physical",
     "neck_pain": "physical",
-    "pain_mobility": "physical"
+    "pain_mobility": "physical",
+    "crackles_auscultation": [
+      "auscultation"
+    ],
+    "crackles_endoscopy": [
+      "endoscopy"
+    ],
+    "arrhythmia_auscultation": [
+      "auscultation"
+    ],
+    "pulsus_paradoxus_blood_pressure": [
+      "blood_pressure"
+    ],
+    "petechiae_inspection": [
+      "inspection"
+    ],
+    "dehydration_inspection": [
+      "inspection"
+    ]
   },
   "treatment_protocols": {
     "dilated_cardiomyopathy": [

@@ -95,8 +95,11 @@ def check_disease_clues(diseases: dict, examinations: dict) -> list:
                 })
 
     for clue_id, exam_type in diseases.get("clue_to_test", {}).items():
-        if exam_type not in exam_keys:
-            errors.append({"sev": SEVERITY_CRITICAL, "msg": f"diseases.json.clue_to_test → \"{clue_id}\" 映射到不存在的检查类型 \"{exam_type}\"", "fixable": False})
+        # clue_to_test value is a list (Wave 1.3+): the clue suggests these exams
+        exam_types = exam_type if isinstance(exam_type, list) else [exam_type]
+        for et in exam_types:
+            if et not in exam_keys:
+                errors.append({"sev": SEVERITY_CRITICAL, "msg": f"diseases.json.clue_to_test → \"{clue_id}\" 映射到不存在的检查类型 \"{et}\"", "fixable": False})
         if clue_id not in all_clue_ids:
             errors.append({
                 "sev": SEVERITY_HIGH,

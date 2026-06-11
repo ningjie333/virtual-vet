@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import ast
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +77,40 @@ def _is_numeric_str(s: str) -> bool:
         return True
     except (ValueError, TypeError):
         return False
+
+
+_RUNTIME_COUPLING_SIGNAL_REGISTRY: dict[str, set[str]] | None = None
+
+
+def _get_runtime_coupling_signal_registry() -> dict[str, set[str]]:
+    """Discover currently published coupling signals from a live engine step.
+
+    This keeps coupling-rule validation anchored to the actual runtime wiring
+    instead of maintaining a second hardcoded signal-name table.
+    """
+    global _RUNTIME_COUPLING_SIGNAL_REGISTRY
+    if _RUNTIME_COUPLING_SIGNAL_REGISTRY is not None:
+        return _RUNTIME_COUPLING_SIGNAL_REGISTRY
+
+    from src.simulation import VirtualCreature
+
+    creature = VirtualCreature(body_weight_kg=20.0, species="canine", dt=0.1)
+    creature.step()
+    _RUNTIME_COUPLING_SIGNAL_REGISTRY = {
+        module_name: set(ctx.all_signals().keys())
+        for module_name, ctx in creature._organ_contexts.items()
+    }
+    return _RUNTIME_COUPLING_SIGNAL_REGISTRY
+
+
+def _collect_expr_identifiers(expr: str) -> set[str]:
+    """Return variable identifiers referenced by a coupling expression."""
+    tree = ast.parse(expr, mode="eval")
+    return {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name)
+    }
 
 
 # ── Schema Loaders ───────────────────────────────────────────────────────────
@@ -329,12 +364,16 @@ def validate_diseases(
         exam_ids = set(examinations_config.keys())
         clue_to_test = config.get("clue_to_test", {})
         for clue_id, exam_type in clue_to_test.items():
-            if exam_type and exam_type not in exam_ids:
-                errors.append(ValidationError(
-                    "diseases.json",
-                    f"clue_to_test.{clue_id}",
-                    f"exam type '{exam_type}' does not exist in examinations.json"
-                ))
+            # Wave 1 (2026-06-11): clue_to_test values are lists of suggested exams
+            # (per clue-trigger-plan Q3 decision). Accept legacy string form too.
+            exam_types = exam_type if isinstance(exam_type, list) else [exam_type]
+            for et in exam_types:
+                if et and et not in exam_ids:
+                    errors.append(ValidationError(
+                        "diseases.json",
+                        f"clue_to_test.{clue_id}",
+                        f"exam type '{et}' does not exist in examinations.json",
+                    ))
 
     return errors
 
@@ -349,10 +388,17 @@ def validate_coupling_rules(config: dict) -> list[ValidationError]:
       - each rule has name, loop, source, target
 
     Programmatic checks:
+      - target.param must be a valid _PARAM_PATHS key
+      - source.module/source.signal must exist in the runtime coupling registry
+      - condition/fn identifiers must resolve against runtime-published signal names
       - references[].id and references[].text are non-empty strings
       - notes is string (can be empty)
     """
     errors: list[ValidationError] = []
+    from .common_types import _PARAM_PATHS as PARAM_PATHS
+    runtime_registry = _get_runtime_coupling_signal_registry()
+    allowed_signal_names = set().union(*runtime_registry.values()) if runtime_registry else set()
+    allowed_expr_names = allowed_signal_names | {"min", "max", "abs", "True", "False", "None"}
     # coupling_rules_schema.json lives in data/, not data/schemas/
     schema_path = _get_data_dir() / "coupling_rules_schema.json"
     with open(schema_path, encoding="utf-8") as f:
@@ -367,6 +413,67 @@ def validate_coupling_rules(config: dict) -> list[ValidationError]:
     for i, rule in enumerate(config.get("couplings", [])):
         if not isinstance(rule, dict):
             continue
+        source = rule.get("source", {})
+        target = rule.get("target", {})
+        if isinstance(source, dict):
+            source_module = source.get("module")
+            source_signal = source.get("signal")
+            if source_module and source_module not in runtime_registry:
+                errors.append(ValidationError(
+                    "coupling_rules.json",
+                    f"couplings[{i}].source.module",
+                    f"Unknown coupling source module '{source_module}'"
+                ))
+            elif source_signal and source_signal not in runtime_registry.get(source_module, set()):
+                errors.append(ValidationError(
+                    "coupling_rules.json",
+                    f"couplings[{i}].source.signal",
+                    f"Unknown runtime signal '{source_module}.{source_signal}'"
+                ))
+        if isinstance(target, dict):
+            target_param = target.get("param")
+            if target_param and target_param not in PARAM_PATHS:
+                errors.append(ValidationError(
+                    "coupling_rules.json",
+                    f"couplings[{i}].target.param",
+                    f"Unknown FactorCommand target '{target_param}' (not registered in _PARAM_PATHS)"
+                ))
+            fn_expr = target.get("fn")
+            if isinstance(fn_expr, str):
+                try:
+                    fn_names = _collect_expr_identifiers(fn_expr)
+                except SyntaxError as ex:
+                    errors.append(ValidationError(
+                        "coupling_rules.json",
+                        f"couplings[{i}].target.fn",
+                        f"Invalid Python expression syntax: {ex.msg}"
+                    ))
+                else:
+                    unknown_names = sorted(name for name in fn_names if name not in allowed_expr_names)
+                    for name in unknown_names:
+                        errors.append(ValidationError(
+                            "coupling_rules.json",
+                            f"couplings[{i}].target.fn",
+                            f"Unknown expression identifier '{name}'"
+                        ))
+        condition_expr = rule.get("condition")
+        if isinstance(condition_expr, str):
+            try:
+                cond_names = _collect_expr_identifiers(condition_expr)
+            except SyntaxError as ex:
+                errors.append(ValidationError(
+                    "coupling_rules.json",
+                    f"couplings[{i}].condition",
+                    f"Invalid Python expression syntax: {ex.msg}"
+                ))
+            else:
+                unknown_names = sorted(name for name in cond_names if name not in allowed_expr_names)
+                for name in unknown_names:
+                    errors.append(ValidationError(
+                        "coupling_rules.json",
+                        f"couplings[{i}].condition",
+                        f"Unknown expression identifier '{name}'"
+                    ))
         for j, ref in enumerate(rule.get("references", [])):
             if not isinstance(ref, dict):
                 continue
