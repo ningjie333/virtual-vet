@@ -179,6 +179,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.interstitial_fluid_mL": ("blood", "interstitial_fluid_mL"),
     # ── Gut ────────────────────────────────────────────────────────────────
     "gut.motility":                ("gut", "gut_motility"),
+    "gut.gut_motility":            ("gut", "gut_motility"),
     "gut.barrier_integrity":       ("gut", "barrier_integrity"),
     "gut.microbiome_activity":     ("gut", "microbiome_activity"),
     # ── Liver ─────────────────────────────────────────────────────────────

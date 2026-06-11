@@ -16,6 +16,8 @@ Heart Module - 心血管循环系统（修正版）
   K⁺ 毒性由 HH 的 h∞ 稳态推导，替代 _potassium_cardiac_effect()。
 """
 
+import math
+
 from parameters import *
 from src.cardiac_electrophysiology import CardiacElectrophysiology
 from src.noble_purkinje import NoblePurkinjeFiber
@@ -366,8 +368,12 @@ class HeartModule:
         para_target = self._clamp(0.7 - 0.5 * error, 0.0, 1.0)
         tau_symp = 5.0   # 交感慢
         tau_para = 1.0   # 副交感快
-        self.sympathetic += (sym_target - self.sympathetic) / tau_symp * dt
-        self.parasympathetic += (para_target - self.parasympathetic) / tau_para * dt
+        self.sympathetic = self._first_order_relax(
+            self.sympathetic, sym_target, dt, tau_symp
+        )
+        self.parasympathetic = self._first_order_relax(
+            self.parasympathetic, para_target, dt, tau_para
+        )
 
         # HR 计算：副交感在MAP偏高时减速，交感在MAP偏低时加速
         # 副交感主导：增益 40 > 交感 15（Ursino 1998）
@@ -397,6 +403,14 @@ class HeartModule:
     @staticmethod
     def _clamp(value: float, lo: float, hi: float) -> float:
         return max(lo, min(hi, value))
+
+    @staticmethod
+    def _first_order_relax(current: float, target: float, dt: float, tau: float) -> float:
+        """Stable first-order lag update for coarse outer simulation steps."""
+        if tau <= 0.0:
+            return target
+        alpha = 1.0 - math.exp(-max(0.0, dt) / tau)
+        return current + (target - current) * alpha
 
     def compute(self, dt: float, svr_factor: float = 1.0,
                 chemoreceptor_drive: float = 0.0):

@@ -27,6 +27,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from src.clinical_state import extract_clinical_state
+
 logger = logging.getLogger(__name__)
 
 
@@ -530,6 +532,5 @@ class ClinicalSignsEngine:
     # ── Engine state snapshot ──────────────────────────────────
 
     def _get_engine_state(self) -> dict:
-        """Get current engine state using the same get_state() used by report_engine."""
-        from src.report_engine import get_state
-        return get_state(self._creature)
+        """Get current engine state via the shared clinical-state adapter."""
+        return extract_clinical_state(self._creature)

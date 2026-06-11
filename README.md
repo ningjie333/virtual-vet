@@ -1,97 +1,106 @@
-# Virtual Vet — 兽医临床生理仿真引擎
+# Virtual Vet
 
-> 基于多器官 ODE 系统的研究级生理仿真引擎，支持 Radau 隐式求解器统一求解全系统。
+Veterinary multi-organ physiology kernel with an outer clinical/game application layer.
 
-## 定位
+## Positioning
 
-**科研级生理仿真** — 用于兽医临床教育的生理引擎，也可作为论文投稿的技术基础。
+`Virtual Vet` is organized around a physiology engine first, not a game first.
 
-与传统教学模拟器不同，本引擎：
-- 使用 **Radau 隐式 ODE 求解器**（`scipy.integrate.solve_ivp`）同时求解 44 个状态变量
-- **半隐式耦合**：模块间通过 CONNECTIONS 表路由输出→输入，避免顺序耦合的误差
-- 12 个器官模块各自拥有 `derivatives()` 方法，支持独立验证和替换
-- 配置驱动的疾病系统（`data/ode_diseases.json`），无需修改代码即可添加新疾病
+- The **kernel** models coupled cardiovascular, respiratory, renal, fluid, metabolic, neuro-immune, and disease dynamics in physical time.
+- The **clinical interpretation layer** turns engine state into observable signs, structured reports, and teaching-facing summaries.
+- The **application layer** provides case orchestration, diagnosis gameplay, time budgeting, sessions, and UI.
 
-## 架构
+The project is best described as a **literature-informed, clinically grounded physiology engine with a teaching application built around it**. Validation is ongoing; the documentation avoids treating gameplay abstractions as kernel truths.
 
-```
-VirtualCreature
- ├── heart / lung / kidney / fluid          # 心血管 + 体液
- ├── gut / liver / endocrine                 # 消化 + 代谢 + 内分泌
- ├── neuro / immune / coagulation            # 神经 + 免疫 + 凝血
- ├── lymphatic                                # 淋巴 + 脾脏
- └── disease (config-driven)                 # 疾病 ODE → FactorCommand
-```
+## Document Map
 
-**状态变量**（44 个）：
+- Start with [docs/architecture.md](docs/architecture.md) for the current authoritative rules.
+- Read [docs/kernel-first-design.md](docs/kernel-first-design.md) for the integrated design narrative.
+- Use [docs/testing.md](docs/testing.md) for the executable test split and regression workflow.
+- Use [docs/README.md](docs/README.md) for the full docs index.
 
-| 模块 | 状态变量 |
-|------|---------|
-| heart | HR, SV, SVR |
-| lung | RR, TV, VQ |
-| kidney | GFR, RBF, urine_output, ADH |
-| fluid | V_vascular, V_isf, V_icf |
-| gut | motility, barrier, microbiome |
-| liver | glycogen_fraction, bilirubin_accumulation |
-| endocrine | T3, insulin, glucagon, cortisol, PTH, IGF1, HPA_axis |
-| neuro | sympathetic_tone, parasympathetic_tone, consciousness, seizure, pain |
-| immune | cytokine, acute_phase, wbc, coagulation_state |
-| coagulation | factor_VII, factor_V, factor_II, factor_IX, factor_X, factor_XI, fibrinogen, coagulation_state |
-| lymphatic | splenic_reserve_mL, interstitial_fluid_mL |
+The rest of this `README` stays intentionally concise. It is an entry document, not the full architecture note.
 
-## 核心 API
+## Time Semantics
 
-```python
-from src.simulation import VirtualCreature
+The project uses three distinct notions of time.
 
-vc = VirtualCreature(body_weight_kg=20.0)
+- **Physical time** is kernel-native truth.
+- **Scenario time** is outer-layer pacing and action cost.
+- **Presentation time** is display-only clock/UI labeling.
 
-# 方式 1：Euler 步进（向后兼容）
-vc.simulate(duration_minutes=30, verbose=True)
-for _ in range(300):
-    vc.step()
+Current rule:
 
-# 方式 2：Radau 统一求解（科研验证用）
-sol = vc.run_unified_ivp(t_end=600.0, dt_save=1.0)
-# sol.y.shape == (44, 601) — 44 状态变量 × 601 时间点
-```
+- gameplay pacing must not redefine kernel biology
 
-## 运行
+Current direction:
+
+- keep disease and organ rates in physical units
+- let the outer app choose how much physical time to advance
+- move pre-encounter disease history into explicit encounter-state construction seams instead of hidden global multipliers
+
+The first concrete builder seam now lives in `src/presentation_state.py` via `PresentationRequest` and `build_presented_engine(...)`.
+
+For the full rationale, read:
+
+- [docs/kernel-first-design.md](docs/kernel-first-design.md)
+- [docs/kernel-time-architecture-sketch.md](docs/kernel-time-architecture-sketch.md)
+
+## Current Solver Status
+
+As of 2026-06-09:
+
+- the repository contains both **Euler** and **Radau** paths
+- the public gameplay application currently instantiates `VirtualCreature` with the default solver path, which is **Euler**
+- Radau APIs and solver numerics tests remain important for validation and research-facing work
+
+This means the gameplay shell should not be documented as if it were already running the full research solver path by default.
+
+## Testing Model
+
+The suite intentionally contains both cheap regression channels and explicit validation channels.
+
+- Fast channels protect development speed.
+- Heavy and benchmark channels protect physiological credibility and numerics work.
+- App/API tests should usually validate orchestration through fake runtime seams or coarser test-only step sizes.
+- Real long-horizon progression should stay explicit and marked.
+
+Recommended workflow:
+
+- everyday edits -> `python -m pytest --channel fast -q`
+- app/runtime/API work -> `python -m pytest --channel core -q`
+- kernel/time/disease changes -> `python -m pytest --channel core -q`, then targeted heavy files
+- split full non-overlapping test execution -> `fast-only`, `core-only`, `heavy-only`, then `benchmark`
+- high-impact changes -> targeted heavy and benchmark files before any full sweep
+
+As of 2026-06-10, the daily `fast` channel currently runs `441` tests and has recently completed in roughly `8-15` seconds on the development machine.
+
+The normal cumulative `core` channel currently runs `750` selected tests and has recently completed in roughly `25-45` seconds.
+
+The heavier validation files are intentionally no longer treated as one monolithic default command. Use the targeted heavy and benchmark subchannels in [docs/testing.md](docs/testing.md) and [docs/test-runbook.md](docs/test-runbook.md) for solver, disease-endurance, survival, toxicology, and performance validation.
+
+If you still see large `deselected` counts, you are probably using an older marker-based command such as `-m fast`; one recent run produced `441 passed, 495 deselected`, while the `--channel` commands stay clean.
+
+If you want a finer-grained full sweep, the suite also supports thematic `--bundle` slicing inside each channel, for example `core-runtime`, `core-solver`, `benchmark-solver-parity`, and `benchmark-performance`.
+
+See [docs/testing.md](docs/testing.md) for the current fake-runtime, marker, and channel conventions.
+
+## Running
 
 ```bash
-# 安装依赖
-uv sync
-
-# 启动游戏
 python gui_app.py
-# 访问 http://127.0.0.1:5000
-
-# 运行测试
-python -m pytest tests/ -v
-
-# 研究验证
-python -c "
-from src.simulation import VirtualCreature
-vc = VirtualCreature(body_weight_kg=20.0)
-sol = vc.run_unified_ivp(t_end=60.0)
-print(f'Radau 求解: {sol.success}, 状态变量: {sol.y.shape}')
-"
 ```
 
-## 技术指标
+Then open `http://127.0.0.1:5000`.
 
-- **求解器**：Radau IIA（5阶隐式 Runge-Kutta）— 无条件稳定，适合病态 ODE
-- **状态维度**：44 个 ODE + 代数约束（通过一阶 lag 近似融入 ODE）
-- **模块数量**：12 个器官模块 + 1 个疾病模块
-- **测试覆盖**：698 tests PASS
-- **稳态精度**：HR drift < 0.01 over 60s
+## Key Documents
 
-## 论文定位
+- [docs/architecture.md](docs/architecture.md): current authoritative architecture rules
+- [docs/kernel-first-design.md](docs/kernel-first-design.md): main design narrative
+- [docs/testing.md](docs/testing.md): test split and command guide
+- [docs/clinical-interpretation-layer.md](docs/clinical-interpretation-layer.md): interpretation seam sketch
+- [CLAUDE.md](CLAUDE.md): contributor-oriented repository guidance
 
-本引擎满足 CCF-C 论文的技术要求：
-- **非 Euler 求解器**：Radau 隐式方法，收敛阶 ≥ 3
-- **非顺序耦合**：半隐式耦合 + CONNECTIONS 表，模块间无显示依赖
-- **可验证**：每个模块的 `derivatives()` 方法独立测试
-- **可复现**：配置驱动疾病系统，JSON 声明式定义
+## Historical Note
 
-> 配套论文写作中。详见 [CLAUDE.md](./CLAUDE.md) 的已知问题和待办。
+Some older project documents describe earlier game-time/AP models or older `/api/wait` semantics. Treat the root `README.md` and [docs/architecture.md](docs/architecture.md) as the current architectural source of truth.

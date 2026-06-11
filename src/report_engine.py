@@ -21,10 +21,12 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Optional
 
+from src.clinical_state import extract_clinical_state
 from src.vitals_config import get_vitals_config
 
 if TYPE_CHECKING:
@@ -35,10 +37,39 @@ logger = logging.getLogger(__name__)
 # ── 配置加载 ──
 _DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 _TEMPLATES: dict[str, dict] = {}
+_ALLOWED_DISEASE_MARKERS: set[str] | None = None
 
 _vc = get_vitals_config()
 
 _FLAG_CN = {"low": "偏低", "high": "偏高", "critical": "危急"}
+
+
+@dataclass(frozen=True)
+class DiseaseMarkerView:
+    """Explicit report-facing view over disease-latent interpretation markers."""
+
+    active: bool
+    values: dict[str, Any]
+
+    def __getattr__(self, attr_name: str) -> Any:
+        if attr_name == "active":
+            return self.active
+        if attr_name in self.values:
+            return self.values[attr_name]
+        raise AttributeError(attr_name)
+
+
+@dataclass(frozen=True)
+class ExamReportInput:
+    """Normalized clinical input consumed by the report engine core."""
+
+    state: dict[str, Any]
+    disease: DiseaseMarkerView | None
+    sign_tags: list[str]
+    timestamp_s: float
+    total_blood_volume_ml: float
+    weight_kg: float
+    ecg_waveform_source: Any | None
 
 
 def _load_templates(reload: bool = False) -> dict[str, dict]:
@@ -50,6 +81,36 @@ def _load_templates(reload: bool = False) -> dict[str, dict]:
         raw = json.load(f)
     _TEMPLATES.update({k: v for k, v in raw.items() if not k.startswith("_")})
     return _TEMPLATES
+
+
+def get_allowed_exam_disease_markers(reload: bool = False) -> set[str]:
+    """Return the set of disease markers referenced by exam templates."""
+    global _ALLOWED_DISEASE_MARKERS
+    if _ALLOWED_DISEASE_MARKERS is not None and not reload:
+        return set(_ALLOWED_DISEASE_MARKERS)
+
+    templates = _load_templates(reload=reload)
+    refs: set[str] = set()
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "requires" and isinstance(value, str) and value.startswith("disease."):
+                    refs.add(value.split(".", 1)[1])
+                _walk(value)
+            return
+        if isinstance(node, list):
+            for value in node:
+                _walk(value)
+            return
+        if isinstance(node, str):
+            refs.update(
+                re.findall(r"disease\.([A-Za-z_][A-Za-z0-9_]*)", node)
+            )
+
+    _walk(templates)
+    _ALLOWED_DISEASE_MARKERS = refs
+    return set(refs)
 
 
 def get_template(test_type: str) -> dict:
@@ -74,86 +135,73 @@ def get_state(creature: VirtualCreature) -> dict:
     优先从 history 读取最新值（包含疾病模块修改后的结果），
     history 为空时回退到直接读取器官属性。
     """
-    hist = creature.history
+    return extract_clinical_state(creature)
 
-    def _last(key: str, fallback):
-        vals = hist.get(key, [])
-        return vals[-1] if vals else fallback
 
-    h = creature.heart
-    b = creature.blood
+def _build_disease_marker_view(creature: VirtualCreature) -> DiseaseMarkerView | None:
+    disease = getattr(creature, "disease", None)
+    if disease is None:
+        return None
 
-    hr = _last("HR_bpm", h.heart_rate)
-    pa_o2 = _last("art_PO2", b.arterial_PO2_mmHg)
-    pa_co2 = _last("art_PCO2", b.arterial_PCO2_mmHg)
-    sat = _last("saturation", b.arterial_saturation)
-    ph = _last("pH", b.arterial_pH)
-    gfr = _last("GFR", creature.kidney.GFR)
-    bun = _last("BUN", b.bun_mg_dL)
-    rr = _last("RR", creature.lung.respiratory_rate)
-    co = _last("CO_ml_min", h.cardiac_output)
-    map_val = _last("MAP_mmHg", h.mean_arterial_pressure)
-    cvp = _last("CVP_mmHg", h.central_venous_pressure)
-    bv = _last("blood_volume_ml", h.circulating_volume_ml)
-    ctr = _last("contractility_factor", h.contractility_factor)
-    urine = _last("urine_ml_min", creature.kidney.urine_output)
+    allowed_markers = get_allowed_exam_disease_markers()
+    values: dict[str, Any] = {}
+    state_vars = getattr(disease, "_state_vars", None)
+    if isinstance(state_vars, dict):
+        for attr_name in allowed_markers:
+            if attr_name in state_vars:
+                values[attr_name] = state_vars[attr_name]
 
-    state = {
-        "HR": hr,
-        "MAP": map_val,
-        "CVP": cvp,
-        "CO": co,
-        "RR": rr,
-        "SpO2": sat * 100,
-        "PaO2": pa_o2,
-        "PaCO2": pa_co2,
-        "pH": ph,
-        "GFR": gfr,
-        "BUN": bun,
-        "Na": b.sodium_mEq_L,
-        "K": b.potassium_mEq_L,
-        "Glu": b.glucose_mmol_L,
-        "Lactate": b.lactate_mmol_L,
-        "HCT": (b.red_cell_volume_ml / b.total_volume_ml) * 100,
-        "HCO3": creature.fluid.vascular_hco3_meq_l if hasattr(creature, 'fluid') else 24.0,
-        "Temp": b.core_temperature_C,
-        "BV": bv,
-        "contractility": ctr,
-        "Urine": urine,
-        "PT": _last("coag_PT", b.PT_sec),
-        "aPTT": _last("coag_aPTT", b.aPTT_sec),
-        "Fibrinogen": _last("coag_fibrinogen", b.fibrinogen_mg_dL),
-        "pain_level": creature.neuro.pain_level,
-    }
+    for attr_name in allowed_markers:
+        if attr_name in values:
+            continue
+        value = getattr(disease, attr_name, None)
+        if callable(value):
+            continue
+        if value is not None:
+            values[attr_name] = value
 
-    # Coagulation state
-    if hasattr(creature, 'coagulation') and creature.coagulation is not None:
-        state["coagulation_state"] = creature.coagulation.coagulation_state
+    return DiseaseMarkerView(
+        active=bool(getattr(disease, "active", False)),
+        values=values,
+    )
 
-    # HH 电生理数据（如果 heart 模块有 HH 集成）
-    if hasattr(creature.heart, 'hh') and creature.heart.hh is not None:
-        hh = creature.heart.hh
-        ecg_interp = hh.get_ecg_interpretation(b.potassium_mEq_L)
-        state["hh_heart_rate"] = round(hh.heart_rate, 1)
-        state["hh_k_toxicity"] = round(hh.k_toxicity_factor, 3)
-        state["hh_h_inf"] = round(hh._h_inf, 3)
-        state["hh_e_k"] = round(hh._nernst_k(b.potassium_mEq_L), 1)
-        # ECG 波形解读字段（供 extra_params 引用）
-        state["T波"] = ecg_interp.get("t_wave_amplitude", "normal")
-        state["QRS宽度"] = ecg_interp.get("qrs_width", "normal")
-        state["P波"] = ecg_interp.get("p_wave", "present")
-        state["K_toxicity_stage"] = ecg_interp.get("k_toxicity_stage", "none")
 
-        # Noble 浦肯野纤维数据
-        from src.noble_purkinje import NoblePurkinjeFiber
-        if isinstance(hh, NoblePurkinjeFiber):
-            av_interp = hh.get_av_interpretation(b.potassium_mEq_L)
-            state["PR间期"] = av_interp.get("pr_interval_ms", 80.0)
-            state["AV传导"] = av_interp.get("av_block_description", "normal_conduction")
-            state["传导速度"] = av_interp.get("conduction_velocity", 4.0)
-            state["逸搏心率"] = av_interp.get("purkinje_intrinsic_rate_bpm", 30.0)
+def _resolve_legacy_sign_tags(
+    creature: VirtualCreature,
+    sign_tags: Optional[list[str]],
+) -> list[str]:
+    if sign_tags is not None:
+        return list(sign_tags)
 
-    return state
+    signs_engine = getattr(creature, "clinical_signs_engine", None)
+    if signs_engine is None:
+        return []
+
+    return list(signs_engine.get_sign_tags())
+
+
+def _build_exam_report_input(
+    creature: VirtualCreature,
+    *,
+    state: Optional[dict] = None,
+    sign_tags: Optional[list[str]] = None,
+) -> ExamReportInput:
+    resolved_state = dict(state or get_state(creature))
+    resolved_state.setdefault("Cr", creature.blood.creatinine_mg_dL)
+    resolved_state.setdefault("Bilirubin", creature.blood.bilirubin_mg_dL)
+    resolved_state.setdefault("Ketone", creature.blood.ketone_mmol_L)
+    resolved_state.setdefault("PLT", creature.blood.PLT)
+    resolved_state.setdefault("WBC", getattr(creature.immune, "wbc_count", None))
+    resolved_state.setdefault("weight_kg", creature.w)
+    return ExamReportInput(
+        state=resolved_state,
+        disease=_build_disease_marker_view(creature),
+        sign_tags=_resolve_legacy_sign_tags(creature, sign_tags),
+        timestamp_s=float(creature.current_time_s),
+        total_blood_volume_ml=float(creature.blood.total_volume_ml),
+        weight_kg=float(creature.w),
+        ecg_waveform_source=getattr(creature.heart, "hh", None),
+    )
 
 
 def flag(value: float, param: str) -> str:
@@ -191,7 +239,7 @@ def _build_report(
     results: list,
     summary: str,
     tags: list[str],
-    creature: VirtualCreature,
+    report_input: ExamReportInput,
     **extra,
 ) -> dict:
     """组装标准化报告 dict。"""
@@ -201,7 +249,7 @@ def _build_report(
         "results": results,
         "tags": tags,
         "summary": summary,
-        "timestamp_s": creature.current_time_s,
+        "timestamp_s": report_input.timestamp_s,
     }
     report.update(extra)
     return report
@@ -212,30 +260,23 @@ def _build_report(
 # ──────────────────────────────────────────────
 
 
-def _resolve_extra_param(param_cfg: dict, state: dict, ctx: dict[str, Any], creature) -> Any:
+def _resolve_extra_param(
+    param_cfg: dict,
+    state: dict,
+    ctx: dict[str, Any],
+) -> Any:
     """
     根据 extra_params 配置解析参数值。
 
     支持来源:
-      1. source = "creature.xxx.yyy" — 从 creature 对象属性读取
-      2. source = "hardcoded" + default_value — 固定值
-      3. source = "computed" + formula/value_formula — 用 ctx 变量计算公式
-      4. source = "state.xxx" — 从 state 字典读取
-      5. 无 source 但 param 在 state 中 — 自动从 state 读取
+      1. source = "hardcoded" + default_value — 固定值
+      2. source = "computed" + formula/value_formula — 用 ctx 变量计算公式
+      3. source = "state.xxx" — 从 state 字典读取
+      4. 无 source 但 param 在 state 中 — 自动从 state 读取
 
     返回值可以是 float 或 str（当 is_text_result=True 时）。
     """
     source = param_cfg.get("source", "")
-
-    # 来源: creature 属性路径
-    if source.startswith("creature."):
-        parts = source.split(".")
-        obj = creature
-        for part in parts[1:]:
-            if obj is None:
-                return param_cfg.get("default_value", 0.0)
-            obj = getattr(obj, part, None)
-        return obj if obj is not None else param_cfg.get("default_value", 0.0)
 
     # 来源: state 字典
     if source.startswith("state."):
@@ -304,13 +345,9 @@ def _eval_formula(formula: str, ctx: dict[str, Any], fallback: float = 0.0) -> A
         disease = ctx.get("disease")
         if disease is not None:
             safe_ns["disease"] = disease
-        # 注入 creature
-        creature = ctx.get("creature")
-        if creature is not None:
-            safe_ns["creature"] = creature
         # 注入其他 ctx 顶层变量
         for k, v in ctx.items():
-            if k not in ("thresholds", "state", "disease", "creature"):
+            if k not in ("thresholds", "state", "disease"):
                 safe_ns[k] = v
         result = eval(formula, safe_ns)  # noqa: S307
         return result
@@ -327,7 +364,6 @@ def _build_quantitative_results(
     meta: dict,
     state: dict,
     ctx: dict[str, Any],
-    creature,
 ) -> list[dict]:
     """
     从 vitals + extra_params 构建定量结果列表。
@@ -350,7 +386,7 @@ def _build_quantitative_results(
         if not param_name:
             continue
 
-        value = _resolve_extra_param(param_cfg, state, ctx, creature)
+        value = _resolve_extra_param(param_cfg, state, ctx)
 
         # 确定 flag
         normal_range = param_cfg.get("normal_range", "")
@@ -425,7 +461,6 @@ def _build_narrative_results(
     meta: dict,
     state: dict,
     ctx: dict[str, Any],
-    creature,
 ) -> tuple[list[str], str]:
     """
     从 findings_rules 构建叙述性结果。
@@ -433,7 +468,7 @@ def _build_narrative_results(
     返回: (findings_list, summary)
     """
     fr = meta.get("findings_rules", {})
-    rule_output = _apply_findings_rules(fr, ctx, creature.disease)
+    rule_output = _apply_findings_rules(fr, ctx, ctx.get("disease"))
     findings = _collect_findings(rule_output)
     summary = "；".join(findings) + "。" if findings else f"{meta['name']}未见明显异常。"
     return findings, summary
@@ -475,22 +510,12 @@ def _resolve_value(expr: str, ctx: dict[str, Any]) -> Any:
       - "thresholds.hr_tachy"  ->  ctx["thresholds"]["hr_tachy"]
       - "disease.alveolar_exudate"  ->  getattr(ctx["disease"], "alveolar_exudate")
       - "bv_ratio"       ->  ctx["bv_ratio"]
-      - "creature.blood.creatinine_mg_dL"  ->  ctx["creature"].blood.creatinine_mg_dL
       - 纯数字如 "140"   ->  float(140)
     """
     try:
         return float(expr)
     except ValueError:
         pass
-
-    if expr.startswith("creature."):
-        parts = expr.split(".")
-        obj = ctx.get("creature")
-        for part in parts[1:]:
-            if obj is None:
-                return None
-            obj = getattr(obj, part, None)
-        return obj
 
     if expr.startswith("disease."):
         parts = expr.split(".", 1)
@@ -505,7 +530,10 @@ def _resolve_value(expr: str, ctx: dict[str, Any]) -> Any:
         if obj is None:
             return None
         if isinstance(obj, dict):
-            return obj.get(attr_name)
+            value = obj.get(attr_name)
+            if obj_name == "thresholds" and isinstance(value, str):
+                return _eval_formula(value, ctx, fallback=value)
+            return value
         return getattr(obj, attr_name, None)
 
     return ctx.get(expr)
@@ -568,6 +596,8 @@ def _has_disease_attr(disease, attr_name: str) -> bool:
     """检查疾病对象是否有指定属性。"""
     if disease is None:
         return False
+    if isinstance(disease, DiseaseMarkerView):
+        return attr_name in disease.values
     return hasattr(disease, attr_name)
 
 
@@ -716,22 +746,27 @@ def _collect_findings(rule_output: dict[str, list[str]]) -> list[str]:
 # ──────────────────────────────────────────────
 
 
-def _build_ctx(meta: dict, state: dict, creature) -> dict[str, Any]:
+def _build_ctx(meta: dict, report_input: ExamReportInput) -> dict[str, Any]:
     """构建规则引擎的上下文。"""
+    return _build_ctx_with_sign_tags(meta, report_input)
+
+
+def _build_ctx_with_sign_tags(
+    meta: dict,
+    report_input: ExamReportInput,
+) -> dict[str, Any]:
+    """构建规则引擎上下文。"""
+    state = report_input.state
     ctx: dict[str, Any] = {
         "state": state,
         "thresholds": meta.get("thresholds", {}),
-        "disease": creature.disease,
-        "creature": creature,
+        "disease": report_input.disease,
+        "weight_kg": report_input.weight_kg,
     }
     # 计算 bv_ratio（多个检查类型需要）
-    total_bv = creature.blood.total_volume_ml
+    total_bv = report_input.total_blood_volume_ml
     ctx["bv_ratio"] = state["BV"] / total_bv if total_bv > 0 else 1.0
-    # 注入 ClinicalSignsEngine 产生的 sign_tags（症状层线索）
-    if hasattr(creature, "clinical_signs_engine"):
-        ctx["sign_tags"] = creature.clinical_signs_engine.get_sign_tags()
-    else:
-        ctx["sign_tags"] = []
+    ctx["sign_tags"] = list(report_input.sign_tags)
     return ctx
 
 
@@ -753,27 +788,35 @@ def _is_narrative(meta: dict) -> bool:
     return False
 
 
-def _generate_narrative_report(meta: dict, state: dict, creature: VirtualCreature) -> dict:
+def _generate_narrative_report(
+    meta: dict,
+    report_input: ExamReportInput,
+) -> dict:
     """生成叙述性检查报告（纯 findings_rules 驱动）。"""
-    ctx = _build_ctx(meta, state, creature)
+    state = report_input.state
+    ctx = _build_ctx_with_sign_tags(meta, report_input)
 
-    findings, summary = _build_narrative_results(meta, state, ctx, creature)
-    tags = _apply_tag_rules(meta.get("tag_rules", []), ctx, creature.disease)
+    findings, summary = _build_narrative_results(meta, state, ctx)
+    tags = _apply_tag_rules(meta.get("tag_rules", []), ctx, report_input.disease)
 
-    return _build_report(meta, findings, summary, tags, creature)
+    return _build_report(meta, findings, summary, tags, report_input)
 
 
-def _generate_quantitative_report(meta: dict, state: dict, creature: VirtualCreature) -> dict:
+def _generate_quantitative_report(
+    meta: dict,
+    report_input: ExamReportInput,
+) -> dict:
     """生成定量检查报告（vitals + extra_params 驱动）。"""
-    ctx = _build_ctx(meta, state, creature)
+    state = report_input.state
+    ctx = _build_ctx_with_sign_tags(meta, report_input)
 
-    results = _build_quantitative_results(meta, state, ctx, creature)
+    results = _build_quantitative_results(meta, state, ctx)
 
     # 检查是否有 findings_rules 需要额外处理（如 blood_gas 的酸碱类型）
     extra_parts: list[str] = []
     fr = meta.get("findings_rules", {})
     if fr:
-        rule_output = _apply_findings_rules(fr, ctx, creature.disease)
+        rule_output = _apply_findings_rules(fr, ctx, report_input.disease)
         # 特殊处理: acidosis_type / alkalosis_type 追加到 summary
         if "acidosis_type" in rule_output:
             extra_parts.append(f"提示{rule_output['acidosis_type'][0]}")
@@ -807,7 +850,7 @@ def _generate_quantitative_report(meta: dict, state: dict, creature: VirtualCrea
     summary = _summarize_quantitative(meta, results, extra_parts)
 
     # Tags: 从 tag_rules 生成（优先），fallback 到 tags_from_results
-    tags = _apply_tag_rules(meta.get("tag_rules", []), ctx, creature.disease)
+    tags = _apply_tag_rules(meta.get("tag_rules", []), ctx, report_input.disease)
     if not tags:
         tags = tags_from_results(results)
 
@@ -824,30 +867,35 @@ def _generate_quantitative_report(meta: dict, state: dict, creature: VirtualCrea
                 tags.append(clue)
 
         # 注入 ECG 波形数据（如果 HH 模块可用）
-        if hasattr(creature.heart, 'hh') and creature.heart.hh is not None:
-            ecg_waveform = creature.heart.hh.get_ecg_waveform(duration_ms=2000.0, dt=0.01)
-            return _build_report(meta, results, summary, tags, creature,
+        hh = report_input.ecg_waveform_source
+        if hh is not None:
+            ecg_waveform = hh.get_ecg_waveform(duration_ms=2000.0, dt=0.01)
+            return _build_report(meta, results, summary, tags, report_input,
                                  ecg_waveform=ecg_waveform)
 
-    return _build_report(meta, results, summary, tags, creature)
+    return _build_report(meta, results, summary, tags, report_input)
 
 
-def _generate_mixed_report(meta: dict, state: dict, creature: VirtualCreature) -> dict:
+def _generate_mixed_report(
+    meta: dict,
+    report_input: ExamReportInput,
+) -> dict:
     """
     生成混合类型报告（定量 + 叙述性 findings_rules）。
     用于 blood_gas（定量参数 + 酸碱类型判断）、physical（定量 + 精神状态）等。
     """
-    ctx = _build_ctx(meta, state, creature)
+    state = report_input.state
+    ctx = _build_ctx_with_sign_tags(meta, report_input)
 
     # 先生成定量结果
-    results = _build_quantitative_results(meta, state, ctx, creature)
+    results = _build_quantitative_results(meta, state, ctx)
 
     # 再处理 findings_rules（如酸碱类型、精神状态等）
     extra_parts: list[str] = []
     extra_keys: dict[str, Any] = {}
     fr = meta.get("findings_rules", {})
     if fr:
-        rule_output = _apply_findings_rules(fr, ctx, creature.disease)
+        rule_output = _apply_findings_rules(fr, ctx, report_input.disease)
         # 收集所有 findings 作为 extra summary parts
         all_findings = _collect_findings(rule_output)
         if all_findings:
@@ -858,11 +906,11 @@ def _generate_mixed_report(meta: dict, state: dict, creature: VirtualCreature) -
 
     summary = _summarize_quantitative(meta, results, extra_parts)
 
-    tags = _apply_tag_rules(meta.get("tag_rules", []), ctx, creature.disease)
+    tags = _apply_tag_rules(meta.get("tag_rules", []), ctx, report_input.disease)
     if not tags:
         tags = tags_from_results(results)
 
-    return _build_report(meta, results, summary, tags, creature, **extra_keys)
+    return _build_report(meta, results, summary, tags, report_input, **extra_keys)
 
 
 # ──────────────────────────────────────────────
@@ -870,7 +918,12 @@ def _generate_mixed_report(meta: dict, state: dict, creature: VirtualCreature) -
 # ──────────────────────────────────────────────
 
 
-def generate_report(test_type: str, creature: VirtualCreature) -> dict:
+def generate_report(
+    test_type: str,
+    creature: VirtualCreature,
+    state: Optional[dict] = None,
+    sign_tags: Optional[list[str]] = None,
+) -> dict:
     """
     根据检查类型返回对应的检查报告。
 
@@ -886,8 +939,18 @@ def generate_report(test_type: str, creature: VirtualCreature) -> dict:
     """
     _load_templates()
     meta = get_template(test_type)
-    state = get_state(creature)
-    logger.debug("generate_report(%s): HR=%.0f PaO2=%.1f", test_type, state["HR"], state["PaO2"])
+    report_input = _build_exam_report_input(
+        creature,
+        state=state,
+        sign_tags=sign_tags,
+    )
+    engine_state = report_input.state
+    logger.debug(
+        "generate_report(%s): HR=%.0f PaO2=%.1f",
+        test_type,
+        engine_state["HR"],
+        engine_state["PaO2"],
+    )
 
     has_findings = bool(meta.get("findings_rules"))
     has_vitals = bool(meta.get("vitals"))
@@ -895,11 +958,11 @@ def generate_report(test_type: str, creature: VirtualCreature) -> dict:
 
     # 纯叙述性: 有 findings_rules，无 vitals，无 extra_params
     if has_findings and not has_vitals and not has_extra:
-        return _generate_narrative_report(meta, state, creature)
+        return _generate_narrative_report(meta, report_input)
 
     # 混合类型: 有 findings_rules 且有 vitals/extra_params
     if has_findings and (has_vitals or has_extra):
-        return _generate_mixed_report(meta, state, creature)
+        return _generate_mixed_report(meta, report_input)
 
     # 纯定量: 有 vitals/extra_params，无 findings_rules
-    return _generate_quantitative_report(meta, state, creature)
+    return _generate_quantitative_report(meta, report_input)

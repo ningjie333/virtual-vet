@@ -12,8 +12,8 @@ import json
 import random
 from typing import Optional
 
-from src.simulation import VirtualCreature
 from src.diseases import list_diseases, create_disease
+from src.presentation_state import PresentationRequest, build_presented_engine
 from game.action_system import GameState
 
 logger = logging.getLogger(__name__)
@@ -78,16 +78,20 @@ def _pick_disease(difficulty: str, rng: random.Random) -> tuple[str, object]:
     return disease_name, disease
 
 
-def _init_engine(weight_kg: float, disease, rng: random.Random) -> VirtualCreature:
+def _init_engine(weight_kg: float, disease, rng: random.Random):
     """
     创建引擎，附着疾病，让疾病发展一段时间（模拟就诊前病程）。
     发展期 5-30 分钟，重度疾病发展更长。
     """
-    engine = VirtualCreature(body_weight_kg=weight_kg)
-    engine.attach_disease(disease)
-
     pre_visit_min = rng.uniform(5, 30)
-    engine.simulate(pre_visit_min)
+    engine = build_presented_engine(
+        request=PresentationRequest(
+            disease_name=disease.name,
+            disease=disease,
+            weight_kg=weight_kg,
+            history_duration_min=pre_visit_min,
+        )
+    )
 
     logger.info(
         "引擎初始化: weight=%.1fkg, 疾病发展 %.1f min, HR=%.0f, SpO2=%.1f%%",

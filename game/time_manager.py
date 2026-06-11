@@ -5,7 +5,7 @@ Time Manager — 动态时间管理系统（v2：分钟级推进）
   - 游戏内时钟：跟踪游戏内时间（08:00 开始）
   - 夜间检测：22:00-06:00 为夜间
   - 夜间生理修正：HR 降低、代谢率降低
-  - 疾病进展速度修正：夜间略慢
+  - 兼容性场景策略辅助：保留夜间 pacing 因子查询接口
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ MINUTES_PER_HOUR = 60
 # ── 夜间修正因子 ────────────────────────────────────────────────────────────
 
 NIGHT_HR_FACTOR = 0.85       # 夜间 HR 降低 15%（生理性心动过缓）
-NIGHT_PROGRESSION_FACTOR = 0.8  # 夜间疾病进展减慢 20%（代谢率降低）
+NIGHT_PROGRESSION_FACTOR = 0.8  # Legacy scenario-policy helper; not a kernel disease-rate control.
 
 
 def game_time_to_hour(game_time_min: float) -> float:
@@ -73,16 +73,18 @@ def get_night_hr_factor(game_time_min: float) -> float:
 
 def get_night_progression_factor(game_time_min: float) -> float:
     """
-    获取夜间疾病进展速度修正因子
+    Legacy compatibility helper for scenario-layer pacing policy.
 
-    夜间：0.8（进展减慢 20%）
-    白天：1.0（正常速度）
+    Important:
+    - this is not a kernel biological time multiplier
+    - it must not be interpreted as permission to rescale disease equations
+    - current kernel progression remains defined in physical time
 
     Args:
         game_time_min: 游戏内经过的分钟数
 
     Returns:
-        疾病进展速度乘数因子
+        外层策略因子
     """
     if is_night_time(game_time_min):
         return NIGHT_PROGRESSION_FACTOR

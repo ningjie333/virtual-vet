@@ -4,8 +4,12 @@ Action System — 玩家行动处理系统（v2：时间预算版）。
 职责:
   - GameState 数据类：承载整个游戏状态（含时间预算、待出报告）
   - process_action()：处理玩家行动（检查/治疗/等待），推进游戏时间
-  - determine_phase()：基于引擎数值自动判定病情阶段
   - check_death()：濒死倒计时 + 死亡判定
+
+兼容性说明:
+  - `determine_phase()` 和 `_engine_summary()` 为 legacy compatibility API
+  - 新代码应优先通过 `GameRuntime.advance_and_refresh(...)` 与
+    `GameRuntime.interpreter` 获取临床 phase / summary / report
 
 时间系统（v2）:
   - 删除 AP 系统，改用真实时间预算（分钟）
@@ -23,13 +27,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from game.runtime import GameRuntime, default_runtime
+from src.clinical_interpreter import DefaultClinicalInterpreter
 from src.simulation import VirtualCreature
 from src.parameters import base_cardiac_output_ml_min, ARTERIAL_SATURATION_NORMAL, LUNG_DIFFUSION_COEFFICIENT
 from src.exam_registry import get_exam_registry
 from game.time_manager import (
     is_night_time,
     get_night_hr_factor,
-    get_night_progression_factor,
     format_game_time,
 )
 
@@ -94,6 +99,7 @@ _LACTATE_CRIT = _PT["lactate"]["critical"]
 
 _URINE_OLIGURIA = _PT["urine"]["oliguria"]
 _URINE_ANURIA = _PT["urine"]["anuria"]
+_COMPAT_INTERPRETER = DefaultClinicalInterpreter()
 
 
 def _get_exam_config(test_type: str) -> tuple[int, int, int]:
@@ -157,126 +163,13 @@ def compute_DO2(engine: VirtualCreature) -> float:
 
 def determine_phase(engine: VirtualCreature) -> str:
     """
-    根据引擎当前状态判定病情阶段。
+    Legacy compatibility API.
 
-    综合评分:
-    1. 传统阈值（MAP/SpO2/HR/pH）
-    2. DO₂ 氧输送指数
-    3. 乳酸
-    4. 尿量
-
-    返回: "stable" | "worsening" | "critical" | "moribund"
+    新代码应通过 `runtime.interpreter.phase(runtime.interpreter.snapshot(engine))`
+    获取医学阶段。此函数保留仅用于兼容旧调用点和现有测试。
     """
-    hist = engine.history
-
-    def _last(key: str, fallback):
-        vals = hist.get(key, [])
-        return vals[-1] if vals else fallback
-
-    map_val = _last("MAP_mmHg", engine.heart.mean_arterial_pressure)
-    hr = _last("HR_bpm", engine.heart.heart_rate)
-    sp_o2 = _last("saturation", engine.blood.arterial_saturation) * 100
-    ph = _last("pH", engine.blood.arterial_pH)
-    do2 = compute_DO2(engine)
-    lactate = engine.blood.lactate_mmol_L
-    urine_output = _last("urine_ml_min", engine.kidney.urine_output)
-    bw_kg = engine.w
-    urine_per_kg = urine_output / bw_kg if bw_kg > 0 else 0.0
-
-    def _score(value, param):
-        lo_mor, lo_crit, lo_warn, hi_warn, hi_crit, hi_mor = _THRESHOLDS[param]
-        if value <= lo_mor or value >= hi_mor:
-            return 3
-        if value <= lo_crit or value >= hi_crit:
-            return 2
-        if value <= lo_warn or value >= hi_warn:
-            return 1
-        return 0
-
-    threshold_score = max(
-        _score(map_val, "MAP"),
-        _score(sp_o2, "SpO2"),
-        _score(hr, "HR"),
-        _score(ph, "pH"),
-    )
-
-    # A-a 梯度评分：肺扩散能力受损的真实指标（SpO2 在 Hill 曲线平坦区会掩盖损伤）
-    dc = engine.lung.diffusion_coefficient
-    aa_gradient = 10.0 + (1.0 - dc / LUNG_DIFFUSION_COEFFICIENT) * 30.0
-    if aa_gradient >= 45:
-        aa_score = 3
-    elif aa_gradient >= 35:
-        aa_score = 2
-    elif aa_gradient >= 25:
-        aa_score = 1
-    else:
-        aa_score = 0
-
-    # 疾病状态变量评分：直接衡量器官损伤程度
-    disease_score = 0
-    if engine.disease and engine.disease.active:
-        sv = engine.disease._state_vars
-        _DAMAGE_VARS = {
-            "alveolar_exudate": (0.5, 0.75, 0.9),
-            "tissue_hypoxia": (0.4, 0.6, 0.85),
-            "renal_injury": (0.3, 0.6, 0.85),
-            "myocardial_depression": (0.3, 0.6, 0.85),
-            "nephron_damage": (0.3, 0.6, 0.85),
-            "gfr_decline": (0.3, 0.6, 0.85),
-        }
-        for var_name, (w, c, m) in _DAMAGE_VARS.items():
-            val = sv.get(var_name, 0.0)
-            if val >= m:
-                disease_score = max(disease_score, 3)
-            elif val >= c:
-                disease_score = max(disease_score, 2)
-            elif val >= w:
-                disease_score = max(disease_score, 1)
-
-    threshold_score = max(threshold_score, aa_score, disease_score)
-
-    if do2 <= _DO2_MORIB:
-        do2_score = 3
-    elif do2 <= _DO2_CRIT:
-        do2_score = 2
-    elif do2 <= _DO2_WARN:
-        do2_score = 1
-    else:
-        do2_score = 0
-
-    if lactate >= _LACTATE_CRIT:
-        lactate_score = 2
-    elif lactate >= _LACTATE_WARN:
-        lactate_score = 1
-    else:
-        lactate_score = 0
-
-    if urine_per_kg < _URINE_ANURIA:
-        urine_score = 3
-    elif urine_per_kg < _URINE_OLIGURIA:
-        urine_score = 2
-    else:
-        urine_score = 0
-
-    if threshold_score >= 3 or do2_score >= 3 or urine_score >= 3:
-        return "moribund"
-
-    if hr < 60 and urine_per_kg < _URINE_ANURIA:
-        return "moribund"
-
-    crit_count = sum([
-        threshold_score >= 2,
-        do2_score >= 2,
-        lactate_score >= 2,
-        urine_score >= 2,
-    ])
-    if crit_count >= 2 or do2_score >= 2:
-        return "critical"
-
-    if threshold_score >= 1 or do2_score >= 1 or lactate_score >= 1 or urine_score >= 1:
-        return "worsening"
-
-    return "stable"
+    snapshot = _COMPAT_INTERPRETER.snapshot(engine)
+    return _COMPAT_INTERPRETER.phase(snapshot)
 
 
 def check_death(state: GameState, medical_phase: str) -> GameState:
@@ -300,25 +193,13 @@ def check_death(state: GameState, medical_phase: str) -> GameState:
 
 
 def _engine_summary(engine: VirtualCreature, elapsed_min: int = 0) -> dict:
-    """返回引擎当前状态的简要摘要。"""
-    hist = engine.history
+    """
+    Legacy compatibility API.
 
-    def _last(key: str, fallback):
-        vals = hist.get(key, [])
-        return vals[-1] if vals else fallback
-
-    return {
-        "HR_bpm": round(_last("HR_bpm", engine.heart.heart_rate), 1),
-        "MAP_mmHg": round(_last("MAP_mmHg", engine.heart.mean_arterial_pressure), 1),
-        "SpO2": round(_last("saturation", engine.blood.arterial_saturation) * 100, 1),
-        "art_PO2": round(_last("art_PO2", engine.blood.arterial_PO2_mmHg), 1),
-        "art_PCO2": round(_last("art_PCO2", engine.blood.arterial_PCO2_mmHg), 1),
-        "pH": round(_last("pH", engine.blood.arterial_pH), 3),
-        "GFR": round(_last("GFR", engine.kidney.GFR), 1),
-        "RR": round(_last("RR", engine.lung.respiratory_rate), 1),
-        "game_time": format_game_time(elapsed_min),
-        "is_night": is_night_time(elapsed_min),
-    }
+    新代码应通过 `runtime.interpreter.summary(...)` 获取临床摘要。
+    """
+    snapshot = _COMPAT_INTERPRETER.snapshot(engine)
+    return _COMPAT_INTERPRETER.summary(snapshot, elapsed_min)
 
 
 def _process_pending_reports(state: GameState, elapsed_min: int) -> list[dict]:
@@ -339,6 +220,22 @@ def _process_pending_reports(state: GameState, elapsed_min: int) -> list[dict]:
             still_pending.append(pr)
     state.pending_reports = still_pending
     return newly_available
+
+
+def _annotate_report_timing(
+    report: dict,
+    *,
+    observed_at_s: float,
+    report_basis: str,
+    available_after_min: int = 0,
+) -> dict:
+    """Attach explicit timing semantics to an exam report payload."""
+    report["timestamp_s"] = observed_at_s  # legacy field
+    report["observed_at_s"] = observed_at_s
+    report["report_basis"] = report_basis
+    report["available_after_min"] = available_after_min
+    report["available_at_s"] = observed_at_s + (available_after_min * 60.0)
+    return report
 
 
 def _apply_night_modifiers(state: GameState) -> None:
@@ -375,7 +272,12 @@ def _apply_night_modifiers(state: GameState) -> None:
     )
 
 
-def process_action(state: GameState, action_type: str, params: dict = None) -> dict:
+def process_action(
+    state: GameState,
+    action_type: str,
+    params: dict = None,
+    runtime: Optional[GameRuntime] = None,
+) -> dict:
     """
     处理一次玩家行动（v2：时间预算版）。
 
@@ -397,7 +299,11 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
             "engine_summary": dict,
         }
     """
+    runtime = runtime or default_runtime()
+    interpreter = runtime.interpreter
+
     if state.phase in ("won", "lost"):
+        snapshot = interpreter.snapshot(state.engine)
         return {
             "success": False,
             "time_cost_min": 0,
@@ -407,20 +313,25 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
             "new_reports": [],
             "pending_count": len(state.pending_reports),
             "phase": state.phase,
-            "medical_phase": determine_phase(state.engine),
-            "engine_summary": _engine_summary(state.engine, state.time_elapsed_min),
+            "medical_phase": interpreter.phase(snapshot),
+            "engine_summary": interpreter.summary(snapshot, state.time_elapsed_min),
         }
 
     params = params or {}
     result = None
     time_cost = 0
+    action_started_at_s = float(state.engine.current_time_s)
 
     if action_type == "examine":
         test_type = params.get("test_type", "physical")
         time_cost, tier, latency_min = _get_exam_config(test_type)
-
-        from game.test_translator import translate
-        report = translate(test_type, state.engine)
+        report = interpreter.report(test_type, state.engine)
+        report = _annotate_report_timing(
+            report,
+            observed_at_s=action_started_at_s,
+            report_basis="pre_advance",
+            available_after_min=latency_min,
+        )
 
         # 延迟报告处理
         if latency_min > 0:
@@ -465,6 +376,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
             logger.info("给药 %s (%.2f mg/kg)", drug_name, dose_mg_kg)
         except KeyError:
             logger.warning("未知药物: %s", drug_name)
+            snapshot = interpreter.snapshot(state.engine)
             return {
                 "success": False,
                 "time_cost_min": 0,
@@ -474,8 +386,8 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
                 "new_reports": [],
                 "pending_count": len(state.pending_reports),
                 "phase": state.phase,
-                "medical_phase": determine_phase(state.engine),
-                "engine_summary": _engine_summary(state.engine, state.time_elapsed_min),
+                "medical_phase": interpreter.phase(snapshot),
+                "engine_summary": interpreter.summary(snapshot, state.time_elapsed_min),
                 "error": f"未知药物: {drug_name}",
             }
         time_cost = 5  # 给药操作消耗5分钟
@@ -486,6 +398,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
 
     else:
         logger.warning("未知行动类型: %s", action_type)
+        snapshot = interpreter.snapshot(state.engine)
         return {
             "success": False,
             "time_cost_min": 0,
@@ -495,15 +408,15 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
             "new_reports": [],
             "pending_count": len(state.pending_reports),
             "phase": state.phase,
-            "medical_phase": determine_phase(state.engine),
-            "engine_summary": _engine_summary(state.engine, state.time_elapsed_min),
+            "medical_phase": interpreter.phase(snapshot),
+            "engine_summary": interpreter.summary(snapshot, state.time_elapsed_min),
         }
 
     # ── 推进游戏时间 ──
     state.time_elapsed_min += time_cost
 
-    # ── 推进引擎模拟（按消耗的分钟数）──
-    state.engine.simulate(float(time_cost))
+    # ── 推进引擎模拟并刷新解释状态（按消耗的分钟数）──
+    runtime.advance_and_refresh(state.engine, float(time_cost))
 
     # ── 处理延迟报告（时间流逝后检查是否有报告到期）──
     new_reports = _process_pending_reports(state, time_cost)
@@ -512,7 +425,8 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
     _apply_night_modifiers(state)
 
     # ── 阶段判定 ──
-    medical_phase = determine_phase(state.engine)
+    snapshot = interpreter.snapshot(state.engine)
+    medical_phase = interpreter.phase(snapshot)
 
     # ── 死亡检测 ──
     check_death(state, medical_phase)
@@ -522,7 +436,7 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
         state.phase = "lost"
         logger.info("时间耗尽，患犬未能得到及时诊治")
 
-    engine_summary = _engine_summary(state.engine, state.time_elapsed_min)
+    engine_summary = interpreter.summary(snapshot, state.time_elapsed_min)
 
     logger.info(
         "完成: phase=%s, 已用时间=%d/%d min, HR=%.0f, MAP=%.0f",
@@ -538,6 +452,8 @@ def process_action(state: GameState, action_type: str, params: dict = None) -> d
         "time_cost_min": time_cost,
         "time_elapsed_min": state.time_elapsed_min,
         "time_remaining_min": state.time_remaining_min,
+        "action_started_at_s": action_started_at_s,
+        "state_time_s": float(state.engine.current_time_s),
         "result": result,
         "new_reports": new_reports,
         "pending_count": len(state.pending_reports),

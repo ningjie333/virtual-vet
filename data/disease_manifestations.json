@@ -1,0 +1,270 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Disease-to-manifestation mapping: each disease lists observable clinical signs it can produce, grouped by body system. Used by diagnosis engine to match patient findings to likely diseases.",
+    "source": "Expert clinical literature review 2026-06-07"
+  },
+  "diseases": {
+    "pneumonia": {
+      "display_name": "肺炎",
+      "species": ["dog", "cat"],
+      "systems": {
+        "全身": ["lethargy", "weakness", "anorexia", "fever", "depression"],
+        "呼吸系统": ["polypnea", "dyspnea", "cough", "crackles", "wheezing", "cyanosis", "open_mouth_breathing", "hemoptysis"],
+        "心血管系统": ["tachycardia"],
+        "消化系统": ["vomiting"]
+      },
+      "key_signs": ["cough", "crackles", "polypnea", "dyspnea"],
+      "differential_diagnosis": ["heart_failure_pulmonary_edema", "bronchitis", "tracheal_collapse", "acute_respiratory_distress_syndrome"]
+    },
+    "acute_renal_failure": {
+      "display_name": "急性肾损伤",
+      "species": ["dog", "cat"],
+      "systems": {
+        "全身": ["lethargy", "weakness", "depression", "anorexia", "collapse", "hypothermia"],
+        "心血管系统": ["bradycardia", "tachycardia", "arrhythmia", "weak_pulses", "hypotension"],
+        "消化系统": ["vomiting", "diarrhea", "oral_ulcers", "halitosis", "halitosis_uremic", "bleeding_gums"],
+        "泌尿系统": ["oliguria", "anuria", "urinary_retention"],
+        "血液系统": ["pale_mucous_membranes", "bleeding_gums"],
+        "神经系统": ["seizure", "consciousness_decreased", "tremor"]
+      },
+      "key_signs": ["anuria", "oliguria", "vomiting", "halitosis_uremic", "bradycardia"],
+      "differential_diagnosis": ["chronic_renal_failure", "dehydration", "urinary_obstruction", "pyelonephritis", "nephrotoxic_poisoning"]
+    },
+    "dilated_cardiomyopathy": {
+      "display_name": "扩张型心肌病",
+      "species": ["dog"],
+      "systems": {
+        "全身": ["weakness", "lethargy", "exercise_intolerance", "collapse", "depression"],
+        "心血管系统": ["tachycardia", "bradycardia", "arrhythmia", "gallop_rhythm", "heart_murmur", "weak_pulses", "hypotension", "syncope", "pulsus_paradoxus"],
+        "呼吸系统": ["polypnea", "dyspnea", "orthopnea", "crackles", "cough"],
+        "消化系统": ["vomiting", "anorexia", "abdominal_distension", "ascites", "diarrhea", "hepatomegaly"],
+        "泌尿系统": ["oliguria"]
+      },
+      "key_signs": ["gallop_rhythm", "heart_murmur", "weak_pulses", "orthopnea", "ascites"],
+      "differential_diagnosis": ["mitral_valve_degeneraton", "heartworm_disease", "cor_pulmonale", "arrhythmogenic_right_ventricular_cardiomyopathy", "thyrotoxic_cardiomyopathy"]
+    },
+    "phosphorus_poisoning": {
+      "display_name": "磷中毒",
+      "species": ["dog", "cat"],
+      "systems": {
+        "全身": ["weakness", "lethargy", "tremor", "collapse", "hypothermia", "depression", "tachycardia"],
+        "心血管系统": ["arrhythmia", "weak_pulses", "hypotension", "bradycardia", "tachycardia"],
+        "消化系统": ["vomiting", "diarrhea", "hypersalivation", "halitosis", "abdominal_pain"],
+        "泌尿系统": ["oliguria", "anuria"],
+        "血液系统": ["hemoglobinuria"],
+        "神经系统": ["seizure", "tremor"]
+      },
+      "key_signs": ["tremor", "arrhythmia", "vomiting", "weakness", "hypothermia"],
+      "differential_diagnosis": ["organophosphate_poisoning", "arsenic_poisoning", "sepsis", "hypoglycemia", "renal_failure"]
+    },
+    "gastric_dilatation_volvulus": {
+      "display_name": "胃扩张-扭转 GDV",
+      "species": ["dog"],
+      "systems": {
+        "全身": ["weakness", "collapse", "tachycardia", "hypothermia", "shock", "depression", "pain"],
+        "心血管系统": ["arrhythmia", "weak_pulses", "hypotension"],
+        "消化系统": ["vomiting", "abdominal_distension", "gastric_retention", "abdominal_pain", "absent_bowel_sounds", "hematemesis", "weak_pulses"],
+        "呼吸系统": ["dyspnea", "polypnea"]
+      },
+      "key_signs": ["abdominal_distension", "gastric_retention", "vomiting", "weakness", "shock"],
+      "differential_diagnosis": ["simple_gastric_dilatation", "intestinal_obstruction", "peritonitis", "splenic_torsion", "acute_pancreatitis"]
+    },
+    "immune_mediated_hemolytic_anemia": {
+      "display_name": "免疫介导性溶血性贫血",
+      "species": ["dog", "cat"],
+      "systems": {
+        "全身": ["weakness", "lethargy", "collapse", "tachycardia", "exercise_intolerance", "depression"],
+        "心血管系统": ["heart_murmur", "weak_pulses", "tachycardia"],
+        "血液系统": ["pale_mucous_membranes", "icterus", "hemoglobinuria", "splenomegaly"],
+        "消化系统": ["anorexia", "vomiting", "diarrhea", "hepatomegaly"],
+        "泌尿系统": ["hemoglobinuria", "hematuria"]
+      },
+      "key_signs": ["pale_mucous_membranes", "icterus", "hemoglobinuria", "tachycardia"],
+      "differential_diagnosis": ["ethylene_glycol_poisoning", "autoimmune_hemolytic_anemia", "blood_loss_anemia", "fragile_splenic_mass", "inner_mass_bleeding"]
+    },
+    "urinary_obstruction": {
+      "display_name": "猫下泌尿道梗阻",
+      "species": ["cat"],
+      "systems": {
+        "全身": ["weakness", "collapse", "lethargy", "depression", "hypothermia"],
+        "心血管系统": ["bradycardia", "tachycardia", "weak_pulses", "arrhythmia"],
+        "泌尿系统": ["oliguria", "anuria", "stranguria", "urinary_retention", "urinary_bladder_distended", "hematuria"],
+        "消化系统": ["vomiting", "anorexia"]
+      },
+      "key_signs": ["anuria", "urinary_bladder_distended", "stranguria", "bradycardia"],
+      "differential_diagnosis": ["feline_lower_urinary_tract_infection", "urolithiasis", "bladder_cancer", "spinalCord_disease", "acute_kidney_injury"]
+    },
+    "diabetic_ketoacidosis": {
+      "display_name": "糖尿病酮症酸中毒",
+      "species": ["dog", "cat"],
+      "systems": {
+        "全身": ["weakness", "lethargy", "dehydration", "collapse", "depression", "hypothermia"],
+        "呼吸系统": ["kussmaul_breathing", "polypnea", "dyspnea"],
+        "心血管系统": ["tachycardia", "hypotension", "weak_pulses"],
+        "消化系统": ["vomiting", "diarrhea", "ketotic_breath", "halitosis", "anorexia"],
+        "泌尿系统": ["polyuria_polydipsia", "oliguria"],
+        "神经系统": ["consciousness_decreased", "seizure"],
+        "代谢系统": ["ketotic_breath"]
+      },
+      "key_signs": ["ketotic_breath", "kussmaul_breathing", "vomiting", "polyuria_polydipsia"],
+      "differential_diagnosis": ["hyperosmolar_hyperglycemic_syndrome", " pancreatitis", "sepsis", " ketoacidosis_from_starvation", "uremic_acidosis"]
+    },
+    "pericardial_effusion": {
+      "display_name": "心包填塞",
+      "species": ["dog"],
+      "systems": {
+        "全身": ["weakness", "collapse", "tachycardia", "lethargy", "depression"],
+        "心血管系统": ["pulsus_paradoxus", "weak_pulses", "hypotension", "gallop_rhythm", "arrhythmia"],
+        "呼吸系统": ["dyspnea", "polypnea", "orthopnea"],
+        "消化系统": ["ascites", "abdominal_distension", "hepatomegaly"],
+        "血液系统": ["pale_mucous_membranes"]
+      },
+      "key_signs": ["pulsus_paradoxus", "weak_pulses", "ascites", "weakness"],
+      "differential_diagnosis": ["dilated_cardiomyopathy", "right_heart_failure", "effusive_pericarditis", "cardiac_tamponade", "neoplasia"]
+    },
+    "disseminated_intravascular_coagulation": {
+      "display_name": "弥散性血管内凝血",
+      "species": ["dog", "cat"],
+      "systems": {
+        "全身": ["weakness", "lethargy", "collapse", "shock", "fever", "depression"],
+        "心血管系统": ["tachycardia", "hypotension", "weak_pulses", "arrhythmia"],
+        "血液系统": ["petechiae", "ecchymosis", "bleeding_gums", "prolonged_bleeding", "melena", "hemoptysis", "epistaxis", "hematuria"],
+        "呼吸系统": ["dyspnea", "hemoptysis"],
+        "泌尿系统": ["oliguria", "anuria"],
+        "消化系统": ["vomiting", "diarrhea", "hematemesis"]
+      },
+      "key_signs": ["petechiae", "ecchymosis", "prolonged_bleeding", "bleeding_gums"],
+      "differential_diagnosis": ["severe_thrombocytopenia", "liver_failure_coagulopathy", "hemophilia", "warfarin_toxicosis", "septic_embolism"]
+    },
+    "hyperthyroidism": {
+      "display_name": "猫甲亢",
+      "species": ["cat"],
+      "systems": {
+        "全身": ["polyphagia", "weight_loss", "lethargy_chronic", "weakness", "depression", "fever"],
+        "心血管系统": ["tachycardia", "heart_murmur", "arrhythmia", "exercise_intolerance", "hypotension"],
+        "消化系统": ["vomiting", "diarrhea", "halitosis", "polyphagia", "borborygmus"],
+        "泌尿系统": ["polyuria_polydipsia"],
+        "皮肤系统": ["alopecia", "pruritus"],
+        "行为变化": ["aggression"]
+      },
+      "key_signs": ["polyphagia", "weight_loss", "tachycardia", "heart_murmur"],
+      "differential_diagnosis": ["diabetes_mellitus", "chronic_kidney_disease", "inflammatory_bowel_disease", "lymphoma", "pheochromocytoma"]
+    },
+    "hypoadrenocorticism": {
+      "display_name": "艾迪森病",
+      "species": ["dog"],
+      "systems": {
+        "全身": ["weakness", "lethargy", "collapse", "bradycardia", "hypothermia", "depression", "anorexia"],
+        "心血管系统": ["hypotension", "weak_pulses", "bradycardia"],
+        "消化系统": ["vomiting", "diarrhea", "anorexia", "hypersalivation"],
+        "泌尿系统": ["oliguria", "polyuria_polydipsia"],
+        "代谢系统": ["weakness", "tremor"]
+      },
+      "key_signs": ["weakness", "bradycardia", "hypotension", "vomiting"],
+      "differential_diagnosis": ["acute_renal_failure", "gastroenteritis", " Addisonian_crisis_vs_sepsis", "hypothyroidism", "chronic_kidney_disease"]
+    },
+    "sepsis": {
+      "display_name": "脓毒症",
+      "species": ["dog", "cat"],
+      "systems": {
+        "全身": ["fever", "hypothermia", "lethargy", "shock", "weakness", "depression"],
+        "心血管系统": ["tachycardia", "hypotension", "weak_pulses", "cold_extremities", "arrhythmia"],
+        "血液系统": ["petechiae", "ecchymosis", "bleeding_gums"],
+        "消化系统": ["vomiting", "diarrhea", "absent_bowel_sounds", "anorexia", "halitosis"],
+        "呼吸系统": ["polypnea", "dyspnea"],
+        "泌尿系统": ["oliguria", "anuria"]
+      },
+      "key_signs": ["fever", "tachycardia", "weak_pulses", "petechiae"],
+      "differential_diagnosis": ["septic_shock", "cardiogenic_shock", "hypovolemic_shock", "anaphylaxis", "systemic_inflammatory_response_syndrome"]
+    },
+    "ivdd_cervical": {
+      "display_name": "IVDD颈椎型",
+      "species": ["dog"],
+      "systems": {
+        "神经系统": ["neck_pain", "neck_stiffness", "paresis", "ataxia", "weakness", "consciousness_decreased"],
+        "肌肉骨骼系统": ["spinal_pain", "pain", "weakness"],
+        "全身": ["lethargy", "depression", "anorexia"],
+        "行为变化": ["aggression"]
+      },
+      "key_signs": ["neck_pain", "neck_stiffness", "paresis"],
+      "differential_diagnosis": [" cervical_spondylomyelopathy", "meningitis", "foramen_magnum_tumor", "traumatic_cervical_disc_herniation", "vestibular_disease"]
+    },
+    "ivdd_thoracolumbar": {
+      "display_name": "IVDD胸腰椎型",
+      "species": ["dog"],
+      "systems": {
+        "神经系统": ["thoracolumbar_pain", "paresis", "paralysis", "urinary_incontinence", "fecal_incontinence", "decreased_anal_tone", "ataxia", "pain_response_abnormal"],
+        "肌肉骨骼系统": ["spinal_pain", "pain", "weakness"],
+        "全身": ["weakness", "lethargy", "depression", "anorexia"]
+      },
+      "key_signs": ["thoracolumbar_pain", "paresis", "paralysis", "urinary_incontinence"],
+      "differential_diagnosis": ["degenerative_myelopathy", "fibrocartilaginous_embolic_myelopathy", "spinal_trauma_tumor", "discospondylitis", "neoplasia"]
+    },
+    "meningitis": {
+      "display_name": "脑膜炎",
+      "species": ["dog", "cat"],
+      "systems": {
+        "神经系统": ["neck_stiffness", "opistothotonus", "seizure", "ataxia", "head_pressing", "head_tilt", "nystagmus", "strabismus", "consciousness_decreased"],
+        "全身": ["lethargy", "depression", "fever", "tachycardia"],
+        "行为变化": ["aggression"],
+        "肌肉骨骼系统": ["spinal_pain", "neck_pain"],
+        "运动系统": ["paresis"]
+      },
+      "key_signs": ["neck_stiffness", "opistothotonus", "seizure", "fever"],
+      "differential_diagnosis": ["encephalitis", "brain_tumor", "intracranial_ hemorrhage", "granulomatous_meningoencephalitis", "rabies"]
+    },
+    "hepatic_failure_coagulopathy": {
+      "display_name": "肝衰竭凝血障碍",
+      "species": ["dog", "cat"],
+      "systems": {
+        "血液系统": ["petechiae", "ecchymosis", "prolonged_bleeding", "bleeding_gums", "melena", "hematuria", "epistaxis"],
+        "消化系统": ["vomiting", "diarrhea", "hepatomegaly", "ascites", "halitosis_uremic"],
+        "神经系统": ["head_pressing", "circling", "seizure", "consciousness_decreased", "ataxia"],
+        "皮肤系统": ["pruritus", "icterus"],
+        "全身": ["lethargy", "weakness", "depression", "anorexia"]
+      },
+      "key_signs": ["petechiae", "prolonged_bleeding", "hepatomegaly", "icterus"],
+      "differential_diagnosis": ["chronic_hepatic_failure", "copper_poisoning", "afeocal_hepatic_disease", "hepatic_neoplasia", "portal_systemic_shunt"]
+    },
+    "splenic_rupture": {
+      "display_name": "脾破裂",
+      "species": ["dog", "cat"],
+      "systems": {
+        "全身": ["collapse", "weakness", "shock", "lethargy", "depression", "cold_extremities"],
+        "心血管系统": ["weak_pulses", "hypotension", "tachycardia", "pale_mucous_membranes"],
+        "消化系统": ["abdominal_pain", "abdominal_tenderness", "abdominal_distension", "vomiting"],
+        "血液系统": ["pale_mucous_membranes", "hematuria"]
+      },
+      "key_signs": ["collapse", "abdominal_pain", "pale_mucous_membranes", "tachycardia"],
+      "differential_diagnosis": ["splenic_mass_hemorrhage", "hemangiosarcoma", "blunt_abdominal_trauma", "coagulopathy", "acute_pancreatitis"]
+    },
+    "ckd_anemia": {
+      "display_name": "慢性肾病贫血",
+      "species": ["dog", "cat"],
+      "systems": {
+        "血液系统": ["pale_mucous_membranes", "weakness", "lethargy_chronic", "exercise_intolerance", "tachycardia"],
+        "心血管系统": ["tachycardia", "heart_murmur", "exercise_intolerance", "hypotension"],
+        "消化系统": ["vomiting", "diarrhea", "halitosis_uremic", "anorexia", "hypersalivation"],
+        "泌尿系统": ["polyuria_polydipsia", "oliguria", "hematuria"],
+        "皮肤系统": ["pruritus", "peripheral_edema"],
+        "全身": ["lethargy_chronic", "weakness", "depression", "anorexia", "weight_loss"]
+      },
+      "key_signs": ["pale_mucous_membranes", "polyuria_polydipsia", "vomiting", "peripheral_edema"],
+      "differential_diagnosis": ["chronic_kidney_disease", "iron_deficiency_anemia", "bone_marrow_failure", "hemolytic_anemia", " hypothyroidism"]
+    },
+    "hepatic_anemia": {
+      "display_name": "肝性贫血",
+      "species": ["dog", "cat"],
+      "systems": {
+        "血液系统": ["pale_mucous_membranes", "icterus", "weakness", "lethargy", "exercise_intolerance", "tachycardia"],
+        "消化系统": ["hepatomegaly", "vomiting", "diarrhea", "halitosis", "ascites", "abdominal_distension"],
+        "神经系统": ["head_pressing", "circling", "lethargy"],
+        "皮肤系统": ["pruritus", "peripheral_edema", "petechiae"],
+        "全身": ["weakness", "lethargy", "depression", "anorexia", "weight_loss"]
+      },
+      "key_signs": ["hepatomegaly", "icterus", "vomiting", "weakness"],
+      "differential_diagnosis": ["portosystemic_shunt", "chronic_active_hepatitis", "hepatic_neoplasia", "copper_associated_hepatopathy", "endstage_liver_cirrhosis"]
+    }
+  }
+}

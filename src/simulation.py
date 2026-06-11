@@ -73,6 +73,8 @@ class VirtualCreature:
         dt: float = None,
         solver: str = "euler",
         lifecycle_mode: str = "bypass",
+        record_history: bool = True,
+        legacy_clinical_signs_enabled: bool = True,
     ):
         self.w = body_weight_kg
         self.species = species
@@ -205,6 +207,8 @@ class VirtualCreature:
         self.current_time_s = 0.0
         self.dt = DT_SECONDS if dt is None else dt  # dt=None → 0.1s (production); dt=float → override (testing)
         self._solver = solver  # "euler" | "radau" — set via solver= kwarg
+        self._record_history_enabled = record_history
+        self._legacy_clinical_signs_enabled = legacy_clinical_signs_enabled
 
         # 事件系统
         self.events = []                            # 待处理事件列表
@@ -325,12 +329,44 @@ class VirtualCreature:
         """
         self.disease = disease_module
         self.disease.activate(self.current_time_s)
+        if self._legacy_clinical_signs_enabled:
+            self._ensure_legacy_clinical_signs_engine()
 
-        # Initialize ClinicalSignsEngine when a disease is attached (case start)
+    def _ensure_legacy_clinical_signs_engine(self):
+        """
+        Compatibility seam for legacy engine-owned interpretation lifecycle.
+
+        New application paths should prefer outer-owned interpretation bundles.
+        This helper exists only to preserve older callers that still expect
+        `attach_disease()` + `simulate()` to populate `engine.clinical_signs_engine`.
+        """
+        if not self._legacy_clinical_signs_enabled:
+            return None
+
+        if hasattr(self, "clinical_signs_engine"):
+            return self.clinical_signs_engine
+
         defs_path = Path(__file__).resolve().parents[1] / "data" / "symptom_definitions.json"
         with open(defs_path, "r", encoding="utf-8") as f:
             defs = json.load(f)
         self.clinical_signs_engine = _ClinicalSignsEngine(self, defs, self.species)
+        return self.clinical_signs_engine
+
+    def _refresh_legacy_clinical_signs(self) -> None:
+        """
+        Compatibility seam for legacy engine-owned interpretation refresh.
+
+        New code should refresh interpretation from outer runtime composition
+        after physical time advancement. This method keeps old direct-engine
+        callers working until that migration is complete.
+        """
+        if not self._legacy_clinical_signs_enabled:
+            return
+
+        signs_engine = getattr(self, "clinical_signs_engine", None)
+        if signs_engine is None:
+            return
+        signs_engine.compute(self.current_time_s)
 
     def apply_factor(self, cmd: FactorCommand) -> None:
         """
@@ -535,10 +571,9 @@ class VirtualCreature:
         CVP = heart_state["CVP_mmHg"]
         CO = heart_state["cardiac_output_ml_min"]
 
-        # Step 2.5: 疾病模块 — 必须在 lung.compute() 之前执行
-        # FIX B: compute() path 之前跳过了 disease.compute()，
-        # 导致 ode_diseases.json 中对 diffusion_coefficient 的修正从未执行
-        # disease 对 diffusion_coefficient 的 multiply 操作需要在本轮 lung.compute() 之前生效
+        # Step 2.5: 疾病模块 — 在器官 compute() 之前执行一次
+        # 这样 diffusion_coefficient / GFR multiplier 等本轮即可影响下游器官，
+        # 同时避免同一 dt 内重复推进 disease state。
         if self.disease and self.disease.active:
             self.disease._current_time_s = self.current_time_s
             engine_state = {
@@ -552,6 +587,16 @@ class VirtualCreature:
             }
             for cmd in self.disease.compute(dt, engine_state):
                 self.apply_factor(cmd)
+
+            # 生理 clamp：防止疾病累积效应把参数推到非生理范围
+            self.heart.heart_rate = max(
+                HEART_RATE_HARD_MIN,
+                min(HEART_RATE_HARD_MAX, self.heart.heart_rate),
+            )
+            self.heart.mean_arterial_pressure = max(
+                30.0,
+                min(200.0, self.heart.mean_arterial_pressure),
+            )
 
         # Step 3: 肺部气体交换（输入：CO → 输出：血气）
         lung_state = self.lung.compute(dt, CO)
@@ -668,29 +713,8 @@ class VirtualCreature:
             kidney_state["GFR_ml_min"] *= self.organ_health.kidney_factor
             self.kidney.GFR *= self.organ_health.kidney_factor
 
-        # Step 5.5: 疾病模块 — 通过 apply_factor() 统一写入
+        # Step 5.5: 重新读取疾病写入后的器官状态（不再次推进 disease）
         if self.disease and self.disease.active:
-            self.disease._current_time_s = t
-            engine_state = {
-                "heart": {
-                    "heart_rate_bpm": heart_state["heart_rate_bpm"],
-                    "MAP_mmHg": heart_state["MAP_mmHg"],
-                    "cardiac_output_ml_min": heart_state["cardiac_output_ml_min"],
-                },
-                "lung": {"arterial_PO2": lung_state["arterial_PO2"]},
-                "kidney": {"GFR_ml_min": kidney_state["GFR_ml_min"]},
-            }
-            commands = self.disease.compute(dt, engine_state)
-            for cmd in commands:
-                self.apply_factor(cmd)
-
-            # 生理 clamp：防止疾病累积效应把参数推到非生理范围
-            # 心率：犬 40-250，猫 140-300
-            self.heart.heart_rate = max(HEART_RATE_HARD_MIN, min(HEART_RATE_HARD_MAX, self.heart.heart_rate))
-            # MAP：30-200 mmHg
-            self.heart.mean_arterial_pressure = max(30.0, min(200.0, self.heart.mean_arterial_pressure))
-
-            # 重新读取被疾病修改后的器官状态（用于后续器官健康追踪和历史记录）
             heart_state["heart_rate_bpm"] = self.heart.heart_rate
             heart_state["MAP_mmHg"] = self.heart.mean_arterial_pressure
             heart_state["CVP_mmHg"] = self.heart.central_venous_pressure
@@ -729,73 +753,73 @@ class VirtualCreature:
         self.blood.total_volume_ml = self.heart.circulating_volume_ml
 
         # Step 8: 记录（使用修改后的最终值）
-        self.history["time_s"].append(t)
-        self.history["HR_bpm"].append(heart_state["heart_rate_bpm"])
-        self.history["CO_ml_min"].append(final_CO)
-        self.history["MAP_mmHg"].append(final_MAP)
-        self.history["CVP_mmHg"].append(CVP)
-        self.history["RR"].append(lung_state["respiratory_rate"])
-        self.history["art_PO2"].append(lung_state["arterial_PO2"])
-        self.history["art_PCO2"].append(lung_state["arterial_PCO2"])
-        self.history["saturation"].append(lung_state["arterial_saturation"])
-        self.history["pH"].append(self.blood.arterial_pH)
-        self.history["GFR"].append(kidney_state["GFR_ml_min"])
-        self.history["urine_ml_min"].append(kidney_state["urine_output_ml_min"])
-        self.history["BUN"].append(kidney_state["BUN_mg_dL"])
-        self.history["plasma_Na"].append(self.blood.sodium_mEq_L)
-        self.history["glucose"].append(self.blood.glucose_mmol_L)
-        self.history["blood_volume_ml"].append(heart_state["blood_volume_ml"])
-        self.history["contractility_factor"].append(heart_state["contractility_factor"])
-        self.history["svr_factor"].append(svr_factor)
-        self.history["heart_health"].append(self.organ_health.heart_health)
-        self.history["lung_health"].append(self.organ_health.lung_health)
-        self.history["kidney_health"].append(self.organ_health.kidney_health)
-        self.history["liver_health"].append(self.organ_health.liver_health)
-        # 体液三室
-        self.history["fluid_vascular_ml"].append(fluid_state["vascular_ml"])
-        self.history["fluid_isf_ml"].append(fluid_state["isf_ml"])
-        self.history["fluid_icf_ml"].append(fluid_state["icf_ml"])
-        self.history["fluid_nfp_mmHg"].append(fluid_state["nfp_mmHg"])
-        # 肝脏/肠道
-        self.history["liver_metabolic_activity"].append(liver_state["metabolic_activity"])
-        self.history["liver_detox_capacity"].append(liver_state["detox_capacity"])
-        self.history["liver_glycogen"].append(liver_state["glycogen_fraction"])
-        self.history["gut_motility"].append(gut_state["gut_motility"])
-        self.history["gut_barrier"].append(gut_state["barrier_integrity"])
-        self.history["gut_microbiome"].append(gut_state["microbiome_activity"])
-        # 内分泌
-        self.history["T3_ng_dL"].append(endocrine_state["T3_ng_dL"])
-        self.history["insulin_uU_mL"].append(endocrine_state["insulin_uU_mL"])
-        self.history["cortisol_ug_dL"].append(endocrine_state["cortisol_ug_dL"])
-        self.history["metabolic_rate"].append(endocrine_state["metabolic_rate"])
-        self.history["core_temperature_C"].append(self.blood.core_temperature_C)
-        # 神经
-        self.history["neuro_sympathetic"].append(neuro_state["sympathetic_tone"])
-        self.history["neuro_consciousness"].append(neuro_state["consciousness"])
-        self.history["neuro_seizure"].append(neuro_state["seizure"])
-        self.history["neuro_pain"].append(neuro_state["pain_level"])
-        self.history["neuro_chemodrive"].append(neuro_state["chemoreceptor_drive"])
-        # 免疫
-        self.history["immune_cytokine"].append(immune_state["cytokine_level"])
-        self.history["immune_wbc"].append(immune_state["wbc_count"])
-        self.history["immune_crp"].append(immune_state["crp_level"])
-        self.history["immune_coagulation"].append(immune_state["coagulation_state"])
+        if self._record_history_enabled:
+            self.history["time_s"].append(t)
+            self.history["HR_bpm"].append(heart_state["heart_rate_bpm"])
+            self.history["CO_ml_min"].append(final_CO)
+            self.history["MAP_mmHg"].append(final_MAP)
+            self.history["CVP_mmHg"].append(CVP)
+            self.history["RR"].append(lung_state["respiratory_rate"])
+            self.history["art_PO2"].append(lung_state["arterial_PO2"])
+            self.history["art_PCO2"].append(lung_state["arterial_PCO2"])
+            self.history["saturation"].append(lung_state["arterial_saturation"])
+            self.history["pH"].append(self.blood.arterial_pH)
+            self.history["GFR"].append(kidney_state["GFR_ml_min"])
+            self.history["urine_ml_min"].append(kidney_state["urine_output_ml_min"])
+            self.history["BUN"].append(kidney_state["BUN_mg_dL"])
+            self.history["plasma_Na"].append(self.blood.sodium_mEq_L)
+            self.history["glucose"].append(self.blood.glucose_mmol_L)
+            self.history["blood_volume_ml"].append(heart_state["blood_volume_ml"])
+            self.history["contractility_factor"].append(heart_state["contractility_factor"])
+            self.history["svr_factor"].append(svr_factor)
+            self.history["heart_health"].append(self.organ_health.heart_health)
+            self.history["lung_health"].append(self.organ_health.lung_health)
+            self.history["kidney_health"].append(self.organ_health.kidney_health)
+            self.history["liver_health"].append(self.organ_health.liver_health)
+            # 体液三室
+            self.history["fluid_vascular_ml"].append(fluid_state["vascular_ml"])
+            self.history["fluid_isf_ml"].append(fluid_state["isf_ml"])
+            self.history["fluid_icf_ml"].append(fluid_state["icf_ml"])
+            self.history["fluid_nfp_mmHg"].append(fluid_state["nfp_mmHg"])
+            # 肝脏/肠道
+            self.history["liver_metabolic_activity"].append(liver_state["metabolic_activity"])
+            self.history["liver_detox_capacity"].append(liver_state["detox_capacity"])
+            self.history["liver_glycogen"].append(liver_state["glycogen_fraction"])
+            self.history["gut_motility"].append(gut_state["gut_motility"])
+            self.history["gut_barrier"].append(gut_state["barrier_integrity"])
+            self.history["gut_microbiome"].append(gut_state["microbiome_activity"])
+            # 内分泌
+            self.history["T3_ng_dL"].append(endocrine_state["T3_ng_dL"])
+            self.history["insulin_uU_mL"].append(endocrine_state["insulin_uU_mL"])
+            self.history["cortisol_ug_dL"].append(endocrine_state["cortisol_ug_dL"])
+            self.history["metabolic_rate"].append(endocrine_state["metabolic_rate"])
+            self.history["core_temperature_C"].append(self.blood.core_temperature_C)
+            # 神经
+            self.history["neuro_sympathetic"].append(neuro_state["sympathetic_tone"])
+            self.history["neuro_consciousness"].append(neuro_state["consciousness"])
+            self.history["neuro_seizure"].append(neuro_state["seizure"])
+            self.history["neuro_pain"].append(neuro_state["pain_level"])
+            self.history["neuro_chemodrive"].append(neuro_state["chemoreceptor_drive"])
+            # 免疫
+            self.history["immune_cytokine"].append(immune_state["cytokine_level"])
+            self.history["immune_wbc"].append(immune_state["wbc_count"])
+            self.history["immune_crp"].append(immune_state["crp_level"])
+            self.history["immune_coagulation"].append(immune_state["coagulation_state"])
 
-        # 凝血
-        self.history["coag_PT"].append(self.blood.PT_sec)
-        self.history["coag_aPTT"].append(self.blood.aPTT_sec)
-        self.history["coag_fibrinogen"].append(self.blood.fibrinogen_mg_dL)
+            # 凝血
+            self.history["coag_PT"].append(self.blood.PT_sec)
+            self.history["coag_aPTT"].append(self.blood.aPTT_sec)
+            self.history["coag_fibrinogen"].append(self.blood.fibrinogen_mg_dL)
 
-        # 淋巴/脾脏
-        self.history["lymph_splenic_reserve"].append(self.blood.splenic_reserve_mL)
-        self.history["lymph_lymph_flow"].append(self.lymphatic.lymph_flow_rate)
+            # 淋巴/脾脏
+            self.history["lymph_splenic_reserve"].append(self.blood.splenic_reserve_mL)
+            self.history["lymph_lymph_flow"].append(self.lymphatic.lymph_flow_rate)
 
         # 更新时间
         self.current_time_s += dt
 
-        # 8.5: ClinicalSignsEngine — 每步评估可观察体征（Euler 路径）
-        if hasattr(self, "clinical_signs_engine"):
-            self.clinical_signs_engine.compute(self.current_time_s)
+        # 8.5: Legacy compatibility refresh for engine-owned signs state.
+        self._refresh_legacy_clinical_signs()
 
         return {
             "heart": heart_state,
@@ -812,12 +836,6 @@ class VirtualCreature:
             "toxicology": tox_state,
             "pharmacology": pharma_effects if (hasattr(self, "pharmacology") and self.pharmacology is not None) else {},
         }
-
-        # 8.5: ClinicalSignsEngine — 每步评估可观察体征（Euler 路径）
-        if hasattr(self, "clinical_signs_engine"):
-            import sys as _sys
-            _sys.stderr.write(f"[Euler] T={self.current_time_s} calling compute\n")
-            self.clinical_signs_engine.compute(self.current_time_s)
 
     def _step_radau(self):
         """
@@ -1049,11 +1067,13 @@ class VirtualCreature:
             self.kidney.GFR *= self.organ_health.kidney_factor
 
         # 8. 记录历史（同 Euler 路径最后部分）
-        self._record_history(dt)
+        if self._record_history_enabled:
+            self._record_history(dt)
+        else:
+            self.current_time_s += dt
 
-        # 8.5: ClinicalSignsEngine — 每步评估可观察体征
-        if hasattr(self, "clinical_signs_engine"):
-            self.clinical_signs_engine.compute(self.current_time_s)
+        # 8.5: Legacy compatibility refresh for engine-owned signs state.
+        self._refresh_legacy_clinical_signs()
         return {}
 
     def _record_history(self, dt: float):
@@ -1091,28 +1111,42 @@ class VirtualCreature:
 
         self.current_time_s += dt
 
-    def simulate(self, duration_minutes: float, verbose: bool = False):
+    def advance_seconds(self, duration_seconds: float, verbose: bool = False):
         """
-        运行仿真直到指定时长
+        运行仿真直到指定物理时长。
 
         Args:
-            duration_minutes: 仿真时长（分钟）
+            duration_seconds: 仿真时长（秒）
             verbose: 是否打印进度
         """
-        total_steps = int(duration_minutes * 60.0 / self.dt)
+        total_steps = int(duration_seconds / self.dt)
 
         if verbose:
-            logger.info("开始仿真：%s min, %s steps", duration_minutes, total_steps)
+            logger.info("开始仿真：%.1f s, %s steps", duration_seconds, total_steps)
 
         for i in range(total_steps):
             self.step()
             if verbose and i % 1000 == 0:
                 t = self.current_time_s
-                logger.info("  t=%.1fs, HR=%s, MAP=%s, GFR=%s",
-                            t,
-                            self.history['HR_bpm'][-1],
-                            self.history['MAP_mmHg'][-1],
-                            self.history['GFR'][-1])
+                if self._record_history_enabled and self.history["HR_bpm"]:
+                    hr = self.history["HR_bpm"][-1]
+                    map_val = self.history["MAP_mmHg"][-1]
+                    gfr = self.history["GFR"][-1]
+                else:
+                    hr = self.heart.heart_rate
+                    map_val = self.heart.mean_arterial_pressure
+                    gfr = self.kidney.GFR
+                logger.info("  t=%.1fs, HR=%s, MAP=%s, GFR=%s", t, hr, map_val, gfr)
+
+    def simulate(self, duration_minutes: float, verbose: bool = False):
+        """
+        兼容旧接口：按分钟推进仿真。
+
+        Args:
+            duration_minutes: 仿真时长（分钟）
+            verbose: 是否打印进度
+        """
+        self.advance_seconds(duration_minutes * 60.0, verbose=verbose)
 
     # ── solve_ivp Radau 引擎（Phase 2: 替换 Euler 求解器）────────────────────────
 
@@ -1700,7 +1734,7 @@ class VirtualCreature:
         """可卡因高剂量（6 mg/kg IV）— 心脏抑制更明显"""
         self.schedule_event(30.0, "cocaine", {"dose_mg_kg": 6.0})
 
-    def to_minimal_snapshot(self) -> dict:
+    def to_persistence_snapshot(self) -> dict:
         """
         Serialize the essential readable engine state for session persistence.
 
@@ -1765,6 +1799,15 @@ class VirtualCreature:
             # ── Disease state (readable summary) ────────────────────────
             "disease_state": self.disease.summary() if self.disease else None,
         }
+
+    def to_minimal_snapshot(self) -> dict:
+        """
+        Legacy compatibility alias for persistence/session snapshots.
+
+        New code should prefer `to_persistence_snapshot()` so the method name
+        reflects its actual outer-layer responsibility.
+        """
+        return self.to_persistence_snapshot()
 
     def print_summary(self):
         """打印当前状态摘要"""

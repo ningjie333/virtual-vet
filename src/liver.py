@@ -317,7 +317,10 @@ class LiverModule:
     def _update_hepatic_flow(self, CO: float):
         """更新肝血流量（≈25% CO）"""
         if CO <= 0:
-            raise ValueError("cardiac_output must be positive")
+            # Moribund states can transiently drive CO to zero or below.
+            # The liver should see absent perfusion, not crash the engine.
+            self.hepatic_blood_flow = 0.0
+            return
         self.hepatic_blood_flow = 0.25 * CO
 
     def _compute_glucose_homeostasis(self, dt: float, gut_state: dict) -> float:

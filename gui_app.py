@@ -27,8 +27,11 @@ from src.parameters import (
     RESPIRATORY_RATE_REST,
 )
 from src.diseases import create_disease
+from src.presentation_state import PresentationRequest, build_presented_engine
 from game.action_system import GameState, process_action, TIME_BUDGET_EASY, TIME_BUDGET_NORMAL, TIME_BUDGET_HARD
 from game.diagnosis_engine import match_diseases, get_suggested_tests, CLUE_DESCRIPTIONS
+from game.runtime import default_runtime
+from game.runtime_composition import build_external_interpretation_bundle
 from src.db.conn import connect
 from src.db.schema import init_db
 from src.db.sessions import create_session as db_create_session
@@ -117,9 +120,30 @@ def _snapshot_json(vc: VirtualCreature) -> str:
     """Serialize VirtualCreature to JSON for SQLite storage."""
     import json
     try:
-        return json.dumps(vc.to_minimal_snapshot(), ensure_ascii=False)
+        return json.dumps(vc.to_persistence_snapshot(), ensure_ascii=False)
     except Exception:
         return "{}"
+
+
+def _clinical_snapshot(vc: VirtualCreature, runtime=None):
+    runtime = runtime or default_runtime()
+    return runtime.interpreter.snapshot(vc)
+
+
+def _clinical_phase(vc: VirtualCreature, runtime=None) -> str:
+    runtime = runtime or default_runtime()
+    snapshot = _clinical_snapshot(vc, runtime=runtime)
+    return runtime.interpreter.phase(snapshot)
+
+
+def _clinical_summary(vc: VirtualCreature, elapsed_min: int, runtime=None) -> dict:
+    runtime = runtime or default_runtime()
+    snapshot = _clinical_snapshot(vc, runtime=runtime)
+    return runtime.interpreter.summary(snapshot, elapsed_min)
+
+
+def _runtime_for_session(session_id: str):
+    return _session_runtimes.get(session_id) or default_runtime()
 
 
 # ============================================================
@@ -127,6 +151,7 @@ def _snapshot_json(vc: VirtualCreature) -> str:
 # ============================================================
 import threading
 _game_sessions: dict[str, GameState] = {}
+_session_runtimes: dict[str, object] = {}
 _session_locks: dict[str, threading.Lock] = {}  # session_id → lock
 _action_seq: dict[str, int] = {}  # session_id → next seq number
 _DEFAULT_SESSION_ID = "case_001"
@@ -286,23 +311,27 @@ def api_new_game():
     age_days = _parse_age_days(age_str, species_str)
     lifecycle_mode = _lifecycle_mode_for_age(age_days, species_en)
 
-    # 创建虚拟生物（带入病例年龄 + 合适的生命周期模式）
-    vc = VirtualCreature(
-        body_weight_kg=weight_kg,
-        species=species_en,
-        age_days=age_days,
-        lifecycle_mode=lifecycle_mode,
-    )
-
-    # 注入疾病
     disease_name = case["disease"]
     disease = create_disease(disease_name)
-    vc.attach_disease(disease)
-
-    # Warmup: 让疾病 ODE 预先进展一段时间，模拟"动物已病了一阵才来就诊"
-    # 每个病例在 cases.json 中定义 warmup_minutes（急性病短、慢性病长）
-    warmup_minutes = case.get("warmup_minutes", 2)
-    vc.simulate(warmup_minutes)
+    history_duration_min = case.get(
+        "history_duration_min",
+        case.get("warmup_minutes", 2),
+    )
+    vc = build_presented_engine(
+        request=PresentationRequest(
+            disease_name=disease_name,
+            disease=disease,
+            weight_kg=weight_kg,
+            species=species_en,
+            age_days=age_days,
+            history_duration_min=history_duration_min,
+        ),
+        engine_factory=lambda **kwargs: VirtualCreature(
+            lifecycle_mode=lifecycle_mode,
+            legacy_clinical_signs_enabled=False,
+            **kwargs,
+        ),
+    )
 
     # 创建游戏状态
     species = animal.get("species", "犬")
@@ -319,6 +348,9 @@ def api_new_game():
     session_id = case_id
     _session_locks[session_id] = threading.Lock()
     _game_sessions[session_id] = state
+    _session_runtimes[session_id] = build_external_interpretation_bundle(
+        vc,
+    ).runtime
 
     # Persist to SQLite
     db_create_session(
@@ -330,7 +362,8 @@ def api_new_game():
         disease_name=disease_name,
     )
 
-    from game.time_manager import format_game_time, is_night_time
+    runtime = _session_runtimes[session_id]
+    initial_summary = _clinical_summary(vc, 0, runtime=runtime)
 
     return jsonify(
         {
@@ -340,12 +373,12 @@ def api_new_game():
                 "phase": state.phase,
                 "time_elapsed_min": 0,
                 "time_budget_min": state.time_budget_min,
-                "medical_phase": "stable",
+                "medical_phase": _clinical_phase(vc, runtime=runtime),
                 "death_timer": state.death_timer,
             },
-            "game_time": format_game_time(0),
-            "is_night": is_night_time(0),
-            "vitals": _get_vitals(vc, 0),
+            "game_time": initial_summary["game_time"],
+            "is_night": initial_summary["is_night"],
+            "vitals": _get_vitals(vc, 0, runtime=runtime),
             "time_budget_min": state.time_budget_min,
             "pending_reports": 0,
         }
@@ -371,12 +404,18 @@ def api_examine():
         state = _game_sessions.get(session_id)
         if not state:
             return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
+        runtime = _runtime_for_session(session_id)
 
         if state.phase in ("won", "lost"):
             return jsonify({"error": f"游戏已结束: {state.phase}"}), 400
 
         # 使用 action_system 的 process_action
-        result = process_action(state, "examine", {"test_type": test_type})
+        result = process_action(
+            state,
+            "examine",
+            {"test_type": test_type},
+            runtime=runtime,
+        )
 
         engine_summary = result.get("engine_summary", {})
         response = {
@@ -386,11 +425,13 @@ def api_examine():
             "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
             "time_budget_min": state.time_budget_min,
             "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
+            "action_started_at_s": result.get("action_started_at_s"),
+            "state_time_s": result.get("state_time_s"),
             "death_timer": state.death_timer,
             "report": result.get("result"),
             "new_reports": result.get("new_reports", []),
             "pending_reports": result.get("pending_count", 0),
-            "vitals": _get_vitals(state.engine, state.time_elapsed_min),
+            "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
             "game_log": _build_game_log(state),
             "game_time": engine_summary.get("game_time", "08:00"),
             "is_night": engine_summary.get("is_night", False),
@@ -429,6 +470,7 @@ def api_administer_drug():
     state = _game_sessions.get(session_id)
     if not state:
         return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
+    runtime = _runtime_for_session(session_id)
 
     if state.phase in ("won", "lost"):
         return jsonify({"error": f"游戏已结束: {state.phase}"}), 400
@@ -440,7 +482,7 @@ def api_administer_drug():
     else:
         params["dose_mg_kg"] = dose_mg_kg
 
-    result = process_action(state, "administer_drug", params)
+    result = process_action(state, "administer_drug", params, runtime=runtime)
     engine_summary = result.get("engine_summary", {})
 
     response = {
@@ -453,7 +495,7 @@ def api_administer_drug():
         "death_timer": state.death_timer,
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.time_elapsed_min),
+        "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
@@ -483,12 +525,18 @@ def api_diagnose():
     state = _game_sessions.get(session_id)
     if not state:
         return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
+    runtime = _runtime_for_session(session_id)
 
     if state.phase in ("won", "lost"):
         return jsonify({"error": f"游戏已结束: {state.phase}"}), 400
 
     # 使用 action_system 的 process_action
-    result = process_action(state, "treat", {"disease_guess": diagnosis})
+    result = process_action(
+        state,
+        "treat",
+        {"disease_guess": diagnosis},
+        runtime=runtime,
+    )
     engine_summary = result.get("engine_summary", {})
 
     response = {
@@ -502,7 +550,7 @@ def api_diagnose():
         "treatment_result": result.get("result"),
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.time_elapsed_min),
+        "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
@@ -543,8 +591,9 @@ def api_wait():
     state = _game_sessions.get(session_id)
     if not state:
         return jsonify({"error": "游戏会话不存在"}), 404
+    runtime = _runtime_for_session(session_id)
 
-    result = process_action(state, "wait", {})
+    result = process_action(state, "wait", {}, runtime=runtime)
     engine_summary = result.get("engine_summary", {})
 
     response = {
@@ -557,7 +606,7 @@ def api_wait():
         "death_timer": state.death_timer,
         "new_reports": result.get("new_reports", []),
         "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.time_elapsed_min),
+        "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
         "game_log": _build_game_log(state),
         "game_time": engine_summary.get("game_time", "08:00"),
         "is_night": engine_summary.get("is_night", False),
@@ -583,24 +632,21 @@ def api_game_state():
     state = _game_sessions.get(session_id)
     if not state:
         return jsonify({"error": "游戏会话不存在"}), 404
+    runtime = _runtime_for_session(session_id)
 
-    from game.action_system import determine_phase
-
-    medical_phase = determine_phase(state.engine)
-
-    from game.time_manager import format_game_time, is_night_time
+    summary = _clinical_summary(state.engine, state.time_elapsed_min, runtime=runtime)
 
     return jsonify(
         {
             "phase": state.phase,
-            "medical_phase": medical_phase,
+            "medical_phase": _clinical_phase(state.engine, runtime=runtime),
             "time_elapsed_min": state.time_elapsed_min,
             "time_budget_min": state.time_budget_min,
             "time_remaining_min": state.time_remaining_min,
             "death_timer": state.death_timer,
-            "game_time": format_game_time(state.time_elapsed_min),
-            "is_night": is_night_time(state.time_elapsed_min),
-            "vitals": _get_vitals(state.engine, state.time_elapsed_min),
+            "game_time": summary["game_time"],
+            "is_night": summary["is_night"],
+            "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
             "reports_count": len(state.reports),
             "pending_reports": len(state.pending_reports),
             "game_log": _build_game_log(state),
@@ -721,26 +767,22 @@ def api_session_replay(session_id):
 # ============================================================
 
 
-def _get_vitals(vc: VirtualCreature, elapsed_min: float = 0.0) -> dict:
+def _get_vitals(vc: VirtualCreature, elapsed_min: float = 0.0, runtime=None) -> dict:
     """从引擎提取当前生命体征"""
-    h = vc.history
-
-    def _last(key, fallback):
-        vals = h.get(key, [])
-        return vals[-1] if vals else fallback
-
-    from game.time_manager import format_game_time, is_night_time
+    runtime = runtime or default_runtime()
+    snapshot = _clinical_snapshot(vc, runtime=runtime)
+    summary = runtime.interpreter.summary(snapshot, int(elapsed_min))
 
     return {
-        "HR_bpm": round(_last("HR_bpm", vc.heart.heart_rate), 1),
-        "MAP_mmHg": round(_last("MAP_mmHg", vc.heart.mean_arterial_pressure), 1),
-        "SpO2": round(_last("saturation", vc.blood.arterial_saturation) * 100, 1),
-        "RR": round(_last("RR", vc.lung.respiratory_rate), 1),
-        "Temp": round(_last("Temp", vc.blood.core_temperature_C), 1),
-        "GFR": round(_last("GFR", vc.kidney.GFR), 1),
-        "pH": round(_last("pH", vc.blood.arterial_pH), 3),
-        "game_time": format_game_time(int(elapsed_min)),
-        "is_night": is_night_time(int(elapsed_min)),
+        "HR_bpm": round(snapshot.hr_bpm, 1),
+        "MAP_mmHg": round(snapshot.map_mmhg, 1),
+        "SpO2": round(snapshot.spo2_pct, 1),
+        "RR": round(snapshot.rr_bpm, 1),
+        "Temp": round(snapshot.temperature_c, 1),
+        "GFR": round(snapshot.gfr_ml_min, 1),
+        "pH": round(snapshot.ph, 3),
+        "game_time": summary["game_time"],
+        "is_night": summary["is_night"],
     }
 
 
@@ -852,7 +894,7 @@ def api_debug_disease_params():
     POST body: {
         "species": "canine", "weight_kg": 30.0, "age_days": 1095,
         "lifecycle_mode": "bypass",
-        "disease": "pneumonia", "severity": "moderate", "warmup_minutes": 2
+        "disease": "pneumonia", "severity": "moderate", "history_duration_min": 2
     }
     """
     data = request.get_json(force=True) or {}
@@ -864,7 +906,12 @@ def api_debug_disease_params():
     lifecycle_mode = data.get("lifecycle_mode", "bypass")
     disease_name = data.get("disease", "pneumonia")
     severity = data.get("severity", "moderate")
-    warmup_minutes = float(data.get("warmup_minutes", 2))
+    history_duration_min = float(
+        data.get(
+            "history_duration_min",
+            data.get("warmup_minutes", 2),
+        )
+    )
 
     from src.simulation import VirtualCreature
     from src.diseases import create_disease
@@ -876,12 +923,21 @@ def api_debug_disease_params():
     healthy_raw = compute_debug_params(species=species, breed="mixed", age_days=age_days, weight_kg=weight_kg)
     healthy_organs = healthy_raw.get("organs", {})
 
-    # 带疾病（完整器官参数）
-    vc_disease = VirtualCreature(body_weight_kg=weight_kg, species=species,
-                                  age_days=age_days, lifecycle_mode=lifecycle_mode)
     disease = create_disease(disease_name, severity=severity)
-    vc_disease.attach_disease(disease)
-    vc_disease.simulate(warmup_minutes)
+    vc_disease = build_presented_engine(
+        request=PresentationRequest(
+            disease_name=disease_name,
+            disease=disease,
+            weight_kg=weight_kg,
+            species=species,
+            age_days=age_days,
+            history_duration_min=history_duration_min,
+        ),
+        engine_factory=lambda **kwargs: VirtualCreature(
+            lifecycle_mode=lifecycle_mode,
+            **kwargs,
+        ),
+    )
 
     # 从疾病引擎提取全部器官参数（与 compute_debug_params 同格式）
     def _extract_organ_params(vc):
@@ -931,7 +987,7 @@ def api_debug_disease_params():
     return jsonify({
         "input": {"species": species, "weight_kg": weight_kg,
                   "disease": disease_name, "severity": severity,
-                  "warmup_minutes": warmup_minutes},
+                  "history_duration_min": history_duration_min},
         "healthy": {"organs": healthy_organs},
         "disease": {"organs": disease_organs},
     })

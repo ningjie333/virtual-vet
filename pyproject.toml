@@ -12,7 +12,14 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 markers = [
+    "fast: fast daily development lane (formulae, invariants, lightweight contracts)",
+    "core: core regression lane layered on top of fast",
+    "heavy: heavier integration/validation lane layered on top of core",
+    "benchmark: long-running endurance/benchmark lane kept out of normal loops",
+    "slow: long-running tests excluded from quick development runs",
+    "slower: heavier endurance or validation-style tests",
     "architecture: architectural constraint checks (AST-based rule enforcement)",
     "suite_disease_blackbox: disease black-box stability test suite",
     "stability: stability tests (cardiovascular, disease, convergence)",
