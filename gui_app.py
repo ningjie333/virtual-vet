@@ -1,7 +1,7 @@
 """
 虚拟生物 GUI - Flask Web 界面（游戏模式）
 启动方式: python gui_app.py
-访问地址: http://127.0.0.1:5000
+访问地址: 由 VV_HOST / VV_PORT 环境变量决定，默认 http://127.0.0.1:5000
 """
 
 import sys, os
@@ -155,10 +155,25 @@ _session_runtimes: dict[str, object] = {}
 _session_locks: dict[str, threading.Lock] = {}  # session_id → lock
 _action_seq: dict[str, int] = {}  # session_id → next seq number
 _DEFAULT_SESSION_ID = "case_001"
+_DEFAULT_HOST = "127.0.0.1"
+_DEFAULT_PORT = 5000
 
 # ============================================================
 # 辅助函数
 # ============================================================
+
+
+def _get_bind_host() -> str:
+    return os.getenv("VV_HOST", _DEFAULT_HOST)
+
+
+def _get_bind_port() -> int:
+    raw = os.getenv("VV_PORT", str(_DEFAULT_PORT))
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning("Invalid VV_PORT=%r, falling back to %d", raw, _DEFAULT_PORT)
+        return _DEFAULT_PORT
 
 
 def get_normal_value(metric_key: str, weight_kg: float = 20.0) -> float:
@@ -1019,9 +1034,11 @@ def api_debug_disease_params():
 # 启动
 # ============================================================
 if __name__ == "__main__":
+    host = _get_bind_host()
+    port = _get_bind_port()
     print("=" * 60)
     print("  虚拟生物 · 兽医诊断游戏 - 启动中...")
-    print("  访问: http://127.0.0.1:5000")
+    print(f"  访问: http://{host}:{port}")
     print("  按 Ctrl+C 停止")
     print("=" * 60)
-    app.run(debug=True, port=5000, use_reloader=False)
+    app.run(debug=True, host=host, port=port, use_reloader=False)

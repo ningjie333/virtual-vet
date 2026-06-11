@@ -130,8 +130,9 @@ def match_route(api_path: str, routes: list[dict]) -> dict | None:
     支持精确匹配和 Flask 路径参数转换:
     /api/cases/{id} <-> /api/cases/:id
     """
-    # 先把前端可能用的 :id 风格转成 {id}
+    # 先把前端可能用的 :id 和模板字符串 ${...} 风格转成占位符。
     normalized = re.sub(r":(\w+)", r"{\1}", api_path)
+    normalized = re.sub(r"\$\{[^}]+\}", r"{}", normalized)
     for r in routes:
         r_normalized = re.sub(r"<[^>]+>", r"{}", r["path"])
         if normalized == r_normalized:
@@ -191,9 +192,12 @@ def run() -> int:
 
     # 后端有但前端没调用（排除静态文件路由）
     backend_api_paths = {r["path"] for r in api_routes}
-    frontend_api_paths = {c["path"] for c in api_calls if not c.get("dynamic")}
+    frontend_api_paths = {c["path"] for c in api_calls}
     # 标准化后比较
-    normalized_frontend = {re.sub(r":(\w+)", r"{\1}", p) for p in frontend_api_paths}
+    normalized_frontend = {
+        re.sub(r"\$\{[^}]+\}", r"{}", re.sub(r":(\w+)", r"{\1}", p))
+        for p in frontend_api_paths
+    }
     for r in api_routes:
         r_norm = re.sub(r"<[^>]+>", r"{}", r["path"])
         if r_norm not in normalized_frontend and r["path"] not in frontend_api_paths:

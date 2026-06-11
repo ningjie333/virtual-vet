@@ -83,11 +83,6 @@ const lifePhaseLabel = computed(() => {
   return labels[lifePhase.value] || lifePhase.value;
 });
 
-const organTabs = computed(() => {
-  if (activeOrgans.value) return Object.keys(activeOrgans.value);
-  return [];
-});
-
 const organLabels: Record<string, string> = {
   heart: "心脏",
   lung: "肺",
@@ -167,10 +162,6 @@ function formatValue(val: number): string {
   if (Math.abs(val) < 0.001) return val.toExponential(2);
   if (Math.abs(val) >= 10000) return val.toExponential(2);
   return val.toFixed(2);
-}
-
-function getOrganParamCount(organ: string): number {
-  return result.value?.organs?.[organ] ? Object.keys(result.value.organs[organ]).length : 0;
 }
 
 // 当前显示的器官数据（健康 or 疾病）

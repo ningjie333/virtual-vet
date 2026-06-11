@@ -35,10 +35,38 @@ const matches = ref<DiagnosisMatch[]>([]);
 const suggestedTests = ref<string[]>([]);
 const diagLoading = ref(false);
 const references = ref<Record<string, DiseaseReference>>({});
+const referenceDetails = ref<Record<string, DiseaseReference>>({});
+const referenceLoading = ref<Record<string, boolean>>({});
+const referenceErrors = ref<Record<string, string>>({});
 const expandedRefDisease = ref<string | null>(null);
 
-function toggleRefDisease(disease: string) {
+async function toggleRefDisease(disease: string) {
   expandedRefDisease.value = expandedRefDisease.value === disease ? null : disease;
+  if (expandedRefDisease.value === disease) {
+    await ensureReferenceDetails(disease);
+  }
+}
+
+async function ensureReferenceDetails(disease: string) {
+  if (referenceDetails.value[disease] || referenceLoading.value[disease]) return;
+
+  referenceLoading.value = { ...referenceLoading.value, [disease]: true };
+  referenceErrors.value = { ...referenceErrors.value, [disease]: "" };
+  try {
+    const fullReference = await api.getDiseaseReferences(disease);
+    referenceDetails.value = { ...referenceDetails.value, [disease]: fullReference };
+  } catch {
+    referenceErrors.value = {
+      ...referenceErrors.value,
+      [disease]: "完整文献依据加载失败，当前显示诊断接口返回的摘要版本。",
+    };
+  } finally {
+    referenceLoading.value = { ...referenceLoading.value, [disease]: false };
+  }
+}
+
+function getDisplayedReference(disease: string, fallback: DiseaseReference): DiseaseReference {
+  return referenceDetails.value[disease] || fallback;
 }
 
 function getCriteriaEntries(ref: DiseaseReference): [string, CriterionReference][] {
@@ -76,6 +104,17 @@ async function refreshDiagnosis() {
     matches.value = d.matches;
     suggestedTests.value = d.suggested_tests;
     references.value = d.references || {};
+    const nextDetails: Record<string, DiseaseReference> = {};
+    const nextLoading: Record<string, boolean> = {};
+    const nextErrors: Record<string, string> = {};
+    for (const disease of Object.keys(references.value)) {
+      if (referenceDetails.value[disease]) nextDetails[disease] = referenceDetails.value[disease];
+      if (referenceLoading.value[disease]) nextLoading[disease] = referenceLoading.value[disease];
+      if (referenceErrors.value[disease]) nextErrors[disease] = referenceErrors.value[disease];
+    }
+    referenceDetails.value = nextDetails;
+    referenceLoading.value = nextLoading;
+    referenceErrors.value = nextErrors;
   } finally {
     diagLoading.value = false;
   }
@@ -86,6 +125,9 @@ watch(() => props.sessionId, () => {
   matches.value = [];
   suggestedTests.value = [];
   references.value = {};
+  referenceDetails.value = {};
+  referenceLoading.value = {};
+  referenceErrors.value = {};
   expandedRefDisease.value = null;
 }, { immediate: true });
 
@@ -132,10 +174,12 @@ watch(() => props.refreshTrigger, () => {
         <span class="ref-toggle">{{ expandedRefDisease === disease ? '▼' : '▶' }}</span>
       </button>
       <div class="ref-content" v-if="expandedRefDisease === disease">
+        <div v-if="referenceLoading[disease]" class="ref-loading">正在加载完整文献依据...</div>
+        <div v-else-if="referenceErrors[disease]" class="ref-loading ref-loading-warn">{{ referenceErrors[disease] }}</div>
         <!-- 指南引用 -->
-        <div v-if="ref.guidelines.length > 0" class="ref-section">
+        <div v-if="getDisplayedReference(disease, ref).guidelines.length > 0" class="ref-section">
           <div class="ref-section-title">核心指南</div>
-          <div v-for="g in ref.guidelines" :key="g.title" class="ref-guideline">
+          <div v-for="g in getDisplayedReference(disease, ref).guidelines" :key="g.title" class="ref-guideline">
             <span class="ref-authors">{{ g.authors }}</span>
             <span class="ref-year">({{ g.year }})</span>
             <span class="ref-title-text">{{ g.title }}.</span>
@@ -145,9 +189,9 @@ watch(() => props.refreshTrigger, () => {
           </div>
         </div>
         <!-- 诊断标准 -->
-        <div v-if="getCriteriaEntries(ref).length > 0" class="ref-section">
+        <div v-if="getCriteriaEntries(getDisplayedReference(disease, ref)).length > 0" class="ref-section">
           <div class="ref-section-title">诊断依据</div>
-          <div v-for="([clue, criterion]) in getCriteriaEntries(ref)" :key="clue" class="ref-criterion">
+          <div v-for="([clue, criterion]) in getCriteriaEntries(getDisplayedReference(disease, ref))" :key="clue" class="ref-criterion">
             <div class="ref-clue-name">{{ clue }}</div>
             <div class="ref-criterion-detail">
               <span class="ref-threshold">{{ criterion.threshold }}</span>
@@ -300,6 +344,14 @@ watch(() => props.refreshTrigger, () => {
   padding: 8px 10px;
   background: rgba(0, 0, 0, 0.15);
   border-radius: 6px;
+}
+.ref-loading {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.ref-loading-warn {
+  color: var(--amber, #ffc107);
 }
 .ref-section {
   margin-bottom: 8px;

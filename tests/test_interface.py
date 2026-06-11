@@ -592,6 +592,16 @@ class TestHint:
         assert "suggested_tests" in data
         assert isinstance(data["suggested_tests"], list)
 
+    def test_api_disease_references_returns_full_reference(self, client):
+        """GET /api/disease-references/<disease> should expose full criteria, not only matched subset."""
+        resp = client.get("/api/disease-references/pneumonia")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert "guidelines" in data
+        assert "criteria" in data
+        assert isinstance(data["criteria"], dict)
+        assert "PaO2_low" in data["criteria"]
+
 
 # ─────────────────────────────────────────────────────────────
 #  SECTION 10: Content Type / JSON Response Verification

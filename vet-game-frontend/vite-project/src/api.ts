@@ -1,6 +1,21 @@
-import type { Case, Report, Vitals, GameState, TreatmentResult, GameOverData, DiagnosisResponse, DrugEntry, AdministerDrugResponse } from "./types";
+import type {
+  Case,
+  Report,
+  Vitals,
+  GameState,
+  TreatmentResult,
+  GameOverData,
+  DiagnosisResponse,
+  DrugEntry,
+  AdministerDrugResponse,
+  DiseaseReference,
+} from "./types";
 
-const BASE = "/api";
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+const BASE = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || "/api");
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const opts: RequestInit = {
@@ -100,6 +115,9 @@ export const api = {
 
   getDiagnosis: (sessionId: string): Promise<DiagnosisResponse> =>
     request("GET", `/diagnosis?session_id=${sessionId}`),
+
+  getDiseaseReferences: (diseaseName: string): Promise<DiseaseReference> =>
+    request("GET", `/disease-references/${encodeURIComponent(diseaseName)}`),
 
   getDrugs: (): Promise<Record<string, { name: string; half_life_h: number; description: string }>> =>
     request("GET", "/drugs"),
