@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, watch, nextTick } from "vue";
-import type { Case, Vitals, Report } from "./types";
+import type { Case, Vitals, Report, ActiveSign } from "./types";
 import { api } from "./api";
 import CaseSelect from "./components/CaseSelect.vue";
 import PatientCard from "./components/PatientCard.vue";
@@ -37,6 +37,7 @@ const gameLog = ref<string[]>([]);
 const gameOverData = ref<{ reason: string; actual_disease: string; score?: { total: number; grade: string; time_used: number } }>({ reason: "", actual_disease: "" });
 const isNight = ref(false);
 const gameTime = ref("08:00");
+const activeSigns = ref<ActiveSign[]>([]);
 
 // ── 疾病名映射 ──
 const diseaseNameMap: Record<string, string> = {
@@ -75,6 +76,36 @@ const timeBarClass = computed(() => {
   return "ok";
 });
 
+// ── 活跃症状按器官系统分组 ──
+const SYSTEM_LABELS: Record<string, string> = {
+  cardiovascular: "心血管",
+  respiratory: "呼吸",
+  gastrointestinal: "消化",
+  hepatic: "肝胆",
+  renal: "泌尿",
+  hematologic: "血液/凝血",
+  neurological: "神经",
+  endocrine: "内分泌/代谢",
+  musculoskeletal: "肌骨/疼痛",
+  integumentary: "皮肤",
+  systemic: "全身",
+};
+const LOCALIZING_LABELS: Record<string, string> = {
+  pathognomonic: "特异性",
+  highly_localizing: "高度定位",
+  organ_localizing: "系统定位",
+  non_specific: "非特异",
+};
+const signsBySystem = computed(() => {
+  const groups: Record<string, ActiveSign[]> = {};
+  for (const s of activeSigns.value) {
+    const sys = s.organ_system || "systemic";
+    if (!groups[sys]) groups[sys] = [];
+    groups[sys].push(s);
+  }
+  return groups;
+});
+
 // ── Helpers ──
 function updateFrom(d: Record<string, unknown>) {
   if (d.vitals) Object.assign(vitals, d.vitals);
@@ -90,6 +121,9 @@ function updateFrom(d: Record<string, unknown>) {
   }
   if (d.game_time !== undefined) gameTime.value = d.game_time as string;
   if (d.is_night !== undefined) isNight.value = d.is_night as boolean;
+  if (d.active_signs && Array.isArray(d.active_signs)) {
+    activeSigns.value = d.active_signs as ActiveSign[];
+  }
   if (d.new_reports && Array.isArray(d.new_reports)) {
     for (const r of d.new_reports) {
       if (!reports.value.find((x) => x.test_type === (r as Report).test_type && x.summary === (r as Report).summary)) {
@@ -423,6 +457,17 @@ function restart() {
             ⏳ 等待观察（10 分钟）
           </button>
         </div>
+        <!-- Active Signs grouped by organ system -->
+        <div v-if="activeSigns.length > 0" class="active-signs-section">
+          <div class="panel-ttl" style="margin-top: 12px">临床体征</div>
+          <div v-for="(signs, system) in signsBySystem" :key="system" class="sign-group">
+            <div class="sign-system-label">{{ SYSTEM_LABELS[system] || system }} ({{ signs.length }})</div>
+            <div v-for="s in signs" :key="s.sign_id" class="sign-item" :class="'loc-' + s.localizing_value">
+              <span class="sign-name">{{ s.display_name }}</span>
+              <span class="sign-loc">{{ LOCALIZING_LABELS[s.localizing_value] || '' }}</span>
+            </div>
+          </div>
+        </div>
       </template>
     </div>
   </div>
@@ -558,5 +603,52 @@ function restart() {
   font-family: var(--mono);
   font-size: 0.55rem;
   color: var(--text-dim);
+}
+
+/* ── Active Signs ── */
+.active-signs-section {
+  margin-top: 4px;
+}
+.sign-group {
+  margin-bottom: 6px;
+}
+.sign-system-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+  padding-left: 2px;
+}
+.sign-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  margin-bottom: 1px;
+  background: var(--surface-1);
+}
+.sign-name {
+  color: var(--text);
+}
+.sign-loc {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+.loc-pathognomonic {
+  border-left: 3px solid #e74c3c;
+}
+.loc-highly_localizing {
+  border-left: 3px solid #f39c12;
+}
+.loc-organ_localizing {
+  border-left: 3px solid #3498db;
+}
+.loc-non_specific {
+  border-left: 3px solid var(--text-dim);
 }
 </style>

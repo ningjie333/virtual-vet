@@ -650,6 +650,7 @@ def api_game_state():
             "reports_count": len(state.reports),
             "pending_reports": len(state.pending_reports),
             "game_log": _build_game_log(state),
+            "active_signs": _get_active_signs(state.engine, runtime=runtime),
         }
     )
 
@@ -784,6 +785,27 @@ def _get_vitals(vc: VirtualCreature, elapsed_min: float = 0.0, runtime=None) -> 
         "game_time": summary["game_time"],
         "is_night": summary["is_night"],
     }
+
+
+def _get_active_signs(vc: VirtualCreature, runtime=None) -> list[dict]:
+    """从引擎提取当前活跃症状，按 organ_system 分组"""
+    runtime = runtime or default_runtime()
+    signs_engine = getattr(vc, "clinical_signs_engine", None)
+    if signs_engine is None:
+        return []
+    active = signs_engine.get_active_signs()
+    return [
+        {
+            "sign_id": s.sign_id,
+            "display_name": s.display_name,
+            "severity": s.severity,
+            "clue_id": s.clue_id,
+            "organ_system": s.organ_system,
+            "localizing_value": s.localizing_value,
+        }
+        for s in active
+        if s.active
+    ]
 
 
 def _build_game_log(state: GameState) -> list[str]:

@@ -46,6 +46,8 @@ class SignInstance:
     onset_time_s: float
     active: bool = True
     clue_id: str = ""
+    organ_system: str = ""
+    localizing_value: str = ""
 
 
 # ──────────────────────────────────────────────
@@ -169,6 +171,8 @@ class ClinicalSignsEngine:
                         onset_time_s=self._onset_delayed[sign_id],
                         active=True,
                         clue_id=rule_def.get("clue_id", sign_id),
+                        organ_system=rule_def.get("organ_system", ""),
+                        localizing_value=rule_def.get("localizing_value", ""),
                     )
             else:
                 # Cancel sustained tracking

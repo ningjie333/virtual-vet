@@ -115,6 +115,15 @@ export interface GameOverData {
   score?: { total: number; grade: string; time_used: number };
 }
 
+export interface ActiveSign {
+  sign_id: string;
+  display_name: string;
+  severity: string;
+  clue_id: string;
+  organ_system: string;
+  localizing_value: string;
+}
+
 export interface DrugEntry {
   drug_name: string;
   dose_mg_kg?: number;
