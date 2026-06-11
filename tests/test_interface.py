@@ -755,6 +755,36 @@ class TestSessionPersistence:
 
 class TestErrorHandling:
 
+    def test_session_endpoints_require_lock(self, client):
+        """Session state without a lock is treated as an invalid session."""
+        _start_game(client)
+        import gui_app as gui
+
+        gui._session_locks.pop("case_001", None)
+
+        endpoints = [
+            ("GET", "/api/game-state?session_id=case_001", None),
+            ("GET", "/api/hint?session_id=case_001", None),
+            ("GET", "/api/diagnosis?session_id=case_001", None),
+            ("POST", "/api/examine", {"session_id": "case_001", "test_type": "physical"}),
+            ("POST", "/api/wait", {"session_id": "case_001"}),
+            ("POST", "/api/diagnose", {"session_id": "case_001", "diagnosis": "pneumonia"}),
+            (
+                "POST",
+                "/api/administer-drug",
+                {"session_id": "case_001", "drug_name": "pimobendan", "dose_mg_kg": 0.25},
+            ),
+        ]
+
+        for method, path, payload in endpoints:
+            resp = client.open(
+                path,
+                method=method,
+                data=json.dumps(payload) if payload is not None else None,
+                content_type="application/json" if payload is not None else None,
+            )
+            assert resp.status_code == 404, path
+
     def test_examine_empty_body(self, client):
         """POST /api/examine with empty JSON body should use defaults."""
         _start_game(client)

@@ -243,3 +243,46 @@ class TestChannelCoverage:
                 return object() if name == "slower" else None
 
         assert _effective_lane_for_item(DummyItem()) == "benchmark"
+
+
+class TestApiGateRules:
+    """API gate should catch frontend/backend contract drift."""
+
+    def test_get_request_body_is_critical(self, tmp_path, monkeypatch, capsys):
+        from tools.dev import check_api_consistency
+
+        gui_app = tmp_path / "gui_app.py"
+        gui_app.write_text(
+            """
+class App:
+    def route(self, *args, **kwargs):
+        def decorator(fn):
+            return fn
+        return decorator
+
+app = App()
+
+@app.route("/api/game-state", methods=["GET"])
+def api_game_state():
+    return {}
+""",
+            encoding="utf-8",
+        )
+        api_ts = tmp_path / "api.ts"
+        api_ts.write_text(
+            '''
+const BASE = "/api";
+async function request(method: string, path: string, body?: unknown) {}
+export const api = {
+  getGameState: (sessionId: string) =>
+    request("GET", "/game-state", { session_id: sessionId }),
+};
+''',
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(check_api_consistency, "GUI_APP", gui_app)
+        monkeypatch.setattr(check_api_consistency, "API_TS", api_ts)
+
+        assert check_api_consistency.run() == 1
+        assert "GET 请求不应传 request body" in capsys.readouterr().out

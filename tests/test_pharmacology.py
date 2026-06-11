@@ -489,11 +489,13 @@ class TestApiAdministerDrug:
         vc.attach_disease(disease)
         state = GameState(engine=vc, disease_name=case["disease"])
         _game_sessions["test_case_001"] = state
+        _session_locks["test_case_001"] = threading.Lock()
 
         yield
 
         # Cleanup
         _game_sessions.pop("test_case_001", None)
+        _session_locks.pop("test_case_001", None)
 
     def test_api_administer_drug_success(self):
         """POST /api/administer-drug should return success and updated vitals."""

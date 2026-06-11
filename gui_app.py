@@ -163,6 +163,13 @@ _DEFAULT_PORT = 5000
 # ============================================================
 
 
+def _session_lock_or_404(session_id: str, message: str):
+    lock = _session_locks.get(session_id)
+    if not lock:
+        return None, (jsonify({"error": message}), 404)
+    return lock, None
+
+
 def _get_bind_host() -> str:
     return os.getenv("VV_HOST", _DEFAULT_HOST)
 
@@ -482,48 +489,53 @@ def api_administer_drug():
     dose_mg_kg = data.get("dose_mg_kg", 0.0)
     volume_ml = data.get("volume_ml", 0.0)
 
-    state = _game_sessions.get(session_id)
-    if not state:
-        return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
-    runtime = _runtime_for_session(session_id)
+    lock, error = _session_lock_or_404(session_id, "游戏会话不存在，请先开始新游戏")
+    if error:
+        return error
 
-    if state.phase in ("won", "lost"):
-        return jsonify({"error": f"游戏已结束: {state.phase}"}), 400
+    with lock:
+        state = _game_sessions.get(session_id)
+        if not state:
+            return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
+        runtime = _runtime_for_session(session_id)
 
-    # 构建 process_action 参数
-    params = {"drug_name": drug_name}
-    if volume_ml > 0:
-        params["volume_ml"] = volume_ml
-    else:
-        params["dose_mg_kg"] = dose_mg_kg
+        if state.phase in ("won", "lost"):
+            return jsonify({"error": f"游戏已结束: {state.phase}"}), 400
 
-    result = process_action(state, "administer_drug", params, runtime=runtime)
-    engine_summary = result.get("engine_summary", {})
+        # 构建 process_action 参数
+        params = {"drug_name": drug_name}
+        if volume_ml > 0:
+            params["volume_ml"] = volume_ml
+        else:
+            params["dose_mg_kg"] = dose_mg_kg
 
-    response = {
-        "success": result["success"],
-        "phase": result["phase"],
-        "medical_phase": result.get("medical_phase", "stable"),
-        "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
-        "time_budget_min": state.time_budget_min,
-        "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
-        "death_timer": state.death_timer,
-        "new_reports": result.get("new_reports", []),
-        "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
-        "game_log": _build_game_log(state),
-        "game_time": engine_summary.get("game_time", "08:00"),
-        "is_night": engine_summary.get("is_night", False),
-        "time_cost_min": result.get("time_cost_min", 0),
-    }
+        result = process_action(state, "administer_drug", params, runtime=runtime)
+        engine_summary = result.get("engine_summary", {})
 
-    if not result["success"]:
-        response["error"] = f"给药失败：药物 '{drug_name}' 未注册"
+        response = {
+            "success": result["success"],
+            "phase": result["phase"],
+            "medical_phase": result.get("medical_phase", "stable"),
+            "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
+            "time_budget_min": state.time_budget_min,
+            "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
+            "death_timer": state.death_timer,
+            "new_reports": result.get("new_reports", []),
+            "pending_reports": result.get("pending_count", 0),
+            "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
+            "game_log": _build_game_log(state),
+            "game_time": engine_summary.get("game_time", "08:00"),
+            "is_night": engine_summary.get("is_night", False),
+            "time_cost_min": result.get("time_cost_min", 0),
+        }
 
-    # Persist to SQLite (best-effort)
-    _persist_action(state, session_id, "administer_drug", params, result)
+        if not result["success"]:
+            response["error"] = f"给药失败：药物 '{drug_name}' 未注册"
 
-    return jsonify(response)
+        # Persist to SQLite (best-effort)
+        _persist_action(state, session_id, "administer_drug", params, result)
+
+        return jsonify(response)
 
 
 @app.route("/api/diagnose", methods=["POST"])
@@ -537,61 +549,66 @@ def api_diagnose():
     session_id = data.get("session_id", _DEFAULT_SESSION_ID)
     diagnosis = data.get("diagnosis", "")
 
-    state = _game_sessions.get(session_id)
-    if not state:
-        return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
-    runtime = _runtime_for_session(session_id)
+    lock, error = _session_lock_or_404(session_id, "游戏会话不存在，请先开始新游戏")
+    if error:
+        return error
 
-    if state.phase in ("won", "lost"):
-        return jsonify({"error": f"游戏已结束: {state.phase}"}), 400
+    with lock:
+        state = _game_sessions.get(session_id)
+        if not state:
+            return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
+        runtime = _runtime_for_session(session_id)
 
-    # 使用 action_system 的 process_action
-    result = process_action(
-        state,
-        "treat",
-        {"disease_guess": diagnosis},
-        runtime=runtime,
-    )
-    engine_summary = result.get("engine_summary", {})
+        if state.phase in ("won", "lost"):
+            return jsonify({"error": f"游戏已结束: {state.phase}"}), 400
 
-    response = {
-        "success": result["success"],
-        "phase": result["phase"],
-        "medical_phase": result.get("medical_phase", "stable"),
-        "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
-        "time_budget_min": state.time_budget_min,
-        "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
-        "death_timer": state.death_timer,
-        "treatment_result": result.get("result"),
-        "new_reports": result.get("new_reports", []),
-        "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
-        "game_log": _build_game_log(state),
-        "game_time": engine_summary.get("game_time", "08:00"),
-        "is_night": engine_summary.get("is_night", False),
-        "time_cost_min": result.get("time_cost_min", 0),
-    }
-
-    if state.phase == "won":
-        response["game_over"] = {
-            "reason": "诊断正确，治疗有效！患犬正在康复。",
-            "actual_disease": state.disease_name,
-            "score": _calc_score(state),
-        }
-    elif state.phase == "lost":
-        response["game_over"] = {
-            "reason": "患犬未能挺过危机，抢救无效。",
-            "actual_disease": state.disease_name,
-        }
-
-    # Persist to SQLite; also record final outcome
-    _persist_action(state, session_id, "treat", {"disease_guess": diagnosis}, result)
-    if state.phase in ("won", "lost"):
-        db_update_session_outcome(
-            _db_conn, session_id, state.phase, state.time_elapsed_min,
+        # 使用 action_system 的 process_action
+        result = process_action(
+            state,
+            "treat",
+            {"disease_guess": diagnosis},
+            runtime=runtime,
         )
+        engine_summary = result.get("engine_summary", {})
 
-    return jsonify(response)
+        response = {
+            "success": result["success"],
+            "phase": result["phase"],
+            "medical_phase": result.get("medical_phase", "stable"),
+            "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
+            "time_budget_min": state.time_budget_min,
+            "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
+            "death_timer": state.death_timer,
+            "treatment_result": result.get("result"),
+            "new_reports": result.get("new_reports", []),
+            "pending_reports": result.get("pending_count", 0),
+            "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
+            "game_log": _build_game_log(state),
+            "game_time": engine_summary.get("game_time", "08:00"),
+            "is_night": engine_summary.get("is_night", False),
+            "time_cost_min": result.get("time_cost_min", 0),
+        }
+
+        if state.phase == "won":
+            response["game_over"] = {
+                "reason": "诊断正确，治疗有效！患犬正在康复。",
+                "actual_disease": state.disease_name,
+                "score": _calc_score(state),
+            }
+        elif state.phase == "lost":
+            response["game_over"] = {
+                "reason": "患犬未能挺过危机，抢救无效。",
+                "actual_disease": state.disease_name,
+            }
+
+        # Persist to SQLite; also record final outcome
+        _persist_action(state, session_id, "treat", {"disease_guess": diagnosis}, result)
+        if state.phase in ("won", "lost"):
+            db_update_session_outcome(
+                _db_conn, session_id, state.phase, state.time_elapsed_min,
+            )
+
+        return jsonify(response)
 
 
 @app.route("/api/wait", methods=["POST"])
@@ -603,100 +620,115 @@ def api_wait():
     data = request.get_json() or {}
     session_id = data.get("session_id", _DEFAULT_SESSION_ID)
 
-    state = _game_sessions.get(session_id)
-    if not state:
-        return jsonify({"error": "游戏会话不存在"}), 404
-    runtime = _runtime_for_session(session_id)
+    lock, error = _session_lock_or_404(session_id, "游戏会话不存在")
+    if error:
+        return error
 
-    result = process_action(state, "wait", {}, runtime=runtime)
-    engine_summary = result.get("engine_summary", {})
+    with lock:
+        state = _game_sessions.get(session_id)
+        if not state:
+            return jsonify({"error": "游戏会话不存在"}), 404
+        runtime = _runtime_for_session(session_id)
 
-    response = {
-        "success": result["success"],
-        "phase": result["phase"],
-        "medical_phase": result.get("medical_phase", "stable"),
-        "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
-        "time_budget_min": state.time_budget_min,
-        "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
-        "death_timer": state.death_timer,
-        "new_reports": result.get("new_reports", []),
-        "pending_reports": result.get("pending_count", 0),
-        "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
-        "game_log": _build_game_log(state),
-        "game_time": engine_summary.get("game_time", "08:00"),
-        "is_night": engine_summary.get("is_night", False),
-        "time_cost_min": result.get("time_cost_min", 0),
-    }
+        result = process_action(state, "wait", {}, runtime=runtime)
+        engine_summary = result.get("engine_summary", {})
 
-    if state.phase == "lost":
-        response["game_over"] = {
-            "reason": "患犬未能挺过危机，抢救无效。",
-            "actual_disease": state.disease_name,
+        response = {
+            "success": result["success"],
+            "phase": result["phase"],
+            "medical_phase": result.get("medical_phase", "stable"),
+            "time_elapsed_min": result.get("time_elapsed_min", state.time_elapsed_min),
+            "time_budget_min": state.time_budget_min,
+            "time_remaining_min": result.get("time_remaining_min", state.time_remaining_min),
+            "death_timer": state.death_timer,
+            "new_reports": result.get("new_reports", []),
+            "pending_reports": result.get("pending_count", 0),
+            "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
+            "game_log": _build_game_log(state),
+            "game_time": engine_summary.get("game_time", "08:00"),
+            "is_night": engine_summary.get("is_night", False),
+            "time_cost_min": result.get("time_cost_min", 0),
         }
 
-    # Persist to SQLite (best-effort)
-    _persist_action(state, session_id, "wait", {}, result)
+        if state.phase == "lost":
+            response["game_over"] = {
+                "reason": "患犬未能挺过危机，抢救无效。",
+                "actual_disease": state.disease_name,
+            }
 
-    return jsonify(response)
+        # Persist to SQLite (best-effort)
+        _persist_action(state, session_id, "wait", {}, result)
+
+        return jsonify(response)
 
 
 @app.route("/api/game-state", methods=["GET"])
 def api_game_state():
     """获取当前游戏状态（用于刷新/轮询）"""
     session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
-    state = _game_sessions.get(session_id)
-    if not state:
-        return jsonify({"error": "游戏会话不存在"}), 404
-    runtime = _runtime_for_session(session_id)
+    lock, error = _session_lock_or_404(session_id, "游戏会话不存在")
+    if error:
+        return error
 
-    summary = _clinical_summary(state.engine, state.time_elapsed_min, runtime=runtime)
+    with lock:
+        state = _game_sessions.get(session_id)
+        if not state:
+            return jsonify({"error": "游戏会话不存在"}), 404
+        runtime = _runtime_for_session(session_id)
 
-    return jsonify(
-        {
-            "phase": state.phase,
-            "medical_phase": _clinical_phase(state.engine, runtime=runtime),
-            "time_elapsed_min": state.time_elapsed_min,
-            "time_budget_min": state.time_budget_min,
-            "time_remaining_min": state.time_remaining_min,
-            "death_timer": state.death_timer,
-            "game_time": summary["game_time"],
-            "is_night": summary["is_night"],
-            "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
-            "reports_count": len(state.reports),
-            "pending_reports": len(state.pending_reports),
-            "game_log": _build_game_log(state),
-            "active_signs": _get_active_signs(state.engine, runtime=runtime),
-        }
-    )
+        summary = _clinical_summary(state.engine, state.time_elapsed_min, runtime=runtime)
+
+        return jsonify(
+            {
+                "phase": state.phase,
+                "medical_phase": _clinical_phase(state.engine, runtime=runtime),
+                "time_elapsed_min": state.time_elapsed_min,
+                "time_budget_min": state.time_budget_min,
+                "time_remaining_min": state.time_remaining_min,
+                "death_timer": state.death_timer,
+                "game_time": summary["game_time"],
+                "is_night": summary["is_night"],
+                "vitals": _get_vitals(state.engine, state.time_elapsed_min, runtime=runtime),
+                "reports_count": len(state.reports),
+                "pending_reports": len(state.pending_reports),
+                "game_log": _build_game_log(state),
+                "active_signs": _get_active_signs(state.engine, runtime=runtime),
+            }
+        )
 
 
 @app.route("/api/hint", methods=["GET"])
 def api_hint():
     """根据已获取的报告给出诊断提示"""
     session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
-    state = _game_sessions.get(session_id)
-    if not state:
-        return jsonify({"error": "游戏会话不存在"}), 404
+    lock, error = _session_lock_or_404(session_id, "游戏会话不存在")
+    if error:
+        return error
 
-    if not state.reports:
-        return jsonify({"hint": "请先开具检查，获取检查报告后再来查看提示。"})
+    with lock:
+        state = _game_sessions.get(session_id)
+        if not state:
+            return jsonify({"error": "游戏会话不存在"}), 404
 
-    matches = match_diseases(state.reports)
-    if not matches:
-        return jsonify({"hint": "目前检查数据不足以匹配任何已知疾病，建议进一步检查。"})
+        if not state.reports:
+            return jsonify({"hint": "请先开具检查，获取检查报告后再来查看提示。"})
 
-    top = matches[0]
-    disease_display = _DISEASE_NAMES.get(top["disease"], top["disease"])
+        matches = match_diseases(state.reports)
+        if not matches:
+            return jsonify({"hint": "目前检查数据不足以匹配任何已知疾病，建议进一步检查。"})
 
-    matched_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["matched_clues"][:5]]
-    missed_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["missed_clues"][:3]]
+        top = matches[0]
+        disease_display = _DISEASE_NAMES.get(top["disease"], top["disease"])
 
-    hint = f"最可能的疾病：**{disease_display}**（置信度 {top['confidence'] * 100:.0f}%）\n\n"
-    hint += f"已匹配线索：{'、'.join(matched_desc)}\n"
-    if missed_desc:
-        hint += f"未确认线索：{'、'.join(missed_desc)}"
+        matched_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["matched_clues"][:5]]
+        missed_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["missed_clues"][:3]]
 
-    return jsonify({"hint": hint})
+        hint = f"最可能的疾病：**{disease_display}**（置信度 {top['confidence'] * 100:.0f}%）\n\n"
+        hint += f"已匹配线索：{'、'.join(matched_desc)}\n"
+        if missed_desc:
+            hint += f"未确认线索：{'、'.join(missed_desc)}"
+
+        return jsonify({"hint": hint})
 
 
 @app.route("/api/diagnosis", methods=["GET"])
@@ -713,28 +745,33 @@ def api_diagnosis():
     from game.diagnosis_engine import get_disease_references_with_clues
 
     session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
-    state = _game_sessions.get(session_id)
-    if not state:
-        return jsonify({"error": "游戏会话不存在"}), 404
+    lock, error = _session_lock_or_404(session_id, "游戏会话不存在")
+    if error:
+        return error
 
-    matches = match_diseases(state.reports)
-    suggested = get_suggested_tests(matches)
+    with lock:
+        state = _game_sessions.get(session_id)
+        if not state:
+            return jsonify({"error": "游戏会话不存在"}), 404
 
-    # 为 top 3 候选疾病添加文献引用
-    references = {}
-    for m in matches[:3]:
-        disease = m["disease"]
-        refs = get_disease_references_with_clues(disease, m["matched_clues"])
-        if refs["guidelines"] or refs["matched_criteria"]:
-            references[disease] = refs
+        matches = match_diseases(state.reports)
+        suggested = get_suggested_tests(matches)
 
-    return jsonify(
-        {
-            "matches": matches,
-            "suggested_tests": suggested,
-            "references": references,
-        }
-    )
+        # 为 top 3 候选疾病添加文献引用
+        references = {}
+        for m in matches[:3]:
+            disease = m["disease"]
+            refs = get_disease_references_with_clues(disease, m["matched_clues"])
+            if refs["guidelines"] or refs["matched_criteria"]:
+                references[disease] = refs
+
+        return jsonify(
+            {
+                "matches": matches,
+                "suggested_tests": suggested,
+                "references": references,
+            }
+        )
 
 
 @app.route("/api/disease-references/<disease_name>", methods=["GET"])

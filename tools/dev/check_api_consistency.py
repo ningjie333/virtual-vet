@@ -86,7 +86,6 @@ def parse_api_ts_calls(filepath: Path) -> list[dict]:
     for m in pattern.finditer(src):
         method = m.group(1).upper()
         path = m.group(2) or m.group(3) or ""
-        is_template = m.group(3) is not None
         has_path_variable = False
         # 检查路径部分（不含 query string）是否含变量
         path_part = path.split("?")[0] if "?" in path else path
@@ -106,6 +105,8 @@ def parse_api_ts_calls(filepath: Path) -> list[dict]:
                 after_second_quote = full_line[second_quote_pos + 1:]
                 if " + " in after_second_quote:
                     has_path_variable = True
+        rest_after_path = src[m.end():]
+        has_body_arg = bool(re.match(r"\s*,\s*[^)]", rest_after_path))
         # 去掉 query string
         clean_path = path.split("?")[0]
         # 拼接 BASE 前缀得到完整路径
@@ -119,6 +120,7 @@ def parse_api_ts_calls(filepath: Path) -> list[dict]:
                 "raw_path": path,
                 "line": src[: m.start()].count("\n") + 1,
                 "dynamic": has_path_variable,
+                "has_body_arg": has_body_arg,
             }
         )
     return calls
@@ -172,6 +174,9 @@ def run() -> int:
         frontend_paths[key] = c
 
     for key, c in frontend_paths.items():
+        if c["method"] == "GET" and c.get("has_body_arg"):
+            errors.append((SEVERITY_CRITICAL, f"api.ts:{c['line']} → {key} GET 请求不应传 request body", 1))
+
         route = match_route(c["path"], api_routes)
         if route is None:
             if c.get("dynamic"):
@@ -191,7 +196,6 @@ def run() -> int:
                 )
 
     # 后端有但前端没调用（排除静态文件路由）
-    backend_api_paths = {r["path"] for r in api_routes}
     frontend_api_paths = {c["path"] for c in api_calls}
     # 标准化后比较
     normalized_frontend = {

@@ -108,13 +108,13 @@ export const api = {
     game_log: string[];
     game_time?: string;
     is_night?: boolean;
-  }> => request("GET", "/game-state", { session_id: sessionId }),
+  }> => request("GET", `/game-state?session_id=${encodeURIComponent(sessionId)}`),
 
   getHint: (sessionId: string): Promise<{ hint: string }> =>
-    request("GET", `/hint?session_id=${sessionId}`),
+    request("GET", `/hint?session_id=${encodeURIComponent(sessionId)}`),
 
   getDiagnosis: (sessionId: string): Promise<DiagnosisResponse> =>
-    request("GET", `/diagnosis?session_id=${sessionId}`),
+    request("GET", `/diagnosis?session_id=${encodeURIComponent(sessionId)}`),
 
   getDiseaseReferences: (diseaseName: string): Promise<DiseaseReference> =>
     request("GET", `/disease-references/${encodeURIComponent(diseaseName)}`),
