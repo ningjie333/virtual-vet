@@ -176,6 +176,10 @@
       "bundle": "fast-engine",
       "lane": "fast"
     },
+    "test_radau_factor_command.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
     "test_solver_endurance.py": {
       "bundle": "benchmark-solver",
       "lane": "benchmark"

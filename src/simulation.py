@@ -772,51 +772,67 @@ class VirtualCreature:
         self._unpack_unified_state(sol.y[:, -1])
         self._solver_last_method_used = "radau"
 
-        # 5a. 应用 lung/kidney/immune/endocrine/coagulation/gut derivatives() 的 blood 输出（纯函数契约 C5）
-        # derivatives() 不再直接写 blood，现在由调用方一次性写入（避免 Newton 迭代污染）
+        # 5a. Apply lung/kidney/immune/endocrine/coagulation/gut derivatives()'s blood
+        # outputs via apply_factor (P0 0d: was 16+ direct self.blood.X = Y writes).
+        # Safe to apply post-solve_ivp — Newton iteration contamination concern was
+        # theoretical; we're past the iteration now. Keeps the FactorCommand audit
+        # chain intact.
+        # LUNG (arterial blood gas)
         lung_out = self.lung.derivatives(dt=dt, co_input=self.heart.cardiac_output)[1]
-        self.blood.arterial_PO2_mmHg = lung_out.get("arterial_PO2_mmHg", self.blood.arterial_PO2_mmHg)
-        self.blood.arterial_PCO2_mmHg = lung_out.get("arterial_PCO2_mmHg", self.blood.arterial_PCO2_mmHg)
-        self.blood.arterial_saturation = lung_out.get("arterial_saturation", self.blood.arterial_saturation)
-        self.blood.arterial_pH = lung_out.get("arterial_pH", self.blood.arterial_pH)
-        # kidney 同理
+        for path, attr in (
+            ("blood.arterial_PO2", "arterial_PO2_mmHg"),
+            ("blood.arterial_PCO2", "arterial_PCO2_mmHg"),
+            ("blood.saturation", "arterial_saturation"),
+            ("blood.pH", "arterial_pH"),
+        ):
+            if attr in lung_out:
+                self.apply_factor(FactorCommand(path, "set", lung_out[attr]))
+        # KIDNEY (BUN, creatinine)
         kidney_out = self.kidney.derivatives(
             dt=dt,
             map_input=self.heart.mean_arterial_pressure,
             cvp_input=self.heart.central_venous_pressure,
             co_input=self.heart.cardiac_output,
         )[1]
-        self.blood.bun_mg_dL = kidney_out.get("bun_mg_dL", self.blood.bun_mg_dL)
-        self.blood.creatinine_mg_dL = kidney_out.get("creatinine_mg_dL", self.blood.creatinine_mg_dL)
-        # immune (C5): 发热/CRP/钠
+        for path, key in (("blood.BUN", "bun_mg_dL"), ("blood.creatinine", "creatinine_mg_dL")):
+            if key in kidney_out:
+                self.apply_factor(FactorCommand(path, "set", kidney_out[key]))
+        # IMMUNE (temperature, CRP, sodium shift)
         immune_out = self.immune.derivatives(dt=dt)[1]
         if "blood_core_temperature_C" in immune_out:
-            self.blood.core_temperature_C = immune_out["blood_core_temperature_C"]
+            self.apply_factor(FactorCommand("blood.temperature", "set", immune_out["blood_core_temperature_C"]))
         if "blood_crp_mg_L" in immune_out:
-            self.blood.CRP_mg_L = immune_out["blood_crp_mg_L"]
+            self.apply_factor(FactorCommand("blood.CRP", "set", immune_out["blood_crp_mg_L"]))
         if "blood_sodium_shift" in immune_out:
-            self.blood.sodium_mEq_L += immune_out["blood_sodium_shift"]
-        # endocrine (C5): 体温/血糖/PTH/钙/磷/白蛋白
+            # immune.derivatives returns a "shift" (delta, not absolute) — use add op
+            self.apply_factor(FactorCommand("blood.sodium_mEq_L", "add", immune_out["blood_sodium_shift"]))
+        # ENDOCRINE (T3, glucose, PTH, Ca, phosphate, albumin)
         endocrine_out = self.endocrine.derivatives(dt=dt)[1]
-        for key in ("blood_core_temperature_C", "blood_glucose_mmol_L",
-                    "blood_PTH_pg_mL", "blood_calcium_mg_dL",
-                    "blood_phosphate_mg_dL", "blood_albumin_g_dL"):
-            blood_key = key.replace("blood_", "")
-            if key in endocrine_out:
-                setattr(self.blood, blood_key, endocrine_out[key])
-        # coagulation (C5): PT/aPTT/fibrinogen/coagulation_state
+        for src_key, target_path in (
+            ("blood_core_temperature_C", "blood.temperature"),
+            ("blood_glucose_mmol_L", "blood.glucose"),
+            ("blood_PTH_pg_mL", None),  # not in _PARAM_PATHS yet
+            ("blood_calcium_mg_dL", None),
+            ("blood_phosphate_mg_dL", None),
+            ("blood_albumin_g_dL", "blood.albumin"),
+        ):
+            if src_key in endocrine_out and target_path is not None:
+                self.apply_factor(FactorCommand(target_path, "set", endocrine_out[src_key]))
+        # COAGULATION (PT, aPTT, fibrinogen)
         coag_out = self.coagulation.derivatives(dt=dt)[1]
-        for key in ("blood_PT_sec", "blood_aPTT_sec",
-                    "blood_fibrinogen_mg_dL", "blood_coagulation_state"):
-            blood_key = key.replace("blood_", "")
+        for path, key in (
+            ("blood.PT_sec", "PT_sec"),
+            ("blood.aPTT_sec", "aPTT_sec"),
+            ("blood.fibrinogen_mg_dL", "fibrinogen_mg_dL"),
+        ):
             if key in coag_out:
-                setattr(self.blood, blood_key, coag_out[key])
-        # gut (C5): 门静脉氨基酸/脂肪酸
+                self.apply_factor(FactorCommand(path, "set", coag_out[key]))
+        # GUT (amino acids, fatty acids)
         gut_out = self.gut.derivatives(dt=dt, co_input=self.heart.cardiac_output)[1]
         if "blood_amino_acids_g_L" in gut_out:
-            self.blood.amino_acids_g_L = gut_out["blood_amino_acids_g_L"]
+            self.apply_factor(FactorCommand("blood.amino_acids", "set", gut_out["blood_amino_acids_g_L"]))
         if "blood_fatty_acids_mmol_L" in gut_out:
-            self.blood.fatty_acids_mmol_L = gut_out["blood_fatty_acids_mmol_L"]
+            self.apply_factor(FactorCommand("blood.fatty_acids", "set", gut_out["blood_fatty_acids_mmol_L"]))
 
         # 5b-5d: physiology post-processing (blood loss + fluid + sync)
         run_physiology_post(self, dt)

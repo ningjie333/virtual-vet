@@ -176,6 +176,9 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.PT_sec":                ("blood", "PT_sec"),
     "blood.aPTT_sec":              ("blood", "aPTT_sec"),
     "blood.fibrinogen_mg_dL":      ("blood", "fibrinogen_mg_dL"),
+    # P0 0d: factor-paths for fields previously written direct in _step_radau
+    "blood.saturation":            ("blood", "arterial_saturation"),
+    "blood.CRP":                   ("blood", "CRP_mg_L"),
     # Blood — lymphatic aliases
     "blood.splenic_reserve_mL":    ("blood", "splenic_reserve_mL"),
     "blood.interstitial_fluid_mL": ("blood", "interstitial_fluid_mL"),
