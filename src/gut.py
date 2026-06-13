@@ -4,9 +4,12 @@ Gut Module - 肠道吸收系统
 """
 
 from parameters import *
+from src.organ_guard import organ_setattr, _blood_escape
 
 
 class GutModule:
+
+    __setattr__ = organ_setattr
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('co_input',)
@@ -34,7 +37,8 @@ class GutModule:
         base_absorption_rate: float = 0.95,
     ):
         self.w = weight_kg
-        self.blood = blood  # 血液隔室引用
+        with _blood_escape(GutModule):
+            self.blood = blood  # 血液隔室引用
 
         # 肠道运动性 (0-1, 正常 ~0.8)
         self.gut_motility = 0.8

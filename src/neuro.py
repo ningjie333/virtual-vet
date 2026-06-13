@@ -12,9 +12,12 @@ Step: 4.8 (endocrine之后, organ_health之前)
 """
 
 from src.common_types import FactorCommand
+from src.organ_guard import organ_setattr, _blood_escape
 
 
 class NeuroModule:
+
+    __setattr__ = organ_setattr
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('heart_state', 'lung_state')
@@ -33,7 +36,8 @@ class NeuroModule:
 
     def __init__(self, weight_kg: float, blood):
         self.w = weight_kg
-        self.blood = blood  # BloodCompartment 引用
+        with _blood_escape(NeuroModule):
+            self.blood = blood  # BloodCompartment 引用
 
         # 自主神经张力
         self.sympathetic_tone = 0.3       # 交感神经张力 (0-1)

@@ -18,9 +18,12 @@ Step: 4.9 (neuro之后, organ_health之前)
 """
 
 from src.common_types import FactorCommand
+from src.organ_guard import organ_setattr, _blood_escape
 
 
 class ImmuneModule:
+
+    __setattr__ = organ_setattr
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('endocrine_cortisol',)
@@ -43,7 +46,8 @@ class ImmuneModule:
 
     def __init__(self, weight_kg: float, blood, endocrine=None):
         self.w = weight_kg
-        self.blood = blood  # BloodCompartment 引用
+        with _blood_escape(ImmuneModule):
+            self.blood = blood  # BloodCompartment 引用
         self.endocrine = endocrine  # EndocrineModule 引用(可选)
 
         # 细胞因子状态

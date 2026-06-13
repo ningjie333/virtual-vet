@@ -53,8 +53,9 @@ def _compile_expr(fn_str: str):
     try:
         return compile(fn_str, "<expr>", "eval")
     except (SyntaxError, ValueError) as e:
-        logger.error("Expression compile failed: '%s' → %s", fn_str, e)
-        return None
+        # P0(2026-06-13): raising instead of returning None — downstream _eval_fn
+        # would silently return 0.0, making a malformed disease appear to do nothing
+        raise ValueError(f"Expression compile failed: '{fn_str}' → {e}") from e
 
 
 _SAFE_BUILTINS = {"min": min, "max": max, "abs": abs, "clamp": _clamp}
@@ -69,12 +70,14 @@ def _ns(state_vars: dict, params: dict, engine_state: dict) -> dict:
 def _eval_fn(code, namespace: dict) -> float:
     """求值预编译的表达式 code 对象。"""
     if code is None:
-        return 0.0
+        # _compile_expr now raises on failure, so this branch is defensive
+        raise ValueError("_eval_fn called with None code (compile previously failed)")
     try:
         return float(eval(code, {"__builtins__": _SAFE_BUILTINS}, namespace))
     except Exception as e:
-        logger.error("Expression eval failed → %s", e)
-        return 0.0
+        # P0(2026-06-13): re-raise with context instead of silent 0.0
+        # a disease with a bad expression should fail loudly, not appear inert
+        raise ValueError(f"Expression eval failed: {e}") from e
 
 
 # ── 内置 ODE 导数求解器（Phase 2: 供 solve_ivp 调用）───────────────────────────

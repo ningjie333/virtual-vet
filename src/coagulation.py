@@ -14,9 +14,12 @@ Step: 4.65 (liver之后, endocrine之前)
 """
 
 from src.common_types import FactorCommand
+from src.organ_guard import organ_setattr, _blood_escape
 
 
 class CoagulationModule:
+
+    __setattr__ = organ_setattr
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('liver_health_factor', 'immune_cytokine')
@@ -39,7 +42,8 @@ class CoagulationModule:
 
     def __init__(self, weight_kg: float, blood):
         self.w = weight_kg
-        self.blood = blood  # BloodCompartment 引用
+        with _blood_escape(CoagulationModule):
+            self.blood = blood  # BloodCompartment 引用
 
         # 凝血因子活性 (0-1, 1=100%)
         # REF: Furie & Furie 2008 (Cell) — 凝血 cascade 关键因子

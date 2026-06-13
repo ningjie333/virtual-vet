@@ -120,6 +120,10 @@
       "bundle": "fast-engine",
       "lane": "fast"
     },
+    "test_mechanism_b_rr.py": {
+      "bundle": "core-engine",
+      "lane": "core"
+    },
     "test_neuro.py": {
       "bundle": "core-engine",
       "lane": "core"
@@ -159,6 +163,10 @@
     "test_simulation.py": {
       "bundle": "heavy-engine",
       "lane": "heavy"
+    },
+    "test_solver_parity.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
     },
     "test_solver_endurance.py": {
       "bundle": "benchmark-solver",

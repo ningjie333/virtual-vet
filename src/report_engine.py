@@ -318,8 +318,8 @@ def _eval_formula(formula: str, ctx: dict[str, Any], fallback: float = 0.0) -> A
     try:
         safe_ns: dict[str, Any] = {
             "__builtins__": {
-                "hasattr": hasattr,
-                "getattr": getattr,
+                # P0(2026-06-13): getattr/hasattr removed — eval with these enables
+                # arbitrary attribute traversal → RCE if formula input is attacker-controlled
                 "float": float,
                 "int": int,
                 "str": str,

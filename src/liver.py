@@ -6,6 +6,7 @@ Liver Module - 肝脏代谢系统
 import math
 from typing import Any
 from parameters import *
+from src.organ_guard import organ_setattr, _blood_escape
 
 # ── 生理常数 ──
 _MAX_GLYCOGEN_G = 300.0           # 满糖原储备 g（犬类约300g）
@@ -23,6 +24,8 @@ _CYP450_KM = 2.0                 # Michaelis 常数（相对单位）
 
 
 class LiverModule:
+
+    __setattr__ = organ_setattr
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('co_input', 'gut_state', 'insulin', 'glucagon', 'PTH', 'cytokine')
@@ -50,7 +53,8 @@ class LiverModule:
     def __init__(self, weight_kg: float, blood, signal_bus=None):
         # Phase 6: signal bus 显式参数. None 时回退到 blood (BloodShim 兼容).
         self.w = weight_kg
-        self.blood = blood  # 保留供向后兼容 (summary 等仍可读)
+        with _blood_escape(LiverModule):
+            self.blood = blood  # 保留供向后兼容 (summary 等仍可读)
         self._bus = signal_bus if signal_bus is not None else blood
 
         # 代谢功能 (0-1)

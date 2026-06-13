@@ -133,6 +133,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "heart.CVP":                     ("heart", "central_venous_pressure"),
     "heart.blood_volume":            ("heart", "circulating_volume_ml"),
     "heart.stroke_volume":           ("heart", "stroke_volume"),
+    "heart.cardiac_output":          ("heart", "cardiac_output"),  # Radau organ_health factor
     # ── Lung ──────────────────────────────────────────────────────────────
     "lung.diffusion_coefficient":    ("lung", "diffusion_coefficient"),
     "lung.PaO2":                     ("lung", "alveolar_PO2"),

@@ -112,8 +112,8 @@ def _persist_action(state: GameState, session_id: str, action_type: str,
             outcome=outcome,
         )
         db_update_engine_snapshot(_db_conn, session_id, snapshot)
-    except Exception:
-        pass  # Never let SQLite errors affect gameplay
+    except Exception as e:
+        logger.warning("SQLite persistence failed for session %s: %s — gameplay continues", session_id, e)
 
 
 def _snapshot_json(vc: VirtualCreature) -> str:
@@ -121,7 +121,8 @@ def _snapshot_json(vc: VirtualCreature) -> str:
     import json
     try:
         return json.dumps(vc.to_persistence_snapshot(), ensure_ascii=False)
-    except Exception:
+    except Exception as e:
+        logger.warning("Snapshot serialization failed: %s — returning empty snapshot", e)
         return "{}"
 
 

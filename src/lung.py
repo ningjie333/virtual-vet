@@ -10,10 +10,13 @@ Lung Module - 肺气体交换系统
 
 from parameters import *
 from src.respiratory_rhythm import VanDerPolRespiratoryRhythm
+from src.organ_guard import organ_setattr, _blood_escape
 import math
 
 
 class LungModule:
+
+    __setattr__ = organ_setattr
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('co_input', 'P_ACO2')
@@ -48,7 +51,8 @@ class LungModule:
         base_minute_vent: float = None,   # 若为 None 则按 TV × RR 计算
     ):
         self.w = weight_kg
-        self.blood = blood  # 血液隔室引用
+        with _blood_escape(LungModule):
+            self.blood = blood  # 血液隔室引用
 
         # 潮气量（外部传入或按 12 mL/kg 计算）
         _tv = tidal_vol_ml if tidal_vol_ml is not None else 12.0 * weight_kg

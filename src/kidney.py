@@ -4,6 +4,7 @@ Kidney Module - 肾脏泌尿系统
 """
 
 from parameters import *
+from src.organ_guard import organ_setattr, _blood_escape
 
 # ── GFR Starling 模型系数 ──
 _GFR_PGC_MAP_RATIO = 0.6       # 肾小球毛细血管压 / MAP 比值
@@ -12,6 +13,8 @@ _GFR_KF = 3.0                  # 肾小球超滤系数 mL/min/mmHg
 
 
 class KidneyModule:
+
+    __setattr__ = organ_setattr
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('map_input', 'cvp_input', 'co_input', 'blood_glucose', 'blood_Na', 'blood_pH', 'blood_K')
@@ -43,7 +46,8 @@ class KidneyModule:
         water_reabsorp_rate: float = TUBULAR_WATER_REABSORPTION,
     ):
         self.w = weight_kg
-        self.blood = blood  # 血液隔室引用
+        with _blood_escape(KidneyModule):
+            self.blood = blood  # 血液隔室引用
 
         # 基础GFR（外部传入或按 3.0 mL/kg 计算）
         _gfr = base_gfr_ml_min if base_gfr_ml_min is not None else 3.0 * weight_kg

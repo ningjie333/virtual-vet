@@ -13,9 +13,12 @@ Endocrine Module - 内分泌系统
 
 import math
 from parameters import *
+from src.organ_guard import organ_setattr, _blood_escape
 
 
 class EndocrineModule:
+
+    __setattr__ = organ_setattr
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('blood_pH',)
@@ -34,7 +37,8 @@ class EndocrineModule:
 
     def __init__(self, weight_kg: float, blood):
         self.w = weight_kg
-        self.blood = blood  # 血液隔室引用(共享读写)
+        with _blood_escape(EndocrineModule):
+            self.blood = blood  # 血液隔室引用(共享读写)
 
         # ══════════════════════════════════════════════════════
         # 1. 甲状腺轴

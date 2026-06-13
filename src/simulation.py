@@ -12,6 +12,16 @@ import numpy as np
 from src.common_types import FactorCommand
 from src.engine import CONNECTIONS
 from src.engine.factor_pipeline import apply_factor as _apply_factor_impl
+from src.engine.step_common import (
+    run_pre_dispatch,
+    run_post_dispatch,
+    run_physiology_post,
+    run_coupling,
+    _apply_urine_blood_loss,
+    _apply_fluid_and_ph,
+    _sync_blood_volume,
+)
+from src.engine.solvers import SolverRegistry
 from src.clinical_signs_engine import ClinicalSignsEngine as _ClinicalSignsEngine
 from blood import BloodCompartment
 from heart import HeartModule
@@ -28,7 +38,7 @@ from immune import ImmuneModule
 from coagulation import CoagulationModule
 from lymphatic import LymphaticModule
 from lifecycle import LifecycleEngine, LifecycleMode
-from src.organs.coupling import CouplingEngine, OrganContext, PhysiologicalSignal
+from src.organs.coupling import CouplingEngine, OrganContext
 from parameters import (
     DT_SECONDS, SIMULATION_STEP_MS, T_MAX_MINUTES,
     PLASMA_VOLUME_FRACTION,
@@ -78,7 +88,8 @@ class VirtualCreature:
     ):
         self.w = body_weight_kg
         self.species = species
-        self._solver = solver  # "euler" | "radau"
+        # P1-3: solver plugin injection (SolverRegistry handles name→instance)
+        self._solver = SolverRegistry.get(solver)
 
         # 根据物种选择特异性参数
         if species == "feline":
@@ -206,7 +217,6 @@ class VirtualCreature:
         # 仿真时间
         self.current_time_s = 0.0
         self.dt = DT_SECONDS if dt is None else dt  # dt=None → 0.1s (production); dt=float → override (testing)
-        self._solver = solver  # "euler" | "radau" — set via solver= kwarg
         self._record_history_enabled = record_history
         self._legacy_clinical_signs_enabled = legacy_clinical_signs_enabled
 
@@ -479,14 +489,11 @@ class VirtualCreature:
         """
         推进仿真一个时间步。
 
-        根据 self._solver 分流：
-        - "euler": 顺序调用各模块 compute(dt)，精度 O(dt)
-        - "radau": solve_ivp(method='Radau') 统一积分，精度 O(dt^5)
+        Delegates to the injected SolverPlugin (self._solver).
+        Default: EulerSolver (explicit, O(dt)).
+        Activate Radau: solver='radau' or RADAU_ENABLED=1.
         """
-        if self._solver == "radau":
-            return self._step_radau()
-        else:
-            return self._step_euler()
+        return self._solver.step(self)
 
     def _step_euler(self):
         """
@@ -509,35 +516,13 @@ class VirtualCreature:
         t = self.current_time_s
         dt = self.dt
 
-        # Step 0: 事件处理（必须先于 tox.compute，确保药物注射立即生效）
-        self._process_events(t)
-
-        # Step 0.1: 连续失血模型（sigmoid + 累积截止，用于 Euler step 路径）
-        # 两条路径独立：Euler→step() 用这里，Radau→_unified_rhs() 用下面的逻辑
-        if self._blood_loss_config is not None:
-            cfg = self._blood_loss_config
-            t_rel = t - cfg["t_onset"]
-            if t_rel >= 0:
-                # bell curve: rise sigmoid × (1 - fall sigmoid)
-                sigmoid_on = 1.0 / (1.0 + np.exp(-t_rel / cfg["width"]))
-                t_fall = t_rel - 3 * cfg["width"]
-                sigmoid_off = 1.0 / (1.0 + np.exp(-t_fall / cfg["width"]))
-                rate = cfg["k"] * sigmoid_on * (1.0 - sigmoid_off)
-                self.heart.circulating_volume_ml -= rate * dt
-                if self.heart.circulating_volume_ml < 0:
-                    self.heart.circulating_volume_ml = 0
-
-        # Step 0.5: 生命周期因子应用（年龄调整后的基线参数）
-        if not self.lifecycle.is_dead():
-            self.lifecycle.apply_age_factors(self)
-            death_cause = self.lifecycle.death_check()
-            if death_cause:
-                self._handle_death(death_cause)
-                return
+        # Step 0-0.5: 事件处理 + 连续失血 + lifecycle（shared with Radau）
+        if run_pre_dispatch(self):
+            return
 
         # Step 1: 毒理学（可卡因等药物效应）
         tox_state = self.toxicology.compute(dt)
-        self.heart.contractility_factor = tox_state["contractility_factor"]
+        self.apply_factor(FactorCommand("heart.contractility_factor", "set", tox_state["contractility_factor"]))
         svr_factor = tox_state["svr_factor"]
 
         # Step 1.1: 在毒理学之后重新应用生命周期因子
@@ -589,14 +574,11 @@ class VirtualCreature:
                 self.apply_factor(cmd)
 
             # 生理 clamp：防止疾病累积效应把参数推到非生理范围
-            self.heart.heart_rate = max(
-                HEART_RATE_HARD_MIN,
-                min(HEART_RATE_HARD_MAX, self.heart.heart_rate),
-            )
-            self.heart.mean_arterial_pressure = max(
-                30.0,
-                min(200.0, self.heart.mean_arterial_pressure),
-            )
+            # P0(2026-06-13): 通过 apply_factor 写入，保持 FactorCommand 审计链完整性
+            hr_clamped = max(HEART_RATE_HARD_MIN, min(HEART_RATE_HARD_MAX, self.heart.heart_rate))
+            self.apply_factor(FactorCommand("heart.heart_rate", "set", hr_clamped))
+            map_clamped = max(30.0, min(200.0, self.heart.mean_arterial_pressure))
+            self.apply_factor(FactorCommand("heart.MAP", "set", map_clamped))
 
         # Step 3: 肺部气体交换（输入：CO → 输出：血气）
         lung_state = self.lung.compute(dt, CO)
@@ -633,47 +615,9 @@ class VirtualCreature:
         for cmd in immune_state.get("factor_commands", []):
             self.apply_factor(cmd)
 
-        # ── Step 4.95: 多器官耦合 ─────────────────────────────────────────────
-        # 所有器官 compute() 完成后，发布信号到各自的 OrganContext
-        ctx = self._organ_contexts
-        t = self.current_time_s
-        # Heart signals
-        ctx["heart"].publish(PhysiologicalSignal("cardiac_output", CO, "mL/min", "heart", t))
-        ctx["heart"].publish(PhysiologicalSignal("MAP", heart_state["MAP_mmHg"], "mmHg", "heart", t))
-        ctx["heart"].publish(PhysiologicalSignal("central_venous_pressure", CVP, "mmHg", "heart", t))
-        ctx["heart"].publish(PhysiologicalSignal("heart_rate", self.heart.heart_rate, "bpm", "heart", t))
-        ctx["heart"].publish(PhysiologicalSignal("stroke_volume", self.heart.stroke_volume, "mL", "heart", t))
-        ctx["heart"].publish(PhysiologicalSignal("SVR", self.heart.SVR, "mmHg·s/mL", "heart", t))
-        # Lung signals
-        ctx["lung"].publish(PhysiologicalSignal("arterial_PO2", self.blood.arterial_PO2_mmHg, "mmHg", "lung", t))
-        ctx["lung"].publish(PhysiologicalSignal("arterial_PCO2", self.blood.arterial_PCO2_mmHg, "mmHg", "lung", t))
-        ctx["lung"].publish(PhysiologicalSignal("arterial_saturation", self.blood.arterial_saturation, "", "lung", t))
-        ctx["lung"].publish(PhysiologicalSignal("respiratory_rate", lung_state["respiratory_rate"], "/min", "lung", t))
-        ctx["lung"].publish(PhysiologicalSignal("minute_ventilation", lung_state["minute_ventilation"], "mL/min", "lung", t))
-        ctx["lung"].publish(PhysiologicalSignal("diffusion_coefficient", self.lung.diffusion_coefficient, "", "lung", t))
-        # Kidney signals
-        ctx["kidney"].publish(PhysiologicalSignal("GFR", kidney_state["GFR_ml_min"], "mL/min", "kidney", t))
-        ctx["kidney"].publish(PhysiologicalSignal("renin_activity", kidney_state["renin_activity"], "", "kidney", t))
-        ctx["kidney"].publish(PhysiologicalSignal("angiotensin_II", kidney_state.get("angiotensin_II", self.kidney.angiotensin_II), "", "kidney", t))
-        ctx["kidney"].publish(PhysiologicalSignal("aldosterone", kidney_state["aldosterone"], "", "kidney", t))
-        ctx["kidney"].publish(PhysiologicalSignal("urine_output", kidney_state["urine_output_ml_min"], "mL/min", "kidney", t))
-        # Blood signals
-        ctx["blood"].publish(PhysiologicalSignal("arterial_pH", self.blood.arterial_pH, "", "blood", t))
-        ctx["blood"].publish(PhysiologicalSignal("arterial_PCO2", self.blood.arterial_PCO2_mmHg, "mmHg", "blood", t))
-        ctx["blood"].publish(PhysiologicalSignal("lactate", self.blood.lactate_mmol_L, "mmol/L", "blood", t))
-        ctx["blood"].publish(PhysiologicalSignal("potassium", self.blood.potassium_mEq_L, "mEq/L", "blood", t))
-        ctx["blood"].publish(PhysiologicalSignal("albumin", self.blood.albumin_g_dL, "g/dL", "blood", t))
-        ctx["blood"].publish(PhysiologicalSignal("ALT", self.blood.ALT_U_L, "U/L", "blood", t))
-        ctx["blood"].publish(PhysiologicalSignal("PT_sec", self.blood.PT_sec, "sec", "blood", t))
-        ctx["blood"].publish(PhysiologicalSignal("fibrinogen_mg_dL", self.blood.fibrinogen_mg_dL, "mg/dL", "blood", t))
-        ctx["blood"].publish(PhysiologicalSignal("HCO3", self.fluid.vascular_hco3_meq_l, "mEq/L", "blood", t))
-        # Fluid signals
-        ctx["fluid"].publish(PhysiologicalSignal("vascular_volume_ml", self.fluid.vascular_volume_ml, "mL", "fluid", t))
-        # Liver signals
-        ctx["liver"].publish(PhysiologicalSignal("metabolic_activity", liver_state["metabolic_activity"], "", "liver", t))
-
-        # 解析耦合规则 → 生成 FactorCommands → apply_factor()
-        coupling_cmds = self.coupling_engine.resolve(ctx, dt)
+        # ── Step 4.95: 多器官耦合（信号发布由 run_post_dispatch 处理）─────────
+        # 耦合规则解析（读取 run_post_dispatch 已发布的信号）
+        coupling_cmds = self.coupling_engine.resolve(self._organ_contexts, dt)
         for cmd in coupling_cmds:
             self.apply_factor(cmd)
 
@@ -692,11 +636,6 @@ class VirtualCreature:
             heart_state_pre=heart_state_pre,
             lung_state_pre=lung_state_pre,
         )
-
-        # 保存原始 MAP 用于后续 step 的 organ_health 追踪
-        _orig_MAP = heart_state["MAP_mmHg"]
-        _orig_CO = heart_state["cardiac_output_ml_min"]
-        _orig_PaO2 = lung_state["arterial_PO2"]
 
         # 健康因子永久降低器官输出（不可逆）
         # NOTE(C6): 一次性应用（不是乘法链）。organ_health.factor 由 track() 根据
@@ -733,26 +672,11 @@ class VirtualCreature:
         # Step 7: 血液代谢物
         self._update_blood_metabolites(dt)
 
-        # Step 7.5: 尿量导致的循环血量损失
-        # 肾脏计算 blood_volume_loss_rate，此处应用到心脏血容量
-        bv_loss = self.kidney.blood_volume_loss_rate * dt / 60.0  # mL/min × dt(s) / 60
-        if bv_loss > 0:
-            self.heart.circulating_volume_ml = max(0.0, self.heart.circulating_volume_ml - bv_loss)
+        # Steps 7.5-8.5: shared post-dispatch (blood loss + fluid + coupling + legacy refresh)
+        # signal_time = t (before +=dt) — Euler publishes at pre-step time
+        fluid_state = run_post_dispatch(self, dt, signal_time=t)
 
-        # Step 7.6: 三室体液交换 + Henderson-Hasselbalch pH
-        fluid_state = self.fluid.compute(dt)
-        # 用 HH 方程更新动脉血 pH（基于当前 HCO₃⁻ 和 PCO₂）
-        self._hh.hco3 = self.fluid.vascular_hco3_meq_l
-        self._hh.pco2 = self.blood.arterial_PCO2_mmHg
-        self.blood.arterial_pH = self._hh._compute_ph()
-
-        # Step 7.7: 保守血容量同步
-        # HeartModule.circulating_volume_ml 是循环血量的权威来源。
-        # blood.total_volume_ml 会在每步结束时与之一致，
-        # 确保血液隔室的血容量始终反映真实的循环血量。
-        self.blood.total_volume_ml = self.heart.circulating_volume_ml
-
-        # Step 8: 记录（使用修改后的最终值）
+        # Step 8 (Euler-only): history recording using the final (post-organ_health) values
         if self._record_history_enabled:
             self.history["time_s"].append(t)
             self.history["HR_bpm"].append(heart_state["heart_rate_bpm"])
@@ -818,9 +742,6 @@ class VirtualCreature:
         # 更新时间
         self.current_time_s += dt
 
-        # 8.5: Legacy compatibility refresh for engine-owned signs state.
-        self._refresh_legacy_clinical_signs()
-
         return {
             "heart": heart_state,
             "lung": lung_state,
@@ -852,15 +773,22 @@ class VirtualCreature:
         t = self.current_time_s
         dt = self.dt
 
-        # 1. 事件处理
+        # Step 0: 事件处理（Radau 路径独有：lifecycle/连续失血由 _unified_rhs 内部处理）
         self._process_events(t)
+
+        # Step 0.5: lifecycle check (before solve_ivp)
+        if not self.lifecycle.is_dead():
+            self.lifecycle.apply_age_factors(self)
+            death_cause = self.lifecycle.death_check()
+            if death_cause:
+                self._handle_death(death_cause)
+                return {}
 
         # 2. 打包状态
         y0 = self._pack_unified_state()
         if len(y0) == 0:
             # 无疾病状态，退化为 Euler
-            self._step_euler()
-            return
+            return self._step_euler()
 
         # 3. 预热：初始化 _cached_inputs
         _ = self._unified_rhs(t, y0)
@@ -932,23 +860,8 @@ class VirtualCreature:
         if "blood_fatty_acids_mmol_L" in gut_out:
             self.blood.fatty_acids_mmol_L = gut_out["blood_fatty_acids_mmol_L"]
 
-        # 5b. Step 7.5: 尿量导致的循环血量损失（Euler 路径 Step 7.5 等价）
-        bv_loss = self.kidney.blood_volume_loss_rate * dt / 60.0  # mL/min × dt(s) / 60
-        self.heart.circulating_volume_ml = max(0.0, self.heart.circulating_volume_ml - bv_loss)
-
-        # 5c. Step 7.6: 三室体液交换 + HH pH（Euler 路径 Step 7.6 等价）
-        # fluid.compute() 更新 V_vascular/V_isf/V_icf，然后 HH 方程更新动脉血 pH
-        fluid_state = self.fluid.compute(dt)
-        #同步 HH 方程参数（Euler 路径在 Step 7.6 已有此同步，Radau 路径遗漏补加）
-        self._hh.hco3 = self.fluid.vascular_hco3_meq_l
-        self._hh.pco2 = self.blood.arterial_PCO2_mmHg
-        self.blood.arterial_pH = self._hh._compute_ph()
-        # 同步 blood.total_volume_ml = heart.circulating_volume_ml
-        self.blood.total_volume_ml = self.heart.circulating_volume_ml
-
-        # 5d. Step 7.7: 血容量同步（Euler 路径 Step 7.7 等价）
-        # HeartModule.circulating_volume_ml 是循环血量的权威来源，fluid 和 blood 都要同步
-        # 这一步已经在 5c 中通过 blood.total_volume_ml = heart.circulating_volume_ml 做了
+        # 5b-5d: physiology post-processing (blood loss + fluid + sync)
+        run_physiology_post(self, dt)
 
         # 5e. C1 修复：补全 8 个模块的 compute()（与 Euler 路径等价）
         # 顺序参照 Euler 路径 Step 4-4.9
@@ -980,25 +893,9 @@ class VirtualCreature:
             logger.warning("neuro.compute failed: %s", e)
         # tox/pharmacology 由 schedule_event / 外部 API 触发，不强制每步调
 
-        # 6. 耦合规则（同 Euler 路径）
-        ctx = self._organ_contexts
-        t_now = self.current_time_s + dt
-        # 重新发布信号（用解包后的状态）
-        ctx["heart"].publish(PhysiologicalSignal("cardiac_output", self.heart.cardiac_output, "mL/min", "heart", t_now))
-        ctx["heart"].publish(PhysiologicalSignal("MAP", self.heart.mean_arterial_pressure, "mmHg", "heart", t_now))
-        ctx["heart"].publish(PhysiologicalSignal("central_venous_pressure", self.heart.central_venous_pressure, "mmHg", "heart", t_now))
-        ctx["kidney"].publish(PhysiologicalSignal("GFR", self.kidney.GFR, "mL/min", "kidney", t_now))
-        ctx["kidney"].publish(PhysiologicalSignal("renin_activity", self.kidney.renin_activity, "", "kidney", t_now))
-        ctx["kidney"].publish(PhysiologicalSignal("angiotensin_II", self.kidney.angiotensin_II, "", "kidney", t_now))
-        ctx["kidney"].publish(PhysiologicalSignal("aldosterone", self.kidney.aldosterone, "", "kidney", t_now))
-        ctx["blood"].publish(PhysiologicalSignal("arterial_pH", self.blood.arterial_pH, "", "blood", t_now))
-        ctx["blood"].publish(PhysiologicalSignal("arterial_PCO2", self.blood.arterial_PCO2_mmHg, "mmHg", "blood", t_now))
-        ctx["fluid"].publish(PhysiologicalSignal("vascular_volume_ml", self.fluid.vascular_volume_ml, "mL", "fluid", t_now))
-        ctx["liver"].publish(PhysiologicalSignal("metabolic_activity", self.liver.metabolic_activity, "", "liver", t_now))
-
-        coupling_cmds = self.coupling_engine.resolve(ctx, dt)
-        for cmd in coupling_cmds:
-            self.apply_factor(cmd)
+        # Step 8: coupling (publish signals + resolve) — after all organ compute()
+        # Radau signal_time = current_time_s + dt (after step completion)
+        run_coupling(self, dt, signal_time=self.current_time_s + dt)
 
         # 7. 疾病模块（必须在 immune.compute 之前，以便 _infection_signal 等信号被疾病提前设置）
         if self.disease is not None:
@@ -1031,9 +928,7 @@ class VirtualCreature:
         except Exception as e:
             logger.warning("immune.compute failed: %s", e)
 
-        # 6b. 器官健康追踪（与 Euler 路径 Step 4.9 等价）
-        # NOTE: 使用 Radau 解包后的当前状态（尚未应用 organ_health 因子）作为 pre-state
-        # 这样 track() 能用未退化的值判断 stress，避免因子×MAP 反馈振荡
+        # 器官健康追踪（Radau 特有：用解包后的当前状态作为 pre-state）
         heart_state = {
             "heart_rate_bpm": self.heart.heart_rate,
             "MAP_mmHg": self.heart.mean_arterial_pressure,
@@ -1058,13 +953,14 @@ class VirtualCreature:
         # 6c. 应用 organ_health 因子（一次性应用，不是乘法链）
         # NOTE(C6): 原问题——在已含旧因子的 dict 上再次相乘，导致累积乘法
         # 修复：直接用 heart_factor 作为唯一乘子，不再重复应用
+        # P0(2026-06-13): 通过 apply_factor 写入（统一 FactorCommand 审计链）
         if self.organ_health.heart_factor < 1.0:
-            self.heart.mean_arterial_pressure *= self.organ_health.heart_factor
-            self.heart.cardiac_output *= self.organ_health.heart_factor
+            self.apply_factor(FactorCommand("heart.MAP", "multiply", self.organ_health.heart_factor))
+            self.apply_factor(FactorCommand("heart.cardiac_output", "multiply", self.organ_health.heart_factor))
         if self.organ_health.lung_factor < 1.0:
-            self.lung.diffusion_coefficient *= self.organ_health.lung_factor
+            self.apply_factor(FactorCommand("lung.diffusion_coefficient", "multiply", self.organ_health.lung_factor))
         if self.organ_health.kidney_factor < 1.0:
-            self.kidney.GFR *= self.organ_health.kidney_factor
+            self.apply_factor(FactorCommand("kidney.GFR", "multiply", self.organ_health.kidney_factor))
 
         # 8. 记录历史（同 Euler 路径最后部分）
         if self._record_history_enabled:

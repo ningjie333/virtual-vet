@@ -13,9 +13,12 @@ Step: 4.75 (endocrine之后, neuro之前)
 """
 
 from src.common_types import FactorCommand
+from src.organ_guard import organ_setattr, _blood_escape
 
 
 class LymphaticModule:
+
+    __setattr__ = organ_setattr
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('map_input', 'hr_input', 'cytokine_input', 'gut_fat_absorption', 'isf_input')
@@ -41,7 +44,8 @@ class LymphaticModule:
 
     def __init__(self, weight_kg: float, blood):
         self.w = weight_kg
-        self.blood = blood  # BloodCompartment 引用
+        with _blood_escape(LymphaticModule):
+            self.blood = blood  # BloodCompartment 引用
 
         # 脾脏储血量 (mL)
         self.splenic_reserve_mL = min(100.0, self.w * self._SPLENIC_RESERVE_MAX_ML_KG)
