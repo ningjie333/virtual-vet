@@ -23,6 +23,10 @@ markers = [
     "architecture: architectural constraint checks (AST-based rule enforcement)",
     "suite_disease_blackbox: disease black-box stability test suite",
     "stability: stability tests (cardiovascular, disease, convergence)",
+    "tier0: pure metadata / unit tests (no engine setup, <1s)",
+    "tier1: engine contract tests (one VirtualCreature, <5s)",
+    "tier2: scenario integration tests (multi-organ coupling, <30s)",
+    "tier3: solver parity / validation / endurance (>30s)",
 ]
 
 [tool.uv]
