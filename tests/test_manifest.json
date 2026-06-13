@@ -133,8 +133,12 @@
       "lane": "core"
     },
     "test_organ_health.py": {
-      "bundle": "core-engine",
-      "lane": "core"
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_organ_health_signature.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
     },
     "test_performance.py": {
       "bundle": "benchmark-performance",

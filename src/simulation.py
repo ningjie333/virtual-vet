@@ -887,6 +887,10 @@ class VirtualCreature:
             logger.warning("immune.compute failed: %s", e)
 
         # 器官健康追踪（Radau 特有：用解包后的当前状态作为 pre-state）
+        # P0 0c: in Radau, organ_health factor is applied AFTER track() (see 6c below),
+        # so the current state IS the pre-degradation state. Pass it as both.
+        # Without this, track() falls back to (post-degradation) state for stress
+        # detection, causing MAP×factor feedback oscillation.
         heart_state = {
             "heart_rate_bpm": self.heart.heart_rate,
             "MAP_mmHg": self.heart.mean_arterial_pressure,
@@ -906,7 +910,11 @@ class VirtualCreature:
             "metabolic_activity": self.liver.metabolic_activity,
             "detox_capacity": self.liver.detox_capacity,
         }
-        self.organ_health.track(dt, heart_state, lung_state, kidney_state, liver_state)
+        self.organ_health.track(
+            dt, heart_state, lung_state, kidney_state, liver_state,
+            heart_state_pre=heart_state,  # P0 0c: same as current (Radau applies factor post-track)
+            lung_state_pre=lung_state,
+        )
 
         # 6c. 应用 organ_health 因子（一次性应用，不是乘法链）
         # NOTE(C6): 原问题——在已含旧因子的 dict 上再次相乘，导致累积乘法
