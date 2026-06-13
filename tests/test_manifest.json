@@ -84,6 +84,10 @@
       "bundle": "fast-engine",
       "lane": "fast"
     },
+    "test_history_schema.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
     "test_immune.py": {
       "bundle": "core-engine",
       "lane": "core"

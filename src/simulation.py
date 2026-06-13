@@ -680,68 +680,17 @@ class VirtualCreature:
         # signal_time = t (before +=dt) — Euler publishes at pre-step time
         fluid_state = run_post_dispatch(self, dt, signal_time=t)
 
-        # Step 8 (Euler-only): history recording using the final (post-organ_health) values
+        # Step 8: history recording (shared with Radau via _record_history)
+        # P0 0b: was inline divergence with Radau; now single source of truth
         if self._record_history_enabled:
-            self.history["time_s"].append(t)
-            self.history["HR_bpm"].append(heart_state["heart_rate_bpm"])
-            self.history["CO_ml_min"].append(final_CO)
-            self.history["MAP_mmHg"].append(final_MAP)
-            self.history["CVP_mmHg"].append(CVP)
-            self.history["RR"].append(lung_state["respiratory_rate"])
-            self.history["art_PO2"].append(lung_state["arterial_PO2"])
-            self.history["art_PCO2"].append(lung_state["arterial_PCO2"])
-            self.history["saturation"].append(lung_state["arterial_saturation"])
-            self.history["pH"].append(self.blood.arterial_pH)
-            self.history["GFR"].append(kidney_state["GFR_ml_min"])
-            self.history["urine_ml_min"].append(kidney_state["urine_output_ml_min"])
-            self.history["BUN"].append(kidney_state["BUN_mg_dL"])
-            self.history["plasma_Na"].append(self.blood.sodium_mEq_L)
-            self.history["glucose"].append(self.blood.glucose_mmol_L)
-            self.history["blood_volume_ml"].append(heart_state["blood_volume_ml"])
-            self.history["contractility_factor"].append(heart_state["contractility_factor"])
-            self.history["svr_factor"].append(svr_factor)
-            self.history["heart_health"].append(self.organ_health.heart_health)
-            self.history["lung_health"].append(self.organ_health.lung_health)
-            self.history["kidney_health"].append(self.organ_health.kidney_health)
-            self.history["liver_health"].append(self.organ_health.liver_health)
-            # 体液三室
-            self.history["fluid_vascular_ml"].append(fluid_state["vascular_ml"])
-            self.history["fluid_isf_ml"].append(fluid_state["isf_ml"])
-            self.history["fluid_icf_ml"].append(fluid_state["icf_ml"])
-            self.history["fluid_nfp_mmHg"].append(fluid_state["nfp_mmHg"])
-            # 肝脏/肠道
-            self.history["liver_metabolic_activity"].append(liver_state["metabolic_activity"])
-            self.history["liver_detox_capacity"].append(liver_state["detox_capacity"])
-            self.history["liver_glycogen"].append(liver_state["glycogen_fraction"])
-            self.history["gut_motility"].append(gut_state["gut_motility"])
-            self.history["gut_barrier"].append(gut_state["barrier_integrity"])
-            self.history["gut_microbiome"].append(gut_state["microbiome_activity"])
-            # 内分泌
-            self.history["T3_ng_dL"].append(endocrine_state["T3_ng_dL"])
-            self.history["insulin_uU_mL"].append(endocrine_state["insulin_uU_mL"])
-            self.history["cortisol_ug_dL"].append(endocrine_state["cortisol_ug_dL"])
-            self.history["metabolic_rate"].append(endocrine_state["metabolic_rate"])
-            self.history["core_temperature_C"].append(self.blood.core_temperature_C)
-            # 神经
-            self.history["neuro_sympathetic"].append(neuro_state["sympathetic_tone"])
-            self.history["neuro_consciousness"].append(neuro_state["consciousness"])
-            self.history["neuro_seizure"].append(neuro_state["seizure"])
-            self.history["neuro_pain"].append(neuro_state["pain_level"])
-            self.history["neuro_chemodrive"].append(neuro_state["chemoreceptor_drive"])
-            # 免疫
-            self.history["immune_cytokine"].append(immune_state["cytokine_level"])
-            self.history["immune_wbc"].append(immune_state["wbc_count"])
-            self.history["immune_crp"].append(immune_state["crp_level"])
-            self.history["immune_coagulation"].append(immune_state["coagulation_state"])
-
-            # 凝血
-            self.history["coag_PT"].append(self.blood.PT_sec)
-            self.history["coag_aPTT"].append(self.blood.aPTT_sec)
-            self.history["coag_fibrinogen"].append(self.blood.fibrinogen_mg_dL)
-
-            # 淋巴/脾脏
-            self.history["lymph_splenic_reserve"].append(self.blood.splenic_reserve_mL)
-            self.history["lymph_lymph_flow"].append(self.lymphatic.lymph_flow_rate)
+            self._record_history(
+                dt, t=t,
+                heart_state=heart_state, lung_state=lung_state,
+                kidney_state=kidney_state, gut_state=gut_state,
+                liver_state=liver_state, endocrine_state=endocrine_state,
+                neuro_state=neuro_state, immune_state=immune_state,
+                fluid_state=fluid_state, svr_factor=svr_factor,
+            )
 
         # 更新时间
         self.current_time_s += dt
@@ -981,36 +930,148 @@ class VirtualCreature:
         self._refresh_legacy_clinical_signs()
         return {}
 
-    def _record_history(self, dt: float):
-        """记录当前状态到 history dict（Euler 和 Radau 共用）。"""
-        self.history["time_s"].append(self.current_time_s)
-        self.history["HR_bpm"].append(self.heart.heart_rate)
-        self.history["CO_ml_min"].append(self.heart.cardiac_output)
-        self.history["MAP_mmHg"].append(self.heart.mean_arterial_pressure)
-        self.history["CVP_mmHg"].append(self.heart.central_venous_pressure)
-        self.history["RR"].append(self.lung.respiratory_rate)
-        self.history["art_PO2"].append(self.blood.arterial_PO2_mmHg)
-        self.history["art_PCO2"].append(self.blood.arterial_PCO2_mmHg)
-        self.history["saturation"].append(self.blood.arterial_saturation)
+    def _record_history(self, dt: float, t: float = None,
+                        heart_state: dict = None, lung_state: dict = None,
+                        kidney_state: dict = None, gut_state: dict = None,
+                        liver_state: dict = None, endocrine_state: dict = None,
+                        neuro_state: dict = None, immune_state: dict = None,
+                        fluid_state: dict = None, svr_factor: float = 1.0):
+        """
+        Record current engine state to history dict.
+
+        Single source of truth for history schema (P0 0b fix: was divergent
+        between Euler inline and Radau _record_history; now both call this).
+
+        Args:
+            dt: timestep
+            t: timestamp (defaults to self.current_time_s)
+            *_state: per-organ state dicts from this step's compute() calls.
+                     If None, falls back to reading self.module.X directly
+                     (used by Radau which doesn't pass per-step dicts).
+        """
+        t = t if t is not None else self.current_time_s
+
+        # Cardio
+        self.history["time_s"].append(t)
+        self.history["HR_bpm"].append(
+            heart_state["heart_rate_bpm"] if heart_state else self.heart.heart_rate)
+        self.history["CO_ml_min"].append(
+            heart_state["cardiac_output_ml_min"] if heart_state else self.heart.cardiac_output)
+        self.history["MAP_mmHg"].append(
+            heart_state["MAP_mmHg"] if heart_state else self.heart.mean_arterial_pressure)
+        self.history["CVP_mmHg"].append(
+            heart_state["CVP_mmHg"] if heart_state else self.heart.central_venous_pressure)
+
+        # Respiratory
+        self.history["RR"].append(
+            lung_state["respiratory_rate"] if lung_state else self.lung.respiratory_rate)
+        self.history["art_PO2"].append(
+            lung_state["arterial_PO2"] if lung_state else self.blood.arterial_PO2_mmHg)
+        self.history["art_PCO2"].append(
+            lung_state["arterial_PCO2"] if lung_state else self.blood.arterial_PCO2_mmHg)
+        self.history["saturation"].append(
+            lung_state["arterial_saturation"] if lung_state else self.blood.arterial_saturation)
         self.history["pH"].append(self.blood.arterial_pH)
-        self.history["GFR"].append(self.kidney.GFR)
-        self.history["urine_ml_min"].append(self.kidney.urine_output)
-        self.history["BUN"].append(self.blood.bun_mg_dL)
-        self.history["creatinine"].append(self.blood.creatinine_mg_dL)
-        self.history["lactate"].append(self.blood.lactate_mmol_L)
+
+        # Renal
+        self.history["GFR"].append(
+            kidney_state["GFR_ml_min"] if kidney_state else self.kidney.GFR)
+        self.history["urine_ml_min"].append(
+            kidney_state["urine_output_ml_min"] if kidney_state else self.kidney.urine_output)
+        self.history["BUN"].append(
+            kidney_state["BUN_mg_dL"] if kidney_state else self.blood.bun_mg_dL)
+        self.history["plasma_Na"].append(self.blood.sodium_mEq_L)
+
+        # Metabolic
         self.history["glucose"].append(self.blood.glucose_mmol_L)
-        self.history["temperature"].append(self.blood.core_temperature_C)
-        self.history["blood_volume_ml"].append(self.heart.circulating_volume_ml)
-        self.history["sympathetic"].append(self.neuro.sympathetic_tone)
-        self.history["contractility_factor"].append(self.heart.contractility_factor)
-        self.history["SVR"].append(self.heart.SVR)
-        self.history["endocrine"].append(self.endocrine.summary())
-        self.history["immune"].append(self.immune.summary())
-        self.history["toxicology"].append(self.toxicology.summary() if hasattr(self.toxicology, 'summary') else {})
-        self.history["liver"].append(self.liver.summary() if hasattr(self.liver, 'summary') else {})
-        self.history["neuro"].append(self.neuro.summary())
-        self.history["coagulation"].append(self.coagulation.summary())
-        self.history["lymphatic"].append(self.lymphatic.summary())
+        self.history["blood_volume_ml"].append(
+            heart_state["blood_volume_ml"] if heart_state else self.heart.circulating_volume_ml)
+        self.history["contractility_factor"].append(
+            heart_state["contractility_factor"] if heart_state else self.heart.contractility_factor)
+        self.history["svr_factor"].append(svr_factor)
+
+        # Organ health
+        self.history["heart_health"].append(self.organ_health.heart_health)
+        self.history["lung_health"].append(self.organ_health.lung_health)
+        self.history["kidney_health"].append(self.organ_health.kidney_health)
+        self.history["liver_health"].append(self.organ_health.liver_health)
+
+        # Fluid compartments
+        if fluid_state:
+            self.history["fluid_vascular_ml"].append(fluid_state["vascular_ml"])
+            self.history["fluid_isf_ml"].append(fluid_state["isf_ml"])
+            self.history["fluid_icf_ml"].append(fluid_state["icf_ml"])
+            self.history["fluid_nfp_mmHg"].append(fluid_state["nfp_mmHg"])
+        else:
+            self.history["fluid_vascular_ml"].append(self.fluid.vascular_volume_ml)
+            self.history["fluid_isf_ml"].append(self.fluid.isf_volume_ml)
+            self.history["fluid_icf_ml"].append(self.fluid.icf_volume_ml)
+            self.history["fluid_nfp_mmHg"].append(0.0)  # not stored on FluidCompartment
+
+        # Liver / Gut
+        self.history["liver_metabolic_activity"].append(
+            liver_state["metabolic_activity"] if liver_state else self.liver.metabolic_activity)
+        self.history["liver_detox_capacity"].append(
+            liver_state["detox_capacity"] if liver_state else self.liver.detox_capacity)
+        self.history["liver_glycogen"].append(
+            liver_state["glycogen_fraction"] if liver_state else self.liver.glycogen_fraction)
+        self.history["gut_motility"].append(
+            gut_state["gut_motility"] if gut_state else self.gut.gut_motility)
+        self.history["gut_barrier"].append(
+            gut_state["barrier_integrity"] if gut_state else self.gut.barrier_integrity)
+        self.history["gut_microbiome"].append(
+            gut_state["microbiome_activity"] if gut_state else self.gut.microbiome_activity)
+
+        # Endocrine
+        if endocrine_state:
+            self.history["T3_ng_dL"].append(endocrine_state["T3_ng_dL"])
+            self.history["insulin_uU_mL"].append(endocrine_state["insulin_uU_mL"])
+            self.history["cortisol_ug_dL"].append(endocrine_state["cortisol_ug_dL"])
+            self.history["metabolic_rate"].append(endocrine_state["metabolic_rate"])
+        else:
+            endo = self.endocrine.summary()
+            self.history["T3_ng_dL"].append(endo.get("T3_ng_dL", 0.0))
+            self.history["insulin_uU_mL"].append(endo.get("insulin_uU_mL", 0.0))
+            self.history["cortisol_ug_dL"].append(endo.get("cortisol_ug_dL", 0.0))
+            self.history["metabolic_rate"].append(endo.get("metabolic_rate", 0.0))
+
+        # Core temperature (single canonical key: core_temperature_C)
+        self.history["core_temperature_C"].append(self.blood.core_temperature_C)
+
+        # Neuro (NO bare 'sympathetic' key — was colliding with neuro_sympathetic in old Radau path)
+        if neuro_state:
+            self.history["neuro_sympathetic"].append(neuro_state["sympathetic_tone"])
+            self.history["neuro_consciousness"].append(neuro_state["consciousness"])
+            self.history["neuro_seizure"].append(neuro_state["seizure"])
+            self.history["neuro_pain"].append(neuro_state["pain_level"])
+            self.history["neuro_chemodrive"].append(neuro_state["chemoreceptor_drive"])
+        else:
+            neuro = self.neuro.summary()
+            self.history["neuro_sympathetic"].append(neuro.get("sympathetic_tone", 0.0))
+            self.history["neuro_consciousness"].append(neuro.get("consciousness", 0.0))
+            self.history["neuro_seizure"].append(neuro.get("seizure", 0.0))
+            self.history["neuro_pain"].append(neuro.get("pain_level", 0.0))
+            self.history["neuro_chemodrive"].append(neuro.get("chemoreceptor_drive", 0.0))
+
+        # Immune
+        if immune_state:
+            self.history["immune_cytokine"].append(immune_state["cytokine_level"])
+            self.history["immune_wbc"].append(immune_state["wbc_count"])
+            self.history["immune_crp"].append(immune_state["crp_level"])
+            self.history["immune_coagulation"].append(immune_state["coagulation_state"])
+        else:
+            imm = self.immune.summary()
+            self.history["immune_cytokine"].append(imm.get("cytokine_level", 0.0))
+            self.history["immune_wbc"].append(imm.get("wbc_count", 0.0))
+            self.history["immune_crp"].append(imm.get("crp_level", 0.0))
+            self.history["immune_coagulation"].append(imm.get("coagulation_state", 0.0))
+
+        # Coagulation
+        self.history["coag_PT"].append(self.blood.PT_sec)
+        self.history["coag_aPTT"].append(self.blood.aPTT_sec)
+        self.history["coag_fibrinogen"].append(self.blood.fibrinogen_mg_dL)
+
+        # Lymphatic / splenic
         self.history["lymph_splenic_reserve"].append(self.blood.splenic_reserve_mL)
         self.history["lymph_lymph_flow"].append(self.lymphatic.lymph_flow_rate)
 
