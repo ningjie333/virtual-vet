@@ -51,7 +51,6 @@ class HeartModule:
         sv_ml: float = None,
         base_co_ml_min: float = None,
         SVR: float = SYSTEMIC_VASCULAR_RESISTANCE,
-        MAP_baseline: float = 60.0,
         MAP_target: float = MEAN_ARTERIAL_PRESSURE_MMHG,
     ):
         self.w = weight_kg
@@ -69,17 +68,17 @@ class HeartModule:
         self.stroke_volume = _sv
 
         # 血管阻力
-        # 校准：MAP = MAP_base + CO × SVR
-        # CO = HR × SV，MAP_base = 基础血管张力（60 mmHg）
-        # SVR = (MAP_target - MAP_base) / (CO_baseline/60)，单位 mmHg·s/mL
-        # 例：SVR = (100-60) / (1700/60) = 1.41 mmHg·s/mL
+        # 校准：MAP = CVP + CO/60 × SVR  (Guyton C2, Ch.14)
+        # CVP = central venous pressure (outflow pressure of systemic circuit)
+        # SVR = (MAP_target - CVP) / (CO_baseline/60)，单位 mmHg·s/mL
+        # 例：SVR = (100-4) / (1700/60) = 3.39 mmHg·s/mL
         CO_baseline_mL_min = HEART_RATE_REST_BPM * stroke_volume_ml(self.w)  # 85 × 20 = 1700 mL/min
-        self.SVR = (MEAN_ARTERIAL_PRESSURE_MMHG - MAP_baseline) / (CO_baseline_mL_min / 60.0)
+        self.SVR = (MEAN_ARTERIAL_PRESSURE_MMHG - CENTRAL_VENOUS_PRESSURE_MMHG) / (CO_baseline_mL_min / 60.0)
         self.SVR_baseline = self.SVR
         self.SVR_max = self.SVR * 3.0
 
         # 血压
-        self.MAP_baseline = MAP_baseline
+        self.MAP_baseline = CENTRAL_VENOUS_PRESSURE_MMHG  # CVP as outflow pressure (Guyton C2)
         self.MAP_target = MAP_target
         self.mean_arterial_pressure = MAP_target
         self.central_venous_pressure = CENTRAL_VENOUS_PRESSURE_MMHG
@@ -169,9 +168,9 @@ class HeartModule:
 
         # ── 3. SVR 代偿（代数+动态）─────────────────────────────────────────
         effective_SVR = self.SVR * svr_factor
-        # 生理学：MAP = MAP_base + CO × SVR
-        MAP_base = self.MAP_baseline
-        raw_MAP = MAP_base + (CO / 60.0) * effective_SVR
+        # 生理学：MAP = CVP + CO/60 × SVR  (Guyton C2, Ch.14)
+        # CVP = central venous pressure (systemic circuit outflow)
+        raw_MAP = CENTRAL_VENOUS_PRESSURE_MMHG + (CO / 60.0) * effective_SVR
         # 当血容量严重不足（vol_ratio < 0.7）时，静脉回流减少进一步降低 MAP
         if vol_ratio < 0.7:
             raw_MAP = raw_MAP * (0.5 + 0.5 * vol_ratio / 0.7)
@@ -444,10 +443,9 @@ class HeartModule:
         # Step 2: 心输出量
         self.cardiac_output = self.heart_rate * self.stroke_volume  # mL/min
 
-        # Step 3: 平均动脉压（MAP = MAP_base + CO × SVR）
-        MAP_base = self.MAP_baseline
+        # Step 3: 平均动脉压（MAP = CVP + CO/60 × SVR, Guyton C2）
         effective_SVR = self.SVR * svr_factor
-        raw_MAP = MAP_base + (self.cardiac_output / 60.0) * effective_SVR
+        raw_MAP = CENTRAL_VENOUS_PRESSURE_MMHG + (self.cardiac_output / 60.0) * effective_SVR
 
         # 血容量严重不足时血压下降
         vol_ratio = self.circulating_volume_ml / self.total_BV
