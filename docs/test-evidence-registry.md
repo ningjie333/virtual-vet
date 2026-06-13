@@ -3,7 +3,7 @@
 Registry of external evidence used, or planned to be used, for literature-backed
 kernel tests.
 
-Last reviewed: 2026-06-10
+Last reviewed: 2026-06-13
 
 ## Purpose
 
@@ -54,8 +54,15 @@ enough that we should not silently encode it as a passing test yet.
 
 ## Source Records
 
+> **Paper → Code traceability** (P3-2): Every source below is mapped to its
+> **Hierarchy ID** (see [docs/literature-hierarchy.md](literature-hierarchy.md))
+> and the **Code modules** that consume its parameters. New sources MUST
+> register in `literature-hierarchy.md` first (Anti-Scatter Rule).
+
 ### 1. Merck Veterinary Manual blood gas reference ranges
 
+- Hierarchy ID: `S-CV-1` (Nelson & Couto Small Animal Internal Medicine 5e, Ch.22)
+- Code modules: `src/blood.py`, `src/lung.py`
 - URL: https://www.merckvetmanual.com/multimedia/table/blood-gas-analysis-reference-ranges
 - Role:
   - healthy blood gas baseline windows
@@ -74,6 +81,8 @@ enough that we should not silently encode it as a passing test yet.
 
 ### 2. Bexfield et al. healthy-dog GFR reference intervals
 
+- Hierarchy ID: `S-REN-2` (Bexfield et al. 2008, healthy dog GFR)
+- Code modules: `src/kidney.py`
 - URL: https://pubmed.ncbi.nlm.nih.gov/18289291/
 - PMID: `18289291`
 - Role:
@@ -85,6 +94,8 @@ enough that we should not silently encode it as a passing test yet.
 
 ### 3. IRIS AKI best-practice consensus
 
+- Hierarchy ID: `S-REN-1` (Segev G et al. IRIS AKI Consensus 2024)
+- Code modules: `src/kidney.py`, `data/ode_diseases.json::acute_renal_failure`
 - URL: https://pubmed.ncbi.nlm.nih.gov/38325516/
 - PMID: `38325516`
 - Pub type:
@@ -101,6 +112,8 @@ enough that we should not silently encode it as a passing test yet.
 
 ### 4. Canine AKI review / clinicopathologic context
 
+- Hierarchy ID: `S-REN-1` (IRIS-aligned; same source pool as record 3)
+- Code modules: `src/kidney.py`
 - URL: https://pubmed.ncbi.nlm.nih.gov/35103347/
 - PMID: `35103347`
 - Role:
@@ -113,6 +126,8 @@ enough that we should not silently encode it as a passing test yet.
 
 ### 5. Bicarbonate deficiency / kidney injury relevance
 
+- Hierarchy ID: `C4` (Henderson-Hasselbalch) for HCO3 chemistry; `S-REN-1` for clinical context
+- Code modules: `src/blood.py`, `src/fluid.py`
 - URL: https://pubmed.ncbi.nlm.nih.gov/37235446/
 - PMID: `37235446`
 - Role:
@@ -125,6 +140,8 @@ enough that we should not silently encode it as a passing test yet.
 
 ### 6. ISCAID respiratory guideline
 
+- Hierarchy ID: `S-RESP-1` (Lappin MR et al. ISCAID 2017)
+- Code modules: `src/lung.py`, `data/ode_diseases.json::pneumonia`
 - URL: https://pubmed.ncbi.nlm.nih.gov/28185306/
 - PMID: `28185306`
 - Role:
@@ -138,6 +155,8 @@ enough that we should not silently encode it as a passing test yet.
 
 ### 7. Respiratory disease oxygenation study in dogs
 
+- Hierarchy ID: `S-RESP-3` (Dear JD 2020 pneumonia oxygenation)
+- Code modules: `src/lung.py`
 - URL: https://pubmed.ncbi.nlm.nih.gov/38250933/
 - PMID: `38250933`
 - Role:
@@ -150,6 +169,8 @@ enough that we should not silently encode it as a passing test yet.
 
 ### 8. AAHA 2024 fluid therapy guidelines
 
+- Hierarchy ID: `S-FLUID-1` (AAHA 2024)
+- Code modules: `src/fluid.py`
 - URL: https://www.aaha.org/resources/2024-aaha-fluid-therapy-guidelines-for-dogs-and-cats/section-5-fluid-therapy-in-ill-patients/
 - Role:
   - future hemodynamic and resuscitation response tests
@@ -159,6 +180,9 @@ enough that we should not silently encode it as a passing test yet.
   - `planned`
 
 ### 9. Equine blood gas anchor from existing repo literature notes
+
+- Hierarchy ID: `(unregistered)` — TODO add to `literature-hierarchy.md` Tier 2 as `S-EQUINE-1`
+- Code modules: `src/lung.py`, `src/parameters.py`
 
 - Source in repo:
   - `tests/test_lifecycle_literature.py`
