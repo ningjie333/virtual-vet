@@ -224,6 +224,10 @@ class VirtualCreature:
         self.events = []                            # 待处理事件列表
         self.event_log = []                         # 事件历史
 
+        # 求解器诊断（Step 0a: 让 twin-run harness 能检测 Radau fallback）
+        self._solver_fallback_count = 0             # Radau 失败退化到 Euler 的次数
+        self._solver_last_method_used = "primary"   # "primary" | "euler_fallback"
+
         # 历史记录
         self.history = {
             "time_s": [],
@@ -807,12 +811,17 @@ class VirtualCreature:
 
         if not sol.success:
             # 求解失败，退化为 Euler
+            # FIX(2026-06-13): P0 0a — return _step_euler() result instead of None
+            # (was breaking step() return-type contract; twin-run harness could
+            #  silently pass by self-comparing Euler)
             logger.warning("Radau failed at t=%.2fs: %s, falling back to Euler", t, sol.message)
-            self._step_euler()
-            return
+            self._solver_fallback_count += 1
+            self._solver_last_method_used = "euler_fallback"
+            return self._step_euler()
 
         # 5. 解包结果到模块属性
         self._unpack_unified_state(sol.y[:, -1])
+        self._solver_last_method_used = "radau"
 
         # 5a. 应用 lung/kidney/immune/endocrine/coagulation/gut derivatives() 的 blood 输出（纯函数契约 C5）
         # derivatives() 不再直接写 blood，现在由调用方一次性写入（避免 Newton 迭代污染）
