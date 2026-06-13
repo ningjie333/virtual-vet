@@ -93,6 +93,11 @@
         "target": "immune._infection_signal",
         "op": "set",
         "fn": "min(bacterial_load / (bacterial_load + 2.0), 1.0)"
+      },
+      {
+        "target": "lung.respiratory_rate",
+        "op": "add",
+        "fn": "fever_state * 12.0"
       }
     ],
     "meta": {
@@ -1995,6 +2000,16 @@
         "target": "immune.wbc_count",
         "op": "set",
         "fn": "10.0 + cytokine_storm * 25.0"
+      },
+      {
+        "target": "lung.respiratory_rate",
+        "op": "add",
+        "fn": "fever_state * 25.0"
+      },
+      {
+        "target": "lung.respiratory_rate",
+        "op": "add",
+        "fn": "capillary_leak * 8.0"
       }
     ],
     "meta": {
