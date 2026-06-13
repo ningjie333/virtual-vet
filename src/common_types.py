@@ -42,6 +42,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     # ── Heart ──────────────────────────────────────────────────────────────
     "heart.heart_rate":              ("heart", "heart_rate"),
     "heart.contractility_factor":    ("heart", "contractility_factor"),
+    "heart.preload_factor":         ("heart", "preload_factor"),
     "heart.SVR":                     ("heart", "SVR"),
     "heart.MAP":                     ("heart", "mean_arterial_pressure"),
     "heart.CVP":                     ("heart", "central_venous_pressure"),

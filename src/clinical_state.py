@@ -3,6 +3,20 @@ from __future__ import annotations
 from typing import Any
 
 from src.clinical_snapshot import ClinicalSnapshot
+from src.parameters import NORMAL_HB_CANINE, NORMAL_HB_FELINE, NORMAL_HB_EQUINE
+
+
+def _hb_from_hct(hct_pct: float, species: str) -> float:
+    """从 HCT% 推算 Hb (g/dL)。HCT/Hb ≈ 3（犬）、≈ 2.8（猫）、≈ 3.1（马）。"""
+    if hct_pct <= 0:
+        return NORMAL_HB_CANINE
+    if species == "cat":
+        return hct_pct / 2.8
+    elif species == "horse":
+        return hct_pct / 3.1
+    else:
+        # 犬：HCT normal ≈ 45%, Hb normal ≈ 14.5 → ratio ≈ 3.1
+        return hct_pct / 3.1
 
 
 def extract_clinical_state(creature: Any) -> dict:
@@ -127,6 +141,7 @@ def build_clinical_snapshot(creature: Any) -> ClinicalSnapshot:
         glucose_mmol_l=float(state["Glu"]),
         hct_pct=float(state["HCT"]),
         hco3_meq_l=float(state["HCO3"]),
+        hb_g_dL=_hb_from_hct(float(state["HCT"]), str(getattr(creature, "species", "dog"))),
         disease_name=type(disease).__name__ if disease is not None else None,
         disease_active=bool(disease is not None and getattr(disease, "active", False)),
         disease_state=disease_state,

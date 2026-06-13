@@ -140,6 +140,28 @@ HCO3_EXTRACELLULAR_MEQ_L = 24.0                    # 细胞外 HCO₃⁻ mEq/L
 HCO3_INTRACELLULAR_MEQ_L = 12.0                    # 细胞内 HCO₃⁻ mEq/L
 PLASMA_COLLOID_OSMOTIC_MMHG = 25.0                # 血浆胶体渗透压 πc
 
+# 血红蛋白浓度 (g/dL)
+# REF: textbook:nelson | Nelson & Couto 5e Ch22 | Canine normal Hb 13-17 g/dL (取 14.0)
+NORMAL_HB_CANINE = 14.0
+# REF: textbook:nelson | Nelson & Couto 5e Ch22 | Feline normal Hb 9-15 g/dL (取 12.0)
+NORMAL_HB_FELINE = 12.0
+# REF: Merck Vet Manual | Equine normal Hb 11-15 g/dL (取 13.0)
+NORMAL_HB_EQUINE = 13.0
+
+# Hüfner 常数 (mL O₂/g Hb)
+HUFNER_CONSTANT = 1.34
+
+# DO2 基准（用于临床解释层 ratio 计算）
+# DO2_normal = CO_normal × Hb × SaO2 × Hüfner
+# REF: textbook:guyton | Guyton 14e Ch31 | O2 capacity ≈ 20 mL O2/100mL blood → 1.34 × Hb
+
+
+def base_DO2_normal_ml_min(weight_kg: float, species: str = "dog") -> float:
+    """正常 DO2（mL O₂/min），用于 ratio 计算。DO2 = CO × Hb × SaO2 × 1.34"""
+    co_normal = base_cardiac_output_ml_min(weight_kg)
+    hb = NORMAL_HB_CANINE if species == "dog" else NORMAL_HB_FELINE if species == "cat" else NORMAL_HB_EQUINE
+    return (co_normal / 1000.0) * hb * ARTERIAL_SATURATION_NORMAL * HUFNER_CONSTANT
+
 # --- 泌尿系统 ---
 PLASMA_SODIUM_MEQ_L = 145.0                       # 血浆钠离子 mEq/L
 TUBULAR_WATER_REABSORPTION = 0.99                 # 99% 的滤过水被重吸收

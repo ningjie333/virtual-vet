@@ -7,8 +7,10 @@ from typing import Any, Callable, Protocol, Sequence
 from src.clinical_state import build_clinical_snapshot, extract_clinical_state
 from src.clinical_snapshot import ClinicalSnapshot
 from src.parameters import (
+    HUFNER_CONSTANT,
     LUNG_DIFFUSION_COEFFICIENT,
     base_cardiac_output_ml_min,
+    base_DO2_normal_ml_min,
 )
 from src.report_engine import generate_report
 
@@ -148,13 +150,14 @@ class DefaultClinicalInterpreter:
         }
 
     def _compute_do2(self, snapshot: ClinicalSnapshot) -> float:
-        normal_co = base_cardiac_output_ml_min(snapshot.weight_kg)
-        co = snapshot.co_ml_min
+        """DO2 ratio = DO2 / DO2_normal；DO2 = CO(L/min) × Hb(g/dL) × SaO2 × 1.34"""
+        do2_normal = base_DO2_normal_ml_min(snapshot.weight_kg, snapshot.species)
+        co_L_min = snapshot.co_ml_min / 1000.0
         sao2 = snapshot.spo2_pct / 100.0 if snapshot.spo2_pct > 1.0 else snapshot.spo2_pct
-        if normal_co <= 0:
+        if do2_normal <= 0:
             return 0.0
-        do2 = (co / normal_co) * sao2
-        return max(0.0, min(1.0, do2))
+        do2 = co_L_min * snapshot.hb_g_dL * sao2 * HUFNER_CONSTANT
+        return max(0.0, min(1.0, do2 / do2_normal))
 
     def _score(self, value: float, param: str) -> int:
         lo_mor, lo_crit, lo_warn, hi_warn, hi_crit, hi_mor = _THRESHOLDS[param]

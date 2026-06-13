@@ -1391,9 +1391,9 @@
     },
     "outputs": [
       {
-        "target": "heart.contractility_factor",
+        "target": "heart.preload_factor",
         "op": "multiply",
-        "fn": "max(0.3, 1.0 - tamponade_severity * 0.6)"
+        "fn": "max(0.4, 1.0 - tamponade_severity * 0.55)"
       },
       {
         "target": "heart.SVR",
@@ -1521,7 +1521,7 @@
           1
         ],
         "ode_type": "algebraic",
-        "fn": "max(0.0, min(1.0, coagulation_consumption * 0.8 - microthrombus_formation * 0.2))"
+        "fn": "max(0.0, min(1.0, coagulation_consumption * 0.8 + microthrombus_formation * 0.2))"
       },
       "organ_ischemia": {
         "initial": 0.0,

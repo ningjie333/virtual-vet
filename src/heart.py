@@ -27,7 +27,7 @@ class HeartModule:
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('svr_factor', 'chemoreceptor_drive', 'T3_factor', 'K_potassium_mEq_L')
-    OUTPUTS: tuple[str, ...] = ('cardiac_output', 'MAP', 'CVP', 'stroke_volume')
+    OUTPUTS: tuple[str, ...] = ('cardiac_output', 'MAP', 'CVP', 'stroke_volume', 'preload_factor')
     READS_BLOOD: tuple[str, ...] = ('arterial_pH', 'potassium_mEq_L', 'arterial_PCO2_mmHg', 'arterial_PO2_mmHg')
     WRITES_BLOOD: tuple[str, ...] = ()
     """
@@ -94,6 +94,11 @@ class HeartModule:
         # 收缩力因子（由 ToxicologyModule 调制，1.0 = 正常）
         self.contractility_factor = 1.0
 
+        # 前负荷因子（由心包积液等疾病调制，1.0 = 正常）
+        # 心包积液 → 舒张期心脏受压 → 前负荷下降 → SV 下降（不是收缩力问题）
+        # 公式：effective_target = target_SV × contractility_factor × preload_factor
+        self.preload_factor = 1.0
+
         # 失血/输液累计
         self.blood_loss_ml = 0.0
         self.fluid_infused_ml = 0.0
@@ -141,7 +146,7 @@ class HeartModule:
         else:
             target_SV = self.base_SV * 1.05
 
-        effective_target = target_SV * self.contractility_factor
+        effective_target = target_SV * self.contractility_factor * self.preload_factor
         pH_factor = self._pH_contractility_effect(self.blood.arterial_pH)
         effective_target *= pH_factor
         coronary_factor = self._coronary_perfusion_effect(self.mean_arterial_pressure)
@@ -327,7 +332,7 @@ class HeartModule:
             target_SV = self.base_SV * 1.05
 
         # 收缩力因子：外部调制（毒理学 + 疾病）
-        effective_target = target_SV * self.contractility_factor
+        effective_target = target_SV * self.contractility_factor * self.preload_factor
 
         # pH 效应：酸中毒抑制心肌收缩力（正反馈核心）
         pH_factor = self._pH_contractility_effect(self.blood.arterial_pH)

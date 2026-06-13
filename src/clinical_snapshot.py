@@ -36,6 +36,7 @@ class ClinicalSnapshot:
     glucose_mmol_l: float
     hct_pct: float
     hco3_meq_l: float
+    hb_g_dL: float
 
     disease_name: str | None
     disease_active: bool
