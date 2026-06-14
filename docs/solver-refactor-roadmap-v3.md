@@ -21,7 +21,7 @@
 | **0d** | Radau 5a blood 写走 apply_factor | ✅ | 14d6a51 | 3hr |
 | **1** | 公共化 `pack_state/unpack_state/unified_rhs` | ✅ | 79b244b | 2hr |
 | **2** | 加 `STATE_VARS` 类属性（替代硬编码 _UNIFIED_MODULES） | ✅ | 5cd27a4 | 4hr |
-| **3** | Radau 拆到 `src/engine/solvers/radau.py` | 🔲 | — | 3hr |
+| **3** | Radau 拆到 `src/engine/solvers/radau.py` | ✅ | (pending commit) | 3hr |
 | **4** | Twin-run validation harness（10 场景 + 收敛率） | ✅ | 467b5b7 | 6hr |
 | **5** | Gauss-Seidel docstring + 耦合统一 | ✅ (docstring + 清册; 真正统一留后续) | 569889f | 6hr |
 
@@ -144,3 +144,30 @@ twin-run 断言 `_solver_fallback_count == 0`，防止"Radau 失败→fallback E
   unpack if/elif）降为改 1 处（模块自己的 STATE_VARS）。CONNECTIONS 的 dead
   routes（跨模块耦合漂移）仍待 Phase 5 INPUTS/OUTPUTS 自动派生解决
   （见 coupling_inventory.md），本次不涉及。
+
+### Step 3 验证（2026-06-14）
+
+- `_step_radau` 的 ~232 行体从 `simulation.py` 抽到
+  `src/engine/solvers/radau.py::run_radau_step(engine)`（模块级函数，与
+  Step 1 的 state_vector / step_common 同模式）。`simulation._step_radau`
+  降为瘦转发（`return _run_radau_step_fn(self)`）。
+- 为容纳 `solvers/radau.py`，`src/engine/solvers.py` → `src/engine/solvers/`
+  包（原文件变 `solvers/__init__.py`，零内容改动）。`SolverRegistry` 等
+  公共 API 从 `__init__.py` re-export，2 个 importer
+  （`simulation.py`、`test_solver_parity.py`）零改动。
+- **位级相同性证明（faked-success solve_ivp）**：因本机真 Radau 跑不了
+  （Python 3.14 + scipy 硬阻塞），用 monkeypatch 让 `solve_ivp` 返回确定性
+  成功结果（y0 不变），驱动 `_step_radau` 的**成功路径**完整跑过
+  （unpack → 5a blood factors → run_physiology_post → 8-module compute →
+  coupling → disease → organ_health → history → time advance）。对比抽取
+  前后 engine 关键状态（HR/MAP/CO/GFR/PO2/PCO2/sat/pH/BV/RR/fallback/
+  method/hist_len）→ **identical: True**。
+- 失败路径（faked-solve_ivp 失败 → fallback Euler）由 `test_solver_fallback.py`
+  覆盖，全通过。`RadauSolver.step` → `engine._step_radau()` → 瘦转发链路
+  经这些测试端到端验证。
+- 验证：gate_check --quick 通过；core channel **788 passed, 5 xfailed,
+  1 failed**（与 Step 2 完全一致，零回归；唯一失败仍是 pre-existing 的
+  mechanism B `fever_state`）。
+- **roadmap 全部 5 步完成**（0a-0d + 1 + 4 + 5 + 2 + 3）。剩余的"真正耦合
+  统一"（Step 5 的 follow-up）与 Radau 真实验证依赖能跑 Radau 的环境，
+  见 coupling_inventory.md 的后续方向。
