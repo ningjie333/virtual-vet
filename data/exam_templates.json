@@ -411,8 +411,7 @@
         "param": "WBC",
         "unit": "×10⁹/L",
         "normal_range": "6.0-17.0",
-        "source": "computed",
-        "value_formula": "thresholds.wbc_base + (disease.bacterial_load * thresholds.wbc_bacterial_factor if getattr(disease, 'active', False) and hasattr(disease, 'bacterial_load') else 0)"
+        "source": "state.WBC"
       },
       {
         "param": "PLT",

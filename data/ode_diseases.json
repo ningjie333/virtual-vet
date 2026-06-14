@@ -1973,6 +1973,18 @@
           "tau": 900.0,
           "target_fn": "cytokine_storm * 0.8"
         }
+      },
+      "fever_state": {
+        "initial": 0.0,
+        "clamp": [
+          0,
+          1
+        ],
+        "ode_type": "first_order_lag",
+        "params": {
+          "tau": 1800.0,
+          "target_fn": "min(cytokine_storm, 1.0)"
+        }
       }
     },
     "outputs": [
@@ -2051,12 +2063,17 @@
           "formula": "dcytokine_storm/dt = (target - cytokine_storm) / τ (τ=600.0s)",
           "description": "细胞因子风暴程度（一阶滞后）"
         },
-        "capillary_leak": {
-          "type": "first_order_lag",
-          "formula": "dcapillary_leak/dt = (target - capillary_leak) / τ (τ=900.0s)",
-          "description": "毛细血管渗漏程度（一阶滞后）"
-        }
-      }
+  "capillary_leak": {
+    "type": "first_order_lag",
+    "formula": "dcapillary_leak/dt = (target - capillary_leak) / τ (τ=900.0s)",
+    "description": "毛细血管渗漏程度（一阶滞后）"
+  },
+  "fever_state": {
+    "type": "first_order_lag",
+    "formula": "dfever_state/dt = (target - fever_state) / τ (τ=1800.0s)",
+    "description": "发热程度（一阶滞后，target 跟随 cytokine_storm）"
+  }
+}
     }
   },
   "ivdd": {

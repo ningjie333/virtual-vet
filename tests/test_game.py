@@ -49,11 +49,20 @@ def healthy_creature():
 
 @pytest.fixture(scope="session")
 def pneumonia_creature():
-    """20kg dog with moderate pneumonia simulated 20 min."""
+    """20kg dog with severe pneumonia simulated 20 min.
+
+    Severity is 'severe' (not 'moderate') because the WBC-elevation contract
+    (test_pneumonia_wbc_elevated expects WBC >= 12) requires the infection to
+    persist and drive cytokine → WBC. Per the disease model
+    (test_diseases.test_pneumonia_bacterial_load_decay), moderate pneumonia's
+    immune_clearance > growth_rate, so bacteria decay and WBC stays at
+    baseline 10.0. Severe pneumonia's growth_rate > immune_clearance, so the
+    infection persists and WBC rises (observed ~16.8 @ 20 min).
+    """
     from src.simulation import VirtualCreature
     from src.diseases import create_disease
     e = VirtualCreature(body_weight_kg=20.0, dt=5.0)
-    d = create_disease("pneumonia", severity="moderate")
+    d = create_disease("pneumonia", severity="severe")
     e.attach_disease(d)
     e.simulate(20.0)
     return e
