@@ -209,20 +209,14 @@ def _hypoadreno_creature():
     return e
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="pre-existing RAAS period-2 limit cycle (MAP 39↔122, swing ~83 "
-           "mmHg/step; see docs/coupling_inventory.md 'RAAS Oscillation Root "
-           "Cause'). Fix = first-order lag on kidney renin_activity (Step 5 "
-           "follow-up). This xfail MUST flip to pass after that fix.",
-)
 def test_no_raas_limit_cycle_pneumonia():
     """Pneumonia (the #4-fixture config) must not exhibit a period-2 MAP cycle.
 
-    Today xfails: the RAAS loop (instant renin → SVR multiply → MAP → renin)
-    oscillates MAP by ~83 mmHg every step (39↔122). After the renin-lag fix
-    this must settle to < 15 mmHg/step. This is the direct regression gate for
-    test_scenarios.test_determine_phase_moderate_pneumonia_fixture.
+    Fixed 2026-06-14 (Fix-B): first-order lag on heart SVR baroreflex
+    (SVR_BAROREFLEX_TAU_SEC=10s) + kidney renin (TAU_RAAS=120s) broke the
+    MAP→renin→SVR→MAP undamped loop. This test is now a permanent regression
+    gate — any change that reintroduces instant (undamped) feedback in the
+    cardiovascular loop must trip it.
     """
     swing = _map_step_swing(lambda: _pneumonia_creature("moderate"))
     assert swing < _RAAS_SWING_TOLERANCE_MMHG, (
@@ -231,16 +225,11 @@ def test_no_raas_limit_cycle_pneumonia():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="pre-existing RAAS oscillation in hypoadrenocorticism (Na_deficit "
-           "drives renin; twin-run xfail twin). Same root cause as pneumonia.",
-)
 def test_no_raas_limit_cycle_hypoadrenocorticism():
     """Hypoadrenocorticism must not exhibit RAAS-driven MAP oscillation.
 
-    Today xfails (Na_deficit → renin → same period-2 loop). After the
-    renin-lag fix this must settle.
+    Fixed 2026-06-14 (Fix-B): same renin+SVR lag treatment as pneumonia.
+    Permanent regression gate for the Na_deficit → renin loop.
     """
     swing = _map_step_swing(_hypoadreno_creature)
     assert swing < _RAAS_SWING_TOLERANCE_MMHG, (
