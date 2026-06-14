@@ -215,6 +215,10 @@
     "test_twin_run.py": {
       "bundle": "core-solver",
       "lane": "core"
+    },
+    "test_multi_disease.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
     }
   }
 }

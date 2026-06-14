@@ -162,7 +162,7 @@ class VirtualCreature:
         )
         self.toxicology = ToxicologyModule(weight_kg=body_weight_kg)
         self.organ_health = OrganHealthTracker()
-        self.disease = None  # 疾病模块（由外部 attach_disease() 注入）
+        self.diseases: list = []  # 疾病模块列表（支持多病叠加；Q1 + Q2 决策 2026-06-14）
 
         # 三室体液模型
         self.fluid = FluidCompartment(weight_kg=body_weight_kg)
@@ -342,15 +342,29 @@ class VirtualCreature:
             "k": k,
         }
 
+    @property
+    def disease(self):
+        """向后兼容：返回第一个疾病（多数单病测试/调用点仍按 `engine.disease` 写）。
+
+        多病场景请直接用 `self.diseases` (list)。Q1 (2026-06-14)。
+        """
+        return self.diseases[0] if self.diseases else None
+
     def attach_disease(self, disease_module):
         """
-        注入疾病模块。
+        注入疾病模块（支持多病叠加）。
+
+        每次调用追加到 `self.diseases` 列表。所有 active 疾病的 FactorCommand
+        在每步按 attach 顺序**chained-rebase** 合并（参见 Q2 决策 2026-06-14）：
+        - `multiply` 链 = 复合效应（DCM 0.7 × 肺炎 0.8 = 0.56）
+        - `add` 链 = 累加（+5 + +10 = +15）
+        - `set` 链 = 后写者赢（最近 attach 的疾病语义最相关）
 
         Args:
             disease_module: DiseaseModule 实例（如 PneumoniaModule）
         """
-        self.disease = disease_module
-        self.disease.activate(self.current_time_s)
+        self.diseases.append(disease_module)
+        disease_module.activate(self.current_time_s)
         if self._legacy_clinical_signs_enabled:
             self._ensure_legacy_clinical_signs_engine()
 
@@ -571,19 +585,24 @@ class VirtualCreature:
         # Step 2.5: 疾病模块 — 在器官 compute() 之前执行一次
         # 这样 diffusion_coefficient / GFR multiplier 等本轮即可影响下游器官，
         # 同时避免同一 dt 内重复推进 disease state。
-        if self.disease and self.disease.active:
-            self.disease._current_time_s = self.current_time_s
-            engine_state = {
-                "heart": {
-                    "heart_rate_bpm": heart_state["heart_rate_bpm"],
-                    "MAP_mmHg": heart_state["MAP_mmHg"],
-                    "cardiac_output_ml_min": CO,
-                },
-                "lung": {"arterial_PO2": self.blood.arterial_PO2_mmHg},
-                "kidney": {"GFR_ml_min": self.kidney.GFR},
-            }
-            for cmd in self.disease.compute(dt, engine_state):
-                self.apply_factor(cmd)
+        # Q1 (2026-06-14)：支持多病叠加——所有 active 疾病按 attach 顺序计算
+        # 各自的 FactorCommand，统一走 apply_factor 的 chained-rebase 合并。
+        if self.diseases:
+            active_diseases = [d for d in self.diseases if d.active]
+            if active_diseases:
+                engine_state = {
+                    "heart": {
+                        "heart_rate_bpm": heart_state["heart_rate_bpm"],
+                        "MAP_mmHg": heart_state["MAP_mmHg"],
+                        "cardiac_output_ml_min": CO,
+                    },
+                    "lung": {"arterial_PO2": self.blood.arterial_PO2_mmHg},
+                    "kidney": {"GFR_ml_min": self.kidney.GFR},
+                }
+                for d in active_diseases:
+                    d._current_time_s = self.current_time_s
+                    for cmd in d.compute(dt, engine_state):
+                        self.apply_factor(cmd)
 
             # 生理 clamp：防止疾病累积效应把参数推到非生理范围
             # P0(2026-06-13): 通过 apply_factor 写入，保持 FactorCommand 审计链完整性
@@ -673,7 +692,8 @@ class VirtualCreature:
             self.kidney.GFR *= self.organ_health.kidney_factor
 
         # Step 5.5: 重新读取疾病写入后的器官状态（不再次推进 disease）
-        if self.disease and self.disease.active:
+        # Q1 (2026-06-14)：多病叠加 — 只要任一 active 疾病就执行重读
+        if any(d.active for d in self.diseases):
             heart_state["heart_rate_bpm"] = self.heart.heart_rate
             heart_state["MAP_mmHg"] = self.heart.mean_arterial_pressure
             heart_state["CVP_mmHg"] = self.heart.central_venous_pressure
@@ -978,29 +998,43 @@ class VirtualCreature:
         return ivp_state_map
 
     def _get_ivp_disease_modules(self) -> list[str]:
-        """返回带有疾病 ODE 状态变量的模块名列表。"""
-        # 疾病状态存在 disease 模块里
-        modules = []
-        if self.disease is not None and hasattr(self.disease, 'compute_derivatives'):
-            modules.append('disease')
-        return modules
+        """返回所有 active 疾病的 namespaced module 名列表。
+
+        用 `disease.{name}` 形式给每个疾病独立命名空间，避免多病 state var
+        名字冲突。Q1 (2026-06-14) 多病叠加支持。
+        """
+        return [
+            f"disease.{d.name}" for d in self.diseases
+            if d.active and hasattr(d, "compute_derivatives")
+        ]
+
+    def _disease_for_mname(self, mname: str):
+        """根据 'disease.{name}' namespace 找到对应 DiseaseModule 实例。"""
+        assert mname.startswith("disease."), f"unexpected mname {mname!r}"
+        disease_name = mname[len("disease."):]
+        for d in self.diseases:
+            if d.name == disease_name:
+                return d
+        raise KeyError(f"no disease named {disease_name!r} in self.diseases")
 
     def _pack_disease_state(self) -> np.ndarray:
-        """将当前疾病状态打包成 numpy 向量 y0。"""
+        """将当前所有疾病状态打包成 numpy 向量 y0。"""
         state_map = self._build_ivp_state_map()
         n = len(state_map)
         y0 = np.zeros(n)
         for (mname, vname), idx in state_map.items():
-            if mname == 'disease':
-                y0[idx] = self.disease._state_vars[vname]
+            if mname.startswith("disease."):
+                d = self._disease_for_mname(mname)
+                y0[idx] = d._state_vars[vname]
         return y0
 
     def _unpack_disease_state(self, y: np.ndarray) -> None:
         """将 numpy 向量 y 分解到各疾病模块的 _state_vars。"""
         state_map = self._build_ivp_state_map()
         for (mname, vname), idx in state_map.items():
-            if mname == 'disease':
-                self.disease._state_vars[vname] = y[idx]
+            if mname.startswith("disease."):
+                d = self._disease_for_mname(mname)
+                d._state_vars[vname] = y[idx]
 
     def _get_engine_state(self) -> dict:
         """收集当前血液/器官状态（供导数计算用）。"""
@@ -1015,17 +1049,21 @@ class VirtualCreature:
         }
 
     def _ivp_rhs(self, t: float, y: np.ndarray) -> np.ndarray:
-        """ODE 右端函数（供 solve_ivp 调用）。"""
+        """ODE 右端函数（供 solve_ivp 调用）。Q1 (2026-06-14): 遍历所有 active 疾病。"""
         self._unpack_disease_state(y)
         engine_state = self._get_engine_state()
         state_map = self._build_ivp_state_map()
         n = len(state_map)
         dydt = np.zeros(n)
 
+        # Cache derivatives per disease to avoid redundant calls
+        per_disease_derivs: dict = {}
         for (mname, vname), idx in state_map.items():
-            if mname == 'disease':
-                derivs = self.disease.compute_derivatives(engine_state)
-                dydt[idx] = derivs.get(vname, 0.0)
+            if mname.startswith("disease."):
+                if mname not in per_disease_derivs:
+                    d = self._disease_for_mname(mname)
+                    per_disease_derivs[mname] = d.compute_derivatives(engine_state)
+                dydt[idx] = per_disease_derivs[mname].get(vname, 0.0)
 
         return dydt
 
@@ -1227,7 +1265,8 @@ class VirtualCreature:
             "lifecycle": self.lifecycle.serialize(),
 
             # ── Disease state (readable summary) ────────────────────────
-            "disease_state": self.disease.summary() if self.disease else None,
+            # Q1 (2026-06-14): 多病叠加 — list 形式，每个 disease 一个 summary
+            "disease_state": [d.summary() for d in self.diseases if d.active] or None,
         }
 
     def to_minimal_snapshot(self) -> dict:

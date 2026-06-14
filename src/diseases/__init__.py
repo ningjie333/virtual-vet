@@ -86,6 +86,34 @@ class DiseaseModule(ABC):
 
     只返回需要变更的指令，未提及的器官/参数保持不变。
     不活跃时返回空列表。
+
+    ──────────────────────────────────────────────────────────────────────
+    多病叠加的合并语义 (Q2 spec, 2026-06-14)
+    ──────────────────────────────────────────────────────────────────────
+    当多个 DiseaseModule 通过 VirtualCreature.attach_disease() 叠加时，
+    引擎按 **attach 顺序 chained-rebase** 合并所有 active 疾病的 FactorCommand：
+
+      - `multiply` 链 = 复合效应
+        例: DCM 降 30% (`×0.7`) + 肺炎降 20% (`×0.8`) → 最终 `×0.56`
+        临床对应: 慢性基础病 + 急性合并症，复合恶化（不是覆盖）
+      - `add` 链 = 累加
+        例: 疼痛 +5 bpm + 发热 +10 bpm → 最终 `+15 bpm`
+        临床对应: 多源刺激累加
+      - `set` 链 = 后写者赢
+        例: 疾病 A `set HR=120`，疾病 B 紧跟 `set HR=140` → 最终 `HR=140`
+        临床对应: 最近 attach 的疾病 = 最相关的临床上下文
+
+    该 spec 的依据：临床 3 个核心 multi-disease 场景（DCM+肺炎、CKD+肺炎、
+    糖尿病+UTI）都需要复合效果，"覆盖"或"取最大"都不生理。详见
+    `docs/severity_design_proposal.md` §"技术问题核实结果" / Q2。
+
+    排序 = `VirtualCreature.attach_disease` 调用顺序（先到先得）；
+    第一个 attach 的疾病是基线，后续 attach 的疾病在此基线上做 chained-rebase。
+
+    **注意**：本类不强制 priority / aggregation 字段（已明确决策：YAGNI）。
+    若未来需要优先级/聚合策略，再扩展本基类。
+
+    测试: `tests/test_multi_disease.py` 回归套件。
     """
 
     def __init__(self, name: str):
