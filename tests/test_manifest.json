@@ -211,6 +211,10 @@
     "test_time_management.py": {
       "bundle": "core-runtime",
       "lane": "core"
+    },
+    "test_twin_run.py": {
+      "bundle": "core-solver",
+      "lane": "core"
     }
   }
 }

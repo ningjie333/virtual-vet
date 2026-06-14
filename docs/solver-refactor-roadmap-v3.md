@@ -22,7 +22,7 @@
 | **1** | 公共化 `pack_state/unpack_state/unified_rhs` | ✅ | 79b244b | 2hr |
 | **2** | 加 `STATE_VARS` 类属性（替代硬编码 _UNIFIED_MODULES） | 🔲 | — | 4hr |
 | **3** | Radau 拆到 `src/engine/solvers/radau.py` | 🔲 | — | 3hr |
-| **4** | Twin-run validation harness（10 场景 + 收敛率） | 🔲 | — | 6hr |
+| **4** | Twin-run validation harness（10 场景 + 收敛率） | ✅ | (pending commit) | 6hr |
 | **5** | Gauss-Seidel docstring + 耦合统一 | 🔲 | — | 6hr |
 
 ## 关键设计决策
@@ -63,3 +63,28 @@ twin-run 断言 `_solver_fallback_count == 0`，防止"Radau 失败→fallback E
 - 真 Radau 单步测试因本机 Python 3.14 + scipy 的 LU 分解性能问题超时
   （pre-existing 环境问题，非行为回归）；faked-solve_ivp 的 fallback 测试
   完整跑过 `_step_radau` → 新 `_pack/_unified_rhs/_unpack` 路径，全通过。
+
+### Step 4 验证（2026-06-14）
+
+- 新增 `src/engine/twin_run.py`（harness 核心）+ `tests/test_twin_run.py`
+  （10 场景 + 5 个 harness 自测 + 1 个 opt-in Radau 测试）。
+- **策略调整**：路线图原写 Euler-vs-Radau，但本机 Python 3.14 + scipy 1.17
+  下真 `solve_ivp(Radau)` 单步 >5min 硬阻塞（baseline 同样，非代码 bug）。
+  改用 **Euler(dt_prod=0.1) vs Euler(dt_ref=0.01)** dt 加细（Richardson 风格
+  收敛验证），保留 opt-in 真 Radau 模式（`TWIN_RUN_REFERENCE=radau` 环境变量，
+  CI/他机可启用，本机 skipif）。
+- **容忍矩阵（D2）**：per-vital 相对容忍（HR/MAP 2%、CO 3%、PO2/PCO2 3%、
+  saturation 1%、pH 0.5%、GFR 5%、urine 20%、blood_volume 1%）× 场景乘数
+  （healthy 1.0 → disease_severe 3.0，只放宽不收紧）。
+- **fallback 检测（D3）**：每个 twin-run 断言 `reference._solver_fallback_count == 0`。
+- **10 场景基线**：5 PASS（healthy / blood_loss_mild / blood_loss_severe /
+  arf_severe / exercise），5 xfail（fluid_resuscitation / arf_moderate /
+  dcm_moderate / hypoadrenocorticism_moderate / cocaine）—— xfail 集记录
+  pre-existing 数值/耦合噪声地板，**Step 5 改耦合时不得让 PASS 的变 FAIL，
+  也不得让 xfail 的发散更严重**。hypoadrenocorticism 的 xfail 根因是
+  angiotensin_II 277% 耦合振荡（roadmap 4 个 pre-existing 之一）。
+- 验证：gate_check --quick 通过；core channel **788 passed, 5 xfailed,
+  1 failed**（唯一失败是 pre-existing 的 mechanism B `fever_state` ValueError，
+  baseline 上已复现）。顺带修复了一个 pre-existing：运行
+  `generate_test_manifest_report.py` 重新生成 `docs/test-manifest-summary.md`
+  （新增 test_twin_run.py 注册到 core-solver/core lane）。
