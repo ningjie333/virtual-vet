@@ -474,6 +474,64 @@
         "肝脏细针穿刺细胞学检查可快速确诊，确诊后需立即放置饲管进行营养支持"
       ],
       "warmup_minutes": 1
+    },
+    {
+      "id": "case_020",
+      "title": "慢性心衰犬急性呼吸道感染",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "犬",
+        "breed": "杜宾犬",
+        "name": "黑米",
+        "age": "8岁",
+        "weight_kg": 30.0,
+        "sex": "雄性"
+      },
+      "chief_complaint": "1周前开始咳嗽，3天加重伴呼吸困难，不愿活动",
+      "history": "8岁杜宾犬，已确诊扩张型心肌病 2 年，长期服用匹莫苯丹 + 呋塞米，近期稳定可散步。1周前受凉后开始间歇性干咳，3天前咳嗽加重为湿咳，伴呼吸频率升高（主人目测约 40 次/分），不愿走动，食欲下降约 50%。昨日开始出现明显呼吸用力，腹部起伏加大。无呕吐腹泻，无血尿。近 1 年体重从 32 kg 降至 30 kg（慢性心衰消耗）。已完成年度免疫。",
+      "disease": "dilated_cardiomyopathy",
+      "diseases": [
+        "dilated_cardiomyopathy",
+        "pneumonia"
+      ],
+      "disease_onset_s": 0,
+      "time_limit_actions": 12,
+      "starting_hints": [
+        "杜宾犬是 DCM 高发品种 — 心功能基线可能已经受损",
+        "8岁 + DCM 基础病 + 急性呼吸道症状 = 复合恶化",
+        "建议同时评估心功能（X光心脏轮廓、BNP、心超）+ 肺功能（X光肺野、血气）"
+      ],
+      "warmup_minutes": 20
+    },
+    {
+      "id": "case_021",
+      "title": "慢性肾病猫急性呼吸道感染",
+      "difficulty": 3,
+      "difficulty_label": "★★★",
+      "animal": {
+        "species": "猫",
+        "breed": "家养短毛猫",
+        "name": "小白",
+        "age": "14岁",
+        "weight_kg": 4.0,
+        "sex": "雌性绝育"
+      },
+      "chief_complaint": "2天咳嗽伴嗜睡，主人提及近期多饮多尿",
+      "history": "14岁家养短毛猫，已确诊慢性肾病 1 年，IRIS 二期，长期肾病处方粮 +口服磷结合剂。1月前复查 BUN 35 / Cr 2.4。2天前受凉后开始咳嗽，1天前嗜睡，食欲下降约 70%。近期主人注意到饮水量比往常多 30%（PD）。无呕吐，无血尿，无尿路阻塞症状。体重 1 年内从 4.5 kg 降至 4.0 kg（CKD 肌肉消耗）。已完成年度免疫，室内猫。",
+      "disease": "ckd_anemia",
+      "diseases": [
+        "ckd_anemia",
+        "pneumonia"
+      ],
+      "disease_onset_s": 0,
+      "time_limit_actions": 12,
+      "starting_hints": [
+        "老年猫 + CKD 基础病 + 急性呼吸道 = 免疫低下易感染",
+        "近期 PD（多饮）是 CKD 进展信号 — 复查肾脏指标",
+        "建议同时评估肾功能（BUN/Cr/SDMA/尿比重）+ 肺功能（X光、血气）"
+      ],
+      "warmup_minutes": 20
     }
   ]
 }
