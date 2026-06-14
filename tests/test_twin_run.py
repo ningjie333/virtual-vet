@@ -154,3 +154,96 @@ def test_twin_run_radau_healthy():
     assert result.reference_solver == "radau"
     assert result.fallback_count == 0, "Radau fell back to Euler — D3 violation"
     assert result.converged, f"Radau twin-run did not converge:\n{result.summary()}"
+
+
+# ── RAAS oscillation characterization (#4, pre-existing) ──────────────────────
+# These tests capture the period-2 limit cycle documented in
+# docs/coupling_inventory.md "RAAS Oscillation Root Cause". They xfail today
+# (strict) because the oscillation is present; they MUST pass after the Step 5
+# follow-up fix (add a first-order lag to kidney renin_activity, TAU_RAAS≈120s).
+#
+# Why they live here (not test_scenarios): these are numerical-dynamics
+# properties (MAP step-to-step swing), not phase-judgment contracts. They
+# belong beside the twin-run harness as the regression gate for the coupling fix.
+#
+# Probed values (2026-06-14, dt=10s, steady-state swing after transient):
+#   pneumonia moderate            83.1 mmHg/step (MAP 39↔122 limit cycle)
+#   hypoadrenocorticism moderate  15.1 mmHg/step
+#   cocaine                      122.8 mmHg/step (worst)
+
+def _map_step_swing(creature_builder, dt: float = 10.0, n_steps: int = 30,
+                    skip_first: int = 10) -> float:
+    """Run a creature and return the largest step-to-step |ΔMAP| over the run.
+
+    `creature_builder` is a zero-arg callable returning an armed (un-stepped)
+    VirtualCreature with record_history=True. skip_first drops the initial
+    transient. A healthy, damped model swings < 5 mmHg/step; the RAAS limit
+    cycle swings 80-120 mmHg/step.
+    """
+    vc = creature_builder()
+    for _ in range(n_steps):
+        vc.step()
+    maps = vc.history["MAP_mmHg"][skip_first:]
+    return max(abs(maps[i + 1] - maps[i]) for i in range(len(maps) - 1))
+
+
+# Threshold: 15 mmHg/step. Generous enough to tolerate real baroreflex swings,
+# tight enough to fail loudly on the period-2 limit cycle (≥80).
+_RAAS_SWING_TOLERANCE_MMHG = 15.0
+
+
+def _pneumonia_creature(severity: str = "moderate"):
+    """The #4 fixture config: pneumonia, dt=10, record_history. Not stepped."""
+    from src.simulation import VirtualCreature
+    from src.diseases import create_disease
+    e = VirtualCreature(body_weight_kg=20.0, dt=10.0, record_history=True)
+    e.attach_disease(create_disease("pneumonia", severity=severity))
+    return e
+
+
+def _hypoadreno_creature():
+    from src.simulation import VirtualCreature
+    from src.diseases import create_disease
+    e = VirtualCreature(body_weight_kg=20.0, dt=10.0, record_history=True)
+    e.attach_disease(create_disease("hypoadrenocorticism", severity="moderate"))
+    return e
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="pre-existing RAAS period-2 limit cycle (MAP 39↔122, swing ~83 "
+           "mmHg/step; see docs/coupling_inventory.md 'RAAS Oscillation Root "
+           "Cause'). Fix = first-order lag on kidney renin_activity (Step 5 "
+           "follow-up). This xfail MUST flip to pass after that fix.",
+)
+def test_no_raas_limit_cycle_pneumonia():
+    """Pneumonia (the #4-fixture config) must not exhibit a period-2 MAP cycle.
+
+    Today xfails: the RAAS loop (instant renin → SVR multiply → MAP → renin)
+    oscillates MAP by ~83 mmHg every step (39↔122). After the renin-lag fix
+    this must settle to < 15 mmHg/step. This is the direct regression gate for
+    test_scenarios.test_determine_phase_moderate_pneumonia_fixture.
+    """
+    swing = _map_step_swing(lambda: _pneumonia_creature("moderate"))
+    assert swing < _RAAS_SWING_TOLERANCE_MMHG, (
+        f"MAP step-to-step swing {swing:.1f} mmHg exceeds "
+        f"{_RAAS_SWING_TOLERANCE_MMHG} — RAAS limit cycle present"
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="pre-existing RAAS oscillation in hypoadrenocorticism (Na_deficit "
+           "drives renin; twin-run xfail twin). Same root cause as pneumonia.",
+)
+def test_no_raas_limit_cycle_hypoadrenocorticism():
+    """Hypoadrenocorticism must not exhibit RAAS-driven MAP oscillation.
+
+    Today xfails (Na_deficit → renin → same period-2 loop). After the
+    renin-lag fix this must settle.
+    """
+    swing = _map_step_swing(_hypoadreno_creature)
+    assert swing < _RAAS_SWING_TOLERANCE_MMHG, (
+        f"MAP step-to-step swing {swing:.1f} mmHg exceeds "
+        f"{_RAAS_SWING_TOLERANCE_MMHG} — RAAS limit cycle present"
+    )

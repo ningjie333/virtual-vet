@@ -209,3 +209,89 @@ Three plausible directions, listed for the record (NOT implemented here):
 Any of these needs (a) a runnable Radau environment and (b) the twin-run
 harness as the regression gate. Step 4 (harness) + this inventory are the
 prerequisites.
+
+---
+
+## RAAS Oscillation Root Cause (#4, the only remaining pre-existing failure)
+
+**Symptom:** `test_scenarios.test_determine_phase_moderate_pneumonia_fixture`
+asserts phase == "worsening" but gets "moribund". Root cause is a **period-2
+limit cycle** in the RAAS loop, not noise. Traced 2026-06-14 on the
+pneumonia-moderate / dt=10s fixture: every step alternates between two exact
+states with no damping:
+
+```
+step  MAP    SVR    CO(mL/min)  renin  angII   HR
+1     39.2   8.25   167         0.61   1.21    ~10   (RAAS full-on)
+2     122.0  3.52   925         0.00   0.00    ~140  (RAAS full-off)
+3     39.2   ... (exact repeat of step 1)
+```
+
+The same loop drives `hypoadrenocorticism_moderate`'s twin-run xfail
+(angiotensin_II 277% swing) — one root cause, two manifestations.
+
+### The feedback loop (positive, undamped)
+
+```
+low MAP (39)
+  → kidney._update_RAAS (kidney.py:259-262): MAP_deficit=0.56
+    → renin = combined_stress * sigmoid (INSTANT, no lag)
+  → CouplingEngine rule "RAAS→SVR": heart.SVR *= 1.0 + 0.20*min(renin,2)
+  → next heart.compute: high SVR → CO×SVR → MAP = 122
+high MAP (122)
+  → kidney: MAP_deficit < 0 → renin = 0 (sigmoid slams shut)
+  → CouplingEngine: SVR *= 1.0
+  → next heart.compute: low SVR → MAP = 39
+low MAP (39) → back to start, forever
+```
+
+### Three contributing factors
+
+1. **RAAS is an instant algebraic function, not an ODE** (`kidney.py:259-262`).
+   `renin_activity` is recomputed every step from the current MAP via a steep
+   sigmoid `1/(1+exp(-15*(stress-0.15)))` — no time constant. Real RAAS
+   responds over **minutes** (renin release → ACE → angiotensin effect); the
+   model has it at **one step** (10 s). This is the core defect.
+
+2. **The RAAS→SVR coupling rule is a multiply-on-already-modulated-SVR**
+   (`coupling_rules.json`, enabled). heart.compute's baroreflex already sets
+   SVR from MAP; the rule then multiplies it again by a RAAS factor,
+   compounding the modulation and amplifying the swing.
+
+3. **No damping anywhere in the loop.** kidney has no lag, CouplingEngine
+   rule has `time_constant: 0` (instant), and heart.compute's SVR is itself a
+   near-instant baroreflex. Three instant responses chained = pure oscillator.
+
+### Why phase misjudges as moribund
+
+`determine_phase` reads **instantaneous** MAP/GFR/urine. The oscillation's
+trough (MAP=39, HR≈10, GFR=0, urine=0) crosses `phase_thresholds.MAP.
+low_moribund = 40` → `_score=3` → returns "moribund" immediately (the
+`threshold_score >= 3` short-circuit at clinical_interpreter.py:111).
+
+### Fix directions (for the Step 5 follow-up "true unification" work)
+
+- **A. Add first-order lag to renin (treats the root cause, recommended).**
+  In `kidney._update_RAAS`, replace the instant assignment with a lag:
+  ```python
+  target = combined_stress * sigmoid_factor + 0.3 * Na_deficit
+  self.renin_activity += (target - self.renin_activity) * dt / TAU_RAAS
+  ```
+  with `TAU_RAAS ≈ 120 s` (Hall 2016 physiology). This breaks the period-2
+  cycle by making RAAS's response slower than the step. Must re-validate via
+  twin-run (5 PASS must stay PASS) and re-check the disease-endurance tests.
+
+- **B. Soften the sigmoid (mitigates amplitude, doesn't cure the cycle).**
+  Lower the steepness from `15` to `5-8` so renin ramps rather than steps.
+  Still instant, so the limit cycle persists but with smaller amplitude.
+
+- **C. Phase-read from a sliding window (fixes only the misjudgment).**
+  `determine_phase` averages MAP/GFR over the last N steps. The oscillation
+  itself remains (twin-run hypoadrenocorticism xfail stays); only the phase
+  test passes. Treat the symptom, not the disease.
+
+**Recommended order:** A (root cause) is the only complete fix. It requires
+deciding TAU_RAAS and validating it doesn't blunt disease severity — that
+tuning is the Step 5 follow-up work. The `oscillation_snapshot` test below
+( xfails today, must pass after fix A ) is the regression gate.
+

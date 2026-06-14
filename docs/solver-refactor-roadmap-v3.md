@@ -125,6 +125,14 @@ twin-run 断言 `_solver_fallback_count == 0`，防止"Radau 失败→fallback E
 - **后续**：真正的耦合统一需要 (a) 能跑 Radau 的环境、(b) 统一方向决策
   （3 个候选方向见 coupling_inventory.md）。本次的文档 + 清册是那个工程的
   前置条件。
+- **#4 RAAS 振荡 RCA + 回归测试已就位（2026-06-14 补充）**：剩余的 1 个
+  pre-existing 失败（test_determine_phase moribund 误判）根因已完整记录在
+  `docs/coupling_inventory.md` "RAAS Oscillation Root Cause" 段——RAAS 是瞬时
+  代数函数（无时间常数），通过 MAP→renin→SVR→MAP 形成无阻尼正反馈环，每步
+  MAP 39↔122 周期-2 极限环。治本修法：给 kidney.renin_activity 加一阶滞后
+  （τ≈120s）。回归闸门已建：`tests/test_twin_run.py` 新增
+  `test_no_raas_limit_cycle_pneumonia` + `test_no_raas_limit_cycle_
+  hypoadrenocorticism`（xfail strict，今天因振荡存在而 xfail，修复后必须 pass）。
 
 ### Step 2 验证（2026-06-14）
 
