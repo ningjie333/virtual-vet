@@ -17,6 +17,12 @@ class PresentationRequest:
     age_days: float | None = None
     encounter_stage: str = "acute_progressed"
     history_duration_min: float | None = None
+    # ── Multi-disease support (Q1, 2026-06-14) ─────────────────────────
+    # 合并症：attach_disease() 会按列表顺序追加，疾病间 FactorCommand 走
+    # chained-rebase 合并（详见 src/diseases/__init__.py::DiseaseModule Q2 spec）。
+    # 第一项即 `disease`（主诊断），`extra_diseases` 是合并症。
+    extra_diseases: tuple = ()           # tuple[DiseaseModule]
+    extra_disease_names: tuple = ()      # tuple[str]（与 extra_diseases 对齐）
 
 
 def build_presented_engine(
@@ -30,6 +36,9 @@ def build_presented_engine(
     V1 keeps the kernel's physical-time semantics unchanged.
     It simply centralizes pre-encounter replay behind one seam so callers stop
     scattering raw `attach_disease()` + `simulate(...)` logic.
+
+    Multi-disease (Q1 2026-06-14): 主疾病 + extra_diseases 按顺序 attach，
+    全部走 chained-rebase 合并。
     """
     engine_factory = engine_factory or VirtualCreature
 
@@ -42,6 +51,8 @@ def build_presented_engine(
 
     engine = engine_factory(**engine_kwargs)
     engine.attach_disease(request.disease)
+    for extra in request.extra_diseases:
+        engine.attach_disease(extra)
 
     history_minutes = _resolve_history_duration_min(request)
     if history_minutes > 0:

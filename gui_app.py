@@ -336,6 +336,13 @@ def api_new_game():
 
     disease_name = case["disease"]
     disease = create_disease(disease_name)
+    # Q1 (2026-06-14): 多病叠加 — cases.json 可选 'diseases' 字段 (list)
+    # 单病 case 走 fallback [disease_name]（向后兼容）
+    extra_disease_names = case.get("diseases", [])
+    if extra_disease_names and extra_disease_names[0] == disease_name:
+        # 防呆：cases.json 里 diseases[0] == disease 时，去重
+        extra_disease_names = extra_disease_names[1:]
+    extra_diseases = tuple(create_disease(n) for n in extra_disease_names)
     history_duration_min = case.get(
         "history_duration_min",
         case.get("warmup_minutes", 2),
@@ -348,6 +355,8 @@ def api_new_game():
             species=species_en,
             age_days=age_days,
             history_duration_min=history_duration_min,
+            extra_diseases=extra_diseases,
+            extra_disease_names=tuple(extra_disease_names),
         ),
         engine_factory=lambda **kwargs: VirtualCreature(
             lifecycle_mode=lifecycle_mode,
@@ -363,6 +372,8 @@ def api_new_game():
     state = GameState(
         engine=vc,
         disease_name=disease_name,
+        # Q1 (2026-06-14): disease_names 是全部疾病列表（含主诊断 + 合并症）
+        disease_names=[disease_name] + list(extra_disease_names),
         species=species,
         time_budget_min=time_budget,
     )

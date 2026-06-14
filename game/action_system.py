@@ -122,7 +122,10 @@ class GameState:
     """游戏状态数据类（v2：时间预算版）。"""
 
     engine: VirtualCreature
+    # Q1 (2026-06-14): 多病叠加 — 保留单数向后兼容，主诊断仍存 disease_name
+    # 新代码请用 disease_names (list) 处理多病场景
     disease_name: str
+    disease_names: list = field(default_factory=list)  # 全部疾病（合并症）
     phase: str = "playing"  # "playing" | "won" | "lost"
     death_timer: Optional[int] = None
     reports: list = field(default_factory=list)
