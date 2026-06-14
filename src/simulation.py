@@ -947,8 +947,8 @@ class VirtualCreature:
         # 8. 记录历史（同 Euler 路径最后部分）
         if self._record_history_enabled:
             self._record_history(dt)
-        else:
-            self.current_time_s += dt
+        # 时间推进（统一在此，不在 _record_history 内）
+        self.current_time_s += dt
 
         # 8.5: Legacy compatibility refresh for engine-owned signs state.
         self._refresh_legacy_clinical_signs()
@@ -1099,7 +1099,9 @@ class VirtualCreature:
         self.history["lymph_splenic_reserve"].append(self.blood.splenic_reserve_mL)
         self.history["lymph_lymph_flow"].append(self.lymphatic.lymph_flow_rate)
 
-        self.current_time_s += dt
+        # NOTE: time advancement is handled by the caller (_step_euler or _step_radau),
+        # not here. This avoids double-advancement when Euler calls _record_history
+        # and then also increments current_time_s.
 
     def advance_seconds(self, duration_seconds: float, verbose: bool = False):
         """
