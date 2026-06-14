@@ -23,7 +23,7 @@
 | **2** | 加 `STATE_VARS` 类属性（替代硬编码 _UNIFIED_MODULES） | 🔲 | — | 4hr |
 | **3** | Radau 拆到 `src/engine/solvers/radau.py` | 🔲 | — | 3hr |
 | **4** | Twin-run validation harness（10 场景 + 收敛率） | ✅ | 467b5b7 | 6hr |
-| **5** | Gauss-Seidel docstring + 耦合统一 | ✅ (docstring + 清册; 真正统一留后续) | (pending commit) | 6hr |
+| **5** | Gauss-Seidel docstring + 耦合统一 | ✅ (docstring + 清册; 真正统一留后续) | 569889f | 6hr |
 
 ## 关键设计决策
 
