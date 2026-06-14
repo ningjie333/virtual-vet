@@ -626,8 +626,16 @@ class VirtualCreature:
         for cmd in immune_state.get("factor_commands", []):
             self.apply_factor(cmd)
 
-        # ── Step 4.95: 多器官耦合（信号发布由 run_post_dispatch 处理）─────────
-        # 耦合规则解析（读取 run_post_dispatch 已发布的信号）
+        # ── Step 4.95: 多器官耦合（第一次 resolve，读上一拍的信号）─────────────
+        # NOTE(Step 5, solver-refactor-roadmap-v3): this resolve() runs BEFORE
+        # run_post_dispatch publishes this step's signals, so it reads the
+        # PREVIOUS step's published signals. This is NOT a bug to remove
+        # casually — twin-run harness (tests/test_twin_run.py) empirically
+        # proved that together with the second resolve in run_post_dispatch
+        # (Step 8, fresh signals), this forms an intentional 2-substep
+        # Gauss-Seidel-style relaxation that the Euler numerics depend on
+        # (removing it flips blood_loss_severe from PASS to FAIL, GFR error
+        # 0.066 → 0.142). See docs/coupling_inventory.md "double-resolve".
         coupling_cmds = self.coupling_engine.resolve(self._organ_contexts, dt)
         for cmd in coupling_cmds:
             self.apply_factor(cmd)

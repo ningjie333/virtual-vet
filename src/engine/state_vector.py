@@ -235,18 +235,43 @@ def unified_rhs(engine: "VirtualCreature", t: float, y: np.ndarray) -> np.ndarra
     """
     统一 ODE 右端函数（供 solve_ivp Radau 调用）。
 
-    半隐式耦合策略：
-    - 在 rhs(t,y) 调用时，用上一 rhs 调用的 outputs 路由为当前 inputs
-    - 每个模块的 derivatives() 只读 inputs（不读其他模块的当前状态）
-    - Radau 的 Newton 迭代会自动收敛到耦合解
+    ── 半隐式 Gauss-Seidel 耦合策略 ──────────────────────────────────────
+    这是 engine 的**积分环内**（intra-step）数据流，与 Euler 路径的**步后**
+    CouplingEngine（post-step 规则引擎）是**两套不同语义的耦合机制**——见
+    docs/coupling_inventory.md 的完整对比。
 
-    数据流：
-    1. 解包 y → 模块实例属性
-    2. 用 _cached_inputs 填充每个模块的 inputs
-    3. 调用各模块 derivatives() → dydt + outputs
-    4. 将 outputs 存入 _current_outputs
-    5. 在连接表上路由：_current_outputs → _cached_inputs（下次调用用）
-    6. 打包 dydt → numpy 向量
+    Gauss-Seidel 半隐式要点：
+    - 每次 rhs(t, y) 调用时，各模块的 derivatives() **只读 `_cached_inputs`**
+      （上一次 rhs 调用的 outputs 经 CONNECTIONS 表路由的结果），**不读**
+      其他模块的当前实例状态。
+    - 模块按固定顺序求导（heart → lung → kidney → ... → fluid），每个模块
+      的 outputs 立即可被本调用内更靠后的模块消费（如 gut 的输出直接喂给
+      liver）——这是 Gauss-Seidel 顺序松驰的本质。
+    - solve_ivp(Radau) 的 Newton 迭代会反复调 rhs：每次调用都更新
+      `_cached_inputs`，子迭代间 inputs 逐步收敛，最终到达耦合不动点。
+      这是为什么半隐式格式能与隐式 Radau 配合——Newton 不需要显式 Jacobian
+      of the coupling，靠函数值迭代即可收敛。
+
+    ── 数据流 ──────────────────────────────────────────────────────────
+    1. （连续失血 sigmoid 计算）
+    2. 解包 y → 模块实例属性（unpack_state）
+    3. 初始化 module_inputs = copy(_cached_inputs)；all_outputs = {}
+    4. 按固定顺序调各模块 derivatives(dt, **inputs_from_cache) → (dydt, outputs)
+       - gut 的 outputs 直接作为 liver 的 gut_state 入参（intra-call 直传）
+       - 其余跨模块依赖通过 CONNECTIONS 在本调用末尾路由到 _cached_inputs
+    5. 按 CONNECTIONS 表路由 all_outputs → _cached_inputs（供下次 rhs 用）
+       注：src_var 命名不匹配的条目被 `if val is not None` 静默跳过
+       （见 docs/coupling_inventory.md 的 dead routes 清单）
+    6. 打包 module_dydt → numpy 向量返回（用 derivatives 的 dydt，非 outputs）
+
+    ── 已知限制 ─────────────────────────────────────────────────────────
+    - **H20**：`_cached_inputs` 在 Newton 子迭代间会变，"上一次输出"的语义
+      因此松散（取决于 solve_ivp 的内部子步策略）。当前可接受——Radau 的
+      自适应步长会限制子迭代幅度。
+    - **覆盖差异**：CONNECTIONS 只在 Radau 路径生效；Euler 路径用
+      CouplingEngine + data/coupling_rules.json。两套机制覆盖的耦合关系
+      **不同**（如 heart.cardiac_output→kidney 只在 CONNECTIONS；
+      RAAS→SVR 只在 CouplingEngine）。详见 docs/coupling_inventory.md。
     """
     # 1. 连续失血模型（sigmoid，用于 Radau 积分路径）
     # 与 step() 里的公式保持一致：bell curve = sigmoid_on × (1 - sigmoid_off)

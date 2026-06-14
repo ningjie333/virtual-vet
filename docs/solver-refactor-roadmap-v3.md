@@ -23,7 +23,7 @@
 | **2** | 加 `STATE_VARS` 类属性（替代硬编码 _UNIFIED_MODULES） | 🔲 | — | 4hr |
 | **3** | Radau 拆到 `src/engine/solvers/radau.py` | 🔲 | — | 3hr |
 | **4** | Twin-run validation harness（10 场景 + 收敛率） | ✅ | 467b5b7 | 6hr |
-| **5** | Gauss-Seidel docstring + 耦合统一 | 🔲 | — | 6hr |
+| **5** | Gauss-Seidel docstring + 耦合统一 | ✅ (docstring + 清册; 真正统一留后续) | (pending commit) | 6hr |
 
 ## 关键设计决策
 
@@ -88,3 +88,35 @@ twin-run 断言 `_solver_fallback_count == 0`，防止"Radau 失败→fallback E
   baseline 上已复现）。顺带修复了一个 pre-existing：运行
   `generate_test_manifest_report.py` 重新生成 `docs/test-manifest-summary.md`
   （新增 test_twin_run.py 注册到 core-solver/core lane）。
+
+### Step 5 验证（2026-06-14）
+
+- **范围收缩（诚实说明）**：roadmap 标题"耦合统一"在本次**不完整实现**。
+  探索揭示两套机制（CONNECTIONS 积分环内数据流 vs CouplingEngine 步后规则
+  引擎）是**不同语义**，一次性合并会破坏隐式积分语义，且 D4 自己说了
+  "先用 twin-run 验证当前行为，再动耦合"。本次交付的是**统一的前置条件**：
+  文档化 + 漂移清册 + 一个被证伪的假设的记录。
+- **交付物**：
+  - `src/engine/state_vector.py` unified_rhs docstring 扩充：明确 Gauss-Seidel
+    半隐式语义、Newton 收敛原理、与 Euler CouplingEngine 的语义差异、H20 限制。
+  - `src/engine/topology.py` CONNECTIONS 注释纠正（原误称 Euler 也用）：明确
+    仅 Radau 路径用；列出 6+ 已知 dead routes（src_var 命名不匹配）。
+  - `docs/coupling_inventory.md`（新）：两机制语义/触发/覆盖对比表；CONNECTIONS
+    dead routes 清单（每条标 `file:line`）；覆盖差异矩阵（RAAS→SVR 只在
+    CouplingEngine、heart.cardiac_output→kidney 只在 CONNECTIONS 等）；已知限制；
+    未来真正统一的 3 个方向建议。
+- **被证伪的假设（有价值）**：原计划删 Euler 的 Step 4.95 double-resolve
+  （以为是 stale-signal bug）。**twin-run harness 实证否决**：删除后
+  blood_loss_severe 从 PASS 翻 FAIL（GFR 误差 0.066 → 0.142）。两次 resolve
+  实为**故意的 2-substep Gauss-Seidel 松弛**，Euler 数值依赖它。已回退删除，
+  改为在 `simulation.py:629` 写注释记录该语义 + 实证证据。这正是 twin-run
+  作为安全网的价值——防止基于错误假设改耦合。
+- **CONNECTIONS dead routes 不删**：它们目前被 `if val is not None` 静默跳过 =
+  无行为影响；删除会改 Radau 路径但本机 Radau 跑不了无法验证。只记录进清册，
+  删除留作未来"真正统一"的工作（届时需能跑 Radau 的环境）。
+- 验证：gate_check --quick 通过；**twin-run 10 场景结果与 baseline 逐字节相同**
+  （IDENTICAL_TO_BASELINE，证明纯文档改动零行为影响）；core channel 仍是
+  **788 passed, 5 xfailed, 1 failed**（与 Step 4 完全一致，零回归）。
+- **后续**：真正的耦合统一需要 (a) 能跑 Radau 的环境、(b) 统一方向决策
+  （3 个候选方向见 coupling_inventory.md）。本次的文档 + 清册是那个工程的
+  前置条件。

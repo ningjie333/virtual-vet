@@ -26,14 +26,36 @@ Phase 1: this module is a pure code-motion extraction from
 from dataclasses import dataclass, field
 
 
-# ── CONNECTIONS: cross-module data flow graph ────────────────────────────────
-# Used by `_unified_rhs()` (Radau path) to route outputs → cached inputs.
-# Used by `_step_euler()` indirectly via OrganContext + CouplingEngine.
+# ── CONNECTIONS: cross-module data flow graph (Radau path only) ──────────────
+# **Scope**: This table is consumed ONLY by `src/engine/state_vector.unified_rhs`,
+# i.e. the Radau integration path's intra-step data flow. It routes each
+# module's `derivatives()` outputs into `_cached_inputs` for the next RHS
+# evaluation (Gauss-Seidel semi-implicit coupling — see unified_rhs docstring).
+#
+# **NOT used by the Euler path.** The Euler path's coupling is the post-step
+# `CouplingEngine.resolve()` rule engine driven by `data/coupling_rules.json`
+# (16 rules, 5 enabled) + the signal-publish helpers in `step_common.py`.
+# The two mechanisms cover DIFFERENT coupling relationships and are NOT
+# synchronized — see `docs/coupling_inventory.md` for the full drift inventory.
+#
 # Format: (src_module, src_var) -> [(tgt_module, tgt_var), ...]
+#
+# **Known dead routes** (src_var never appears in the source module's
+# derivatives() outputs dict → silently skipped by `if val is not None` in
+# unified_rhs; documented, not removed — removal would change Radau behavior
+# that can't be verified on Python 3.14 + scipy 1.17 where Radau hangs):
+#   - ("liver", "glucose_output")       liver emits "glucose_output_g_min"
+#   - ("gut", "portal_flow")            gut emits "portal_blood_flow_mL_min"
+#   - ("gut", "fat_absorption_active")  gut emits "fat_absorption_g_min"
+#   - ("neuro", "heart_rate_bpm")       neuro.derivatives() has no such key
+#   - ("lung", "respiratory_rate")      only in compute(), not derivatives()
+#   - ("fluid", "V_vascular_mL"/"V_isf_mL")  fluid outputs have neither key
+# All `blood`-targeted routes are also dead: `blood` is not in UNIFIED_MODULES,
+# so its derivatives() is never called on the Radau path.
 #
 # Phase 5 plan: this table will be auto-derived from each module's
 # `INPUTS`/`OUTPUTS` class attributes via `discover_topology()`. Until then
-# it remains the canonical hand-maintained source.
+# it remains the canonical hand-maintained source (Radau path only).
 #
 # Moved from simulation.py:52-128 (Phase 1).
 
