@@ -233,7 +233,7 @@ class KidneyModule:
 
         return dydt, outputs
 
-    def _apply_RAAS(self, MAP: float, CVP: float, Na_conc: float):
+    def _apply_RAAS(self, MAP: float, CVP: float, Na_conc: float, dt: float = 0.1):
         """
         肾素-血管紧张素-醛固酮系统（RAAS）
 
@@ -253,13 +253,19 @@ class KidneyModule:
 
         # 肾素激活（血压低 + 钠低）— REF: Hall 2016 生理学
         # 用 sigmoid 让低灌注时急剧激活（之前线性可能过度/不足）
+        # FIX-B Phase 2 (2026-06-14): renin_activity 改为一阶滞后（TAU_RAAS=120s），
+        # 与 heart SVR 滞后（Phase 1）协同打破 MAP→renin→SVR→MAP 无阻尼正反馈环。
+        # 真实 RAAS 响应分钟级；此前瞬时代数赋值是极限环的第二条叠加环路。
         import math
         MAP_deficit = (MEAN_ARTERIAL_PRESSURE_MMHG - MAP) / MEAN_ARTERIAL_PRESSURE_MMHG
         Na_deficit = max(0.0, (145.0 - Na_conc) / 145.0)
         combined_stress = max(MAP_deficit, Na_deficit)
-        # Sigmoid: combined_stress > 0.2 → renin 急剧上升
+        # Sigmoid: combined_stress > 0.2 → renin target 急剧上升
         sigmoid_factor = 1.0 / (1.0 + math.exp(-15.0 * (combined_stress - 0.15)))
-        self.renin_activity = max(0.0, combined_stress * sigmoid_factor + 0.3 * Na_deficit)
+        target_renin = max(0.0, combined_stress * sigmoid_factor + 0.3 * Na_deficit)
+        # 一阶滞后（稳态 = target，无静态偏差；只是响应变慢）
+        alpha = min(dt / TAU_RAAS, 1.0) if (TAU_RAAS > 0 and dt > 0) else 1.0
+        self.renin_activity = self.renin_activity + alpha * (target_renin - self.renin_activity)
 
         # 血管紧张素 II（简化：与肾素成正比）
         self.angiotensin_II = self.renin_activity * 2.0
@@ -367,7 +373,7 @@ class KidneyModule:
         self.renal_blood_flow = self.base_renal_blood_flow * CO_fraction
 
         # Step 2: RAAS 系统激活（MAP 低时触发）
-        self._apply_RAAS(MAP, CVP, self.blood.sodium_mEq_L)
+        self._apply_RAAS(MAP, CVP, self.blood.sodium_mEq_L, dt=dt)
 
         # Step 3: 更新 GFR
         self._update_GFR(MAP, CVP)

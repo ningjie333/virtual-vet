@@ -87,6 +87,20 @@ SYSTEMIC_VASCULAR_RESISTANCE = 1.41               # 体循环血管阻力
 # REF: textbook:guyton | Guyton 14e Ch26 | PVR ≈ 0.18 mmHg·s/mL
 PULMONARY_VASCULAR_RESISTANCE = 0.18              # 肺循环血管阻力
 
+# SVR baroreflex 响应时间常数 — Fix-B Phase 1 (2026-06-14, RAAS 振荡 #4):
+# Euler 路径 heart._baroreceptor_feedback 的 SVR 赋值此前是瞬时代数覆盖（无 τ），
+# 与 Radau 路径 derivatives() 的 alpha_svr=0.1 (τ≈10s) 不对称，是 MAP 周期-2
+# 极限环的核心驱动。此常量让 Euler 对齐 Radau 的 τ。生理上动脉压力反射的 SVR
+# 分量响应在 ~10s 量级（比 HR 的交感分量 τ=5s 略慢，因 arteriole 平滑肌惯性）。
+# REF: textbook:guyton | Guyton 14e Ch18 | Baroreflex SVR component ~10s
+SVR_BAROREFLEX_TAU_SEC = 10.0                     # SVR 压力反射一阶滞后 τ (s)
+
+# RAAS 响应时间常数 — Fix-B Phase 2 (2026-06-14, RAAS 振荡 #4):
+# kidney._apply_RAAS 的 renin_activity 此前是瞬时代数赋值（无 τ），与 heart SVR 滞后
+# 叠加形成第二条无阻尼环路。真实 RAAS 响应分钟级（renin 释放 → ACE → angiotensin 效应）。
+# REF: textbook:hall | Hall 2016 | RAAS effector response ~minutes
+TAU_RAAS = 120.0                                # RAAS 肾素活性一阶滞后 τ (s)
+
 # 顺应性 (mL/mmHg)
 # REF: textbook:guyton | Guyton 14e Ch20 | Arterial compliance ≈ 1.5 mL/mmHg
 ARTERIAL_COMPLIANCE = 1.5                         # 动脉顺应性

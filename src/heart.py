@@ -441,9 +441,14 @@ class HeartModule:
         self.heart_rate *= k_factor
         self.heart_rate = max(5.0, self.heart_rate)
 
-        # SVR 代偿
+        # SVR 代偿 — Fix-B Phase 1: 一阶滞后（对齐 Radau derivatives 的 alpha_svr=0.1）
+        # 此前是瞬时代数覆盖 self.SVR = ...（无 τ），是 MAP 周期-2 极限环的核心驱动。
+        # raw_MAP → baroreflex → sympathetic(τ=5s) → SVR(此处，原瞬时) → raw_MAP 环路里，
+        # SVR 是唯一无阻尼环节。加 τ=10s 后 SVR 不再当步全跳，环路净增益 < 1，极限环消失。
+        # 见 docs/coupling_inventory.md 'RAAS Oscillation Root Cause'。
         SVR_increase = 1.0 + 2.0 * self.sympathetic * max(0.0, error)
-        self.SVR = min(self.SVR_max, self.SVR_baseline * SVR_increase)
+        svr_target = min(self.SVR_max, self.SVR_baseline * SVR_increase)
+        self.SVR = self._first_order_relax(self.SVR, svr_target, dt, SVR_BAROREFLEX_TAU_SEC)
 
     @staticmethod
     def _clamp(value: float, lo: float, hi: float) -> float:
