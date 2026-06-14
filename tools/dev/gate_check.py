@@ -195,6 +195,11 @@ def run_quick() -> int:
     else:
         print("  [类型一致性] 未实现（Phase B）")
 
+    # Orphan cache 检查（防御 npm/pnpm/yarn 在 cwd 误建 cache 目录）
+    # 见 _knowledge/03_environment.md "npm cache junction" 节
+    code = check_orphan_caches()
+    max_code = max(max_code, code)
+
     print("=" * 50)
     if max_code == 0:
         print("[PASS] 所有检查通过 ✓")
@@ -205,6 +210,80 @@ def run_quick() -> int:
     print("=" * 50)
 
     return max_code
+
+
+def check_orphan_caches() -> int:
+    """扫描 cwd，检测工具链误建的 cache 目录。
+
+    三类高置信信号（任一触发即报错）：
+
+    1. **npm cache 签名**：`_cacache/` + `_logs/` 同时存在
+       → 典型 bug：npm config set cache 配错后，npm 在 cwd 建 cache
+    2. **全角 Unicode 字符**（U+FF00-U+FFEF）在目录名里
+       → 典型 bug：Windows console/IME 把 ASCII 冒号转全角，
+         伪装成 `D:：dev-cache：npm` 这样的"D 盘路径"绕过 .gitignore
+    3. **drive-letter 前缀**：`^[A-Z]:`
+       → 任何在 cwd 顶层出现的 `D:xxx` `C:xxx` 都极可疑
+
+    已知合法的项目目录在白名单里（避免误报）。发现时给出修复建议：
+    `rm -rf -- "<name>"` 后再 `git status` 确认。
+
+    工作量：~50ms（仅 iterdir + 2-3 个 stat 调用每个 entry）。
+    """
+    KNOWN_GOOD = {
+        # 源码/测试/文档/数据
+        "src", "tests", "docs", "data", "tools", "scripts", "scripts_bak",
+        # 缓存/构建产物（.gitignore 覆盖，但白名单避免误报）
+        ".venv", "node_modules", "static", "dist", "build",
+        ".pytest_cache", ".ruff_cache", ".mypy_cache", ".tox",
+        # 前端项目（在 vite-project/ 子目录，cwd 顶层不会出，但留作防御）
+        "vet-game-frontend", "vet-game-frontend_backup",
+        # 外部参考 + 第三方克隆
+        "cvs-reference", "Bioflow_Labs_Platform-main", "Medicina-main",
+        # IDE/工具状态
+        ".claude", ".codegraph", ".cursor", ".vscode", ".idea",
+        # 结果/输出
+        "results", ".tmp", "paper_rewriting_output",
+        # 实验/调试（约定 _tools_dev/ 在 .gitignore）
+        "experiments", "_tools_dev",
+    }
+
+    issues: list[tuple[Path, str]] = []
+    for entry in sorted(PROJECT_ROOT.iterdir()):
+        if not entry.is_dir():
+            continue
+        # 跳过隐藏目录（.git, .venv, .tmp 等已在白名单或 .gitignore）
+        if entry.name.startswith("."):
+            continue
+        if entry.name in KNOWN_GOOD:
+            continue
+
+        # Signal 1: npm cache 签名
+        if (entry / "_cacache").is_dir() and (entry / "_logs").is_dir():
+            issues.append((entry, "npm cache signature (_cacache/ + _logs/)"))
+            continue
+
+        # Signal 2: 全角字符
+        if any(0xFF00 <= ord(c) <= 0xFFEF for c in entry.name):
+            issues.append((entry, "fullwidth Unicode chars (likely path-injection bug)"))
+            continue
+
+        # Signal 3: drive-letter 前缀
+        if len(entry.name) >= 2 and entry.name[0].isalpha() and entry.name[1] == ":":
+            issues.append((entry, f"drive-letter pattern '{entry.name[:2]}'"))
+            continue
+
+    if not issues:
+        print("  [orphan-cache] 通过 (0.0s)")
+        return 0
+
+    print(f"  [orphan-cache] FAIL: 发现 {len(issues)} 个可疑 cache 目录:")
+    for entry, reason in issues:
+        # 用 repr() 展示含全角字符的名称，避免被终端渲染成看起来正常的"D 盘路径"
+        print(f"    {entry.name!r}: {reason}")
+    print("  修复: 排查后大概率 `rm -rf -- <name>` 即可。")
+    print("  参考: _knowledge/03_environment.md 的 'npm cache junction' 节")
+    return 1
 
 
 def changed_modules() -> list[Path]:
