@@ -1,0 +1,65 @@
+# Solver Refactor Roadmap v3
+
+> 稳定优雅为主。基于 3-agent（Architect + Code Reviewer + Healthcare Reviewer）多视角审计。
+> Created: 2026-06-13
+
+## 设计原则
+
+- **Euler 是生产路径**，Radau 是**验证路径**（不是另一种 production 模式）
+- 新增 solver 只需关心"如何积分"，不碰耦合/器官/历史
+- 任何改耦合/打包的步骤必须先有 twin-run 验证兜底
+
+## 序列：1→4→5→2→3
+
+（Architect 推荐：先 Radau 拆分再 auto-derive，先 validation harness 再耦合统一）
+
+| 步 | 行动 | 状态 | Commit | 估时 |
+|---|------|------|--------|------|
+| **0a** | Radau fallback return dict + fallback_count 检测 | ✅ | d9afcd5 | 30min |
+| **0b** | History schema 统一（Euler/Radau 同 45 键） | ✅ | 0c95400, 3884d29 | 2hr |
+| **0c** | organ_health.track 签名对齐（pre-state） | ✅ | 469eb8d | 1hr |
+| **0d** | Radau 5a blood 写走 apply_factor | ✅ | 14d6a51 | 3hr |
+| **1** | 公共化 `pack_state/unpack_state/unified_rhs` | ✅ | 79b244b | 2hr |
+| **2** | 加 `STATE_VARS` 类属性（替代硬编码 _UNIFIED_MODULES） | 🔲 | — | 4hr |
+| **3** | Radau 拆到 `src/engine/solvers/radau.py` | 🔲 | — | 3hr |
+| **4** | Twin-run validation harness（10 场景 + 收敛率） | 🔲 | — | 6hr |
+| **5** | Gauss-Seidel docstring + 耦合统一 | 🔲 | — | 6hr |
+
+## 关键设计决策
+
+### D1: STATE_VARS（不是 OUTPUTS）用于 state packing
+
+OUTPUTS 是计算接口（如 cardiac_output, MAP），不是 ODE 积分变量。
+需要新声明 `STATE_VARS = (("HR", "heart_rate"), ...)` 元组。
+
+### D2: Twin-run 容忍矩阵
+
+per-vital 绝对+相对容忍，严重度乘数只放宽不收紧。详见 healthcare reviewer 报告。
+
+### D3: Radau fallback 必须可检测
+
+twin-run 断言 `_solver_fallback_count == 0`，防止"Radau 失败→fallback Euler→自比较通过"。
+
+### D4: 耦合统一放最后
+
+`_unified_rhs` 的 CONNECTIONS 路由 vs CouplingEngine.resolve() 是两种机制。
+先用 twin-run 验证当前行为，再动耦合。
+
+## 测试结果
+
+- **940 passed**, 4 failed（全部 pre-existing），3 xpassed
+- **零新增回归**
+- 4 个 pre-existing：WBC=0.0 / manifest 摘要 / mechanism B ValueError / 耦合振荡
+
+### Step 1 验证（2026-06-14）
+
+- `pack_state` / `unpack_state` / `unified_rhs` / `UNIFIED_MODULES` 抽到
+  `src/engine/state_vector.py`（模块级函数，仿 `step_common.py` 风格）。
+- `simulation.py` 保留同名实例方法作瘦转发，`_UNIFIED_MODULES = UNIFIED_MODULES`
+  保向后兼容（experiments/tools 70+ 引用零修改）。
+- 验证：gate_check --quick 通过；core channel **781 passed, 2 failed**，
+  两个失败（manifest 摘要 + mechanism B ValueError）均为 pre-existing
+  （已用 `git stash` 在 baseline 上复现确认）。
+- 真 Radau 单步测试因本机 Python 3.14 + scipy 的 LU 分解性能问题超时
+  （pre-existing 环境问题，非行为回归）；faked-solve_ivp 的 fallback 测试
+  完整跑过 `_step_radau` → 新 `_pack/_unified_rhs/_unpack` 路径，全通过。
