@@ -20,7 +20,7 @@
 | **0c** | organ_health.track 签名对齐（pre-state） | ✅ | 469eb8d | 1hr |
 | **0d** | Radau 5a blood 写走 apply_factor | ✅ | 14d6a51 | 3hr |
 | **1** | 公共化 `pack_state/unpack_state/unified_rhs` | ✅ | 79b244b | 2hr |
-| **2** | 加 `STATE_VARS` 类属性（替代硬编码 _UNIFIED_MODULES） | ✅ | (pending commit) | 4hr |
+| **2** | 加 `STATE_VARS` 类属性（替代硬编码 _UNIFIED_MODULES） | ✅ | 5cd27a4 | 4hr |
 | **3** | Radau 拆到 `src/engine/solvers/radau.py` | 🔲 | — | 3hr |
 | **4** | Twin-run validation harness（10 场景 + 收敛率） | ✅ | 467b5b7 | 6hr |
 | **5** | Gauss-Seidel docstring + 耦合统一 | ✅ (docstring + 清册; 真正统一留后续) | 569889f | 6hr |
