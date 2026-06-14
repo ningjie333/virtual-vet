@@ -729,16 +729,33 @@ def api_hint():
         if not matches:
             return jsonify({"hint": "目前检查数据不足以匹配任何已知疾病，建议进一步检查。"})
 
-        top = matches[0]
-        disease_display = _DISEASE_NAMES.get(top["disease"], top["disease"])
+        # 方向三 (2026-06-14): 多病场景下展示 top N 候选 — 让玩家能同时识别
+        # 出多个疾病。阈值 = 0.30（任一候选 ≥ 30% 置信度即展示，低于则视为噪声）
+        # 单病 case 行为不变（top 1 自然占主导，top 2 通常 < 30%）
+        _HINT_CONFIDENCE_FLOOR = 0.30
+        _HINT_TOP_N = 3
+        notable = [m for m in matches if m["confidence"] >= _HINT_CONFIDENCE_FLOOR][: _HINT_TOP_N]
 
-        matched_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["matched_clues"][:5]]
-        missed_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["missed_clues"][:3]]
-
-        hint = f"最可能的疾病：**{disease_display}**（置信度 {top['confidence'] * 100:.0f}%）\n\n"
-        hint += f"已匹配线索：{'、'.join(matched_desc)}\n"
-        if missed_desc:
-            hint += f"未确认线索：{'、'.join(missed_desc)}"
+        if len(notable) == 1:
+            # 兼容旧 UI — 单病时只展示一条
+            top = notable[0]
+            disease_display = _DISEASE_NAMES.get(top["disease"], top["disease"])
+            matched_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["matched_clues"][:5]]
+            missed_desc = [CLUE_DESCRIPTIONS.get(c, c) for c in top["missed_clues"][:3]]
+            hint = f"最可能的疾病：**{disease_display}**（置信度 {top['confidence'] * 100:.0f}%）\n\n"
+            hint += f"已匹配线索：{'、'.join(matched_desc)}\n"
+            if missed_desc:
+                hint += f"未确认线索：{'、'.join(missed_desc)}"
+        else:
+            # 多病场景 — 列出 top N 候选
+            lines = ["**可能的疾病（按置信度）：**\n"]
+            for m in notable:
+                disp = _DISEASE_NAMES.get(m["disease"], m["disease"])
+                lines.append(
+                    f"- **{disp}** ({m['confidence'] * 100:.0f}%) — "
+                    f"匹配 {m['matched_count']}/{m['total_clues']} 条线索"
+                )
+            hint = "\n".join(lines)
 
         return jsonify({"hint": hint})
 
@@ -777,11 +794,14 @@ def api_diagnosis():
             if refs["guidelines"] or refs["matched_criteria"]:
                 references[disease] = refs
 
+        # 方向三 (2026-06-14): 返回 target_diseases (GameState.disease_names 全集)
+        # 让 client 知道这一关应该识别出几个病 (单病 case 仍 = [disease_name])
         return jsonify(
             {
                 "matches": matches,
                 "suggested_tests": suggested,
                 "references": references,
+                "target_diseases": state.disease_names,
             }
         )
 
