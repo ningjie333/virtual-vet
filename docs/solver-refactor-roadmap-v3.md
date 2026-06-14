@@ -47,9 +47,14 @@ twin-run 断言 `_solver_fallback_count == 0`，防止"Radau 失败→fallback E
 
 ## 测试结果
 
-- **940 passed**, 4 failed（全部 pre-existing），3 xpassed
-- **零新增回归**
-- 4 个 pre-existing：WBC=0.0 / manifest 摘要 / mechanism B ValueError / 耦合振荡
+- **初始状态**（refactor 前）：940 passed, 4 failed（全部 pre-existing），3 xpassed
+- **最终状态**（refactor + bug-fix 后）：core **789 passed / 0 failed**，heavy **946 passed / 1 failed**，5 xfailed
+- **全程零新增回归**
+- 4 个 pre-existing 的最终状态：
+  - ✅ **manifest 摘要** — Step 4 顺手修复（重生成 test-manifest-summary.md）
+  - ✅ **mechanism B `fever_state` ValueError** — sepsis 漏声明 fever_state 状态变量，补上（commit `08e1d32`）
+  - ✅ **WBC=0.0** — 公式用了被安全加固移除的 getattr/hasattr + 未定义 thresholds；改 `source: state.WBC` + fixture 改 severe（commit `08e1d32`）
+  - ❌ **耦合振荡 moribund 误判** — RAAS 耦合振荡（MAP/GFR/urine 每步 50-97% swing），需真正的耦合统一工程（见 `docs/coupling_inventory.md` 后续方向）
 
 ### Step 1 验证（2026-06-14）
 
