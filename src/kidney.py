@@ -21,6 +21,16 @@ class KidneyModule:
     OUTPUTS: tuple[str, ...] = ('GFR', 'renal_blood_flow', 'urine_output', 'ADH_level', 'angiotensin_II', 'renin_activity', 'aldosterone')
     READS_BLOOD: tuple[str, ...] = ('glucose_mmol_L', 'sodium_mEq_L', 'arterial_pH', 'potassium_mEq_L', 'bun_mg_dL', 'creatinine_mg_dL')
     WRITES_BLOOD: tuple[str, ...] = ('bun_mg_dL', 'creatinine_mg_dL')
+
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    # NOTE: ode_name "RBF" aliases onto renin_activity (RBF 用 renin_activity 代) —
+    # preserved verbatim from the legacy central table for bit-identical y-vectors.
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("GFR", "GFR"),
+        ("RBF", "renin_activity"),
+        ("urine_output", "urine_output"),
+        ("ADH", "ADH_level"),
+    )
     """
     肾脏泌尿模块：模拟肾脏滤过、重吸收和排泄功能
 

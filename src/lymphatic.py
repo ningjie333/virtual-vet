@@ -25,6 +25,12 @@ class LymphaticModule:
     OUTPUTS: tuple[str, ...] = ('splenic_reserve_mL', 'lymph_flow_rate', 'interstitial_fluid_mL')
     READS_BLOOD: tuple[str, ...] = ('MAP_mmHg', 'heart_rate_bpm', 'cytokine_level', 'splenic_reserve_mL', 'lymph_flow_mL_min', 'interstitial_fluid_mL')
     WRITES_BLOOD: tuple[str, ...] = ('splenic_reserve_mL', 'lymph_flow_mL_min', 'interstitial_fluid_mL')
+
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("splenic_reserve_mL", "splenic_reserve_mL"),
+        ("interstitial_fluid_mL", "interstitial_fluid_mL"),
+    )
     """
     淋巴/脾脏模块: 淋巴循环 + 脾脏储血
 

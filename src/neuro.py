@@ -24,6 +24,15 @@ class NeuroModule:
     OUTPUTS: tuple[str, ...] = ('sympathetic_tone', 'parasympathetic_tone', 'consciousness', 'seizure', 'pain_level', 'chemoreceptor_drive')
     READS_BLOOD: tuple[str, ...] = ('arterial_PCO2_mmHg', 'arterial_PO2_mmHg', 'arterial_pH')
     WRITES_BLOOD: tuple[str, ...] = ()
+
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("sympathetic_tone", "sympathetic_tone"),
+        ("parasympathetic_tone", "parasympathetic_tone"),
+        ("consciousness", "consciousness"),
+        ("seizure", "seizure"),
+        ("pain", "pain_level"),
+    )
     """
     神经模块: 整合自主神经、CNS功能和疼痛通路
 

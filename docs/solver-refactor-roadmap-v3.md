@@ -20,7 +20,7 @@
 | **0c** | organ_health.track 签名对齐（pre-state） | ✅ | 469eb8d | 1hr |
 | **0d** | Radau 5a blood 写走 apply_factor | ✅ | 14d6a51 | 3hr |
 | **1** | 公共化 `pack_state/unpack_state/unified_rhs` | ✅ | 79b244b | 2hr |
-| **2** | 加 `STATE_VARS` 类属性（替代硬编码 _UNIFIED_MODULES） | 🔲 | — | 4hr |
+| **2** | 加 `STATE_VARS` 类属性（替代硬编码 _UNIFIED_MODULES） | ✅ | (pending commit) | 4hr |
 | **3** | Radau 拆到 `src/engine/solvers/radau.py` | 🔲 | — | 3hr |
 | **4** | Twin-run validation harness（10 场景 + 收敛率） | ✅ | 467b5b7 | 6hr |
 | **5** | Gauss-Seidel docstring + 耦合统一 | ✅ (docstring + 清册; 真正统一留后续) | 569889f | 6hr |
@@ -120,3 +120,27 @@ twin-run 断言 `_solver_fallback_count == 0`，防止"Radau 失败→fallback E
 - **后续**：真正的耦合统一需要 (a) 能跑 Radau 的环境、(b) 统一方向决策
   （3 个候选方向见 coupling_inventory.md）。本次的文档 + 清册是那个工程的
   前置条件。
+
+### Step 2 验证（2026-06-14）
+
+- 每个器官模块声明自己的 `STATE_VARS = (("ode_name", "attr_name"), ...)`
+  类属性（与现有 `INPUTS`/`OUTPUTS` 契约同胞，见 `src/organs/contracts.py`）。
+  11 个模块共 47 个状态变量，与原中心表完全一致。
+- `src/engine/state_vector.py` 重写：`UNIFIED_MODULES` 从 3-tuple 瘦身为
+  2-tuple（只剩模块名↔engine 属性映射）；`build_state_map`/`pack_state`/
+  `unpack_state` 改为声明驱动（getattr/setattr 遍历 STATE_VARS），删除 ~150 行
+  if/elif 链。新增 `_iter_state_modules` helper。
+- heart 的 MAP 同步副作用提取为 `HeartModule._post_unpack_state()` hook，
+  由 `unpack_state` 在写完该模块所有 STATE_VARS 后通过可选 hook 协议调用
+  （目前仅 heart 有此 hook）。逻辑逐字搬迁，行为不变。
+- **位级相同性证明**：用 `git stash` 抓 OLD pack 输出，与 NEW 做
+  `np.array_equal` → **True**；state_map（47 keys）也完全相等。twin-run
+  10 场景结果与 Step 5 baseline **逐字节相同**（5 PASS / 5 xfail，每个
+  scenario 的 worst vital + 误差值到 6 位小数全一致）。
+- 验证：gate_check --quick 通过；core channel **788 passed, 5 xfailed,
+  1 failed**（与 Step 5 完全一致，零回归；唯一失败仍是 pre-existing 的
+  mechanism B `fever_state`）。
+- **去中心化收益**：加一个 ODE 状态变量从改 3 处（中心表 + pack if/elif +
+  unpack if/elif）降为改 1 处（模块自己的 STATE_VARS）。CONNECTIONS 的 dead
+  routes（跨模块耦合漂移）仍待 Phase 5 INPUTS/OUTPUTS 自动派生解决
+  （见 coupling_inventory.md），本次不涉及。

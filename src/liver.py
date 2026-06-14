@@ -32,6 +32,12 @@ class LiverModule:
     OUTPUTS: tuple[str, ...] = ('metabolic_activity', 'detox_capacity', 'cyp450_activity', 'glycogen_fraction', 'bilirubin_conjugation', 'glucose_output', 'ammonia_umol_L', 'albumin_g_dL', 'bilirubin_mg_dL', 'urea_mmol', 'PT_sec', 'INR')
     READS_BLOOD: tuple[str, ...] = ('glucose_mmol_L', 'ammonia_umol_L', 'amino_acids_g_L', 'drug_concentration_mg_kg', 'lactate_mmol_L', 'albumin_g_dL', 'bilirubin_mg_dL', 'ALT_U_L', 'AST_U_L', 'ALP_U_L', 'GGT_U_L', 'coagulation_factor_VII', 'PT_sec', 'INR', 'fibrinogen_mg_dL')
     WRITES_BLOOD: tuple[str, ...] = ('ammonia_umol_L', 'albumin_g_dL', 'bilirubin_mg_dL', 'bun_mg_dL', 'coagulation_factor_VII', 'PT_sec', 'INR', 'fibrinogen_mg_dL', 'ALT_U_L', 'AST_U_L', 'ALP_U_L', 'GGT_U_L', 'glucose_mmol_L', 'drug_concentration_mg_kg', 'amino_acids_g_L')
+
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("glycogen_fraction", "glycogen_fraction"),
+        ("bilirubin_accumulation", "_bilirubin_accumulation"),
+    )
     """
     肝脏模块：核心代谢和解毒器官
 

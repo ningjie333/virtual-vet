@@ -34,6 +34,22 @@ class HeartModule:
     OUTPUTS: tuple[str, ...] = ('cardiac_output', 'MAP', 'CVP', 'stroke_volume', 'preload_factor')
     READS_BLOOD: tuple[str, ...] = ('arterial_pH', 'potassium_mEq_L', 'arterial_PCO2_mmHg', 'arterial_PO2_mmHg')
     WRITES_BLOOD: tuple[str, ...] = ()
+
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    # Each tuple is (ode_name, attr_name):
+    #   - ode_name: logical name entering the unified y-vector (stable contract
+    #     consumed by src/engine/state_vector.py; renaming breaks pack/unpack).
+    #   - attr_name: the instance attribute holding the value.
+    # Declared here (not in a central table) so the module owns its own ODE
+    # state surface — adding a state var is now a 1-place edit.
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("HR", "heart_rate"),
+        ("SV", "stroke_volume"),
+        ("SVR", "SVR"),
+        ("blood_volume", "circulating_volume_ml"),
+        ("sympathetic", "sympathetic"),
+        ("parasympathetic", "parasympathetic"),
+    )
     """
     心血管模块：模拟心脏泵血功能与血压调节
     状态变量：HR, SV, MAP, CVP, blood_volume
@@ -109,6 +125,26 @@ class HeartModule:
 
         # 电生理计算器（Noble 1962 浦肯野纤维，扩展 HH）
         self.hh = NoblePurkinjeFiber()
+
+    def _post_unpack_state(self) -> None:
+        """Re-sync mean_arterial_pressure after the Radau path unpacks STATE_VARS.
+
+        Step 2 (solver-refactor-roadmap-v3): extracted verbatim from the old
+        if-vname=='blood_volume' branch in state_vector.unpack_state. MAP is
+        not itself an ODE state var (not in STATE_VARS), but it is a low-pass-
+        filtered function of the unpacked HR/SV/SVR/blood_volume. Must run
+        AFTER all heart STATE_VARS are unpacked (needs vol_ratio from
+        circulating_volume_ml). Called by state_vector.unpack_state via the
+        optional `_post_unpack_state` hook protocol.
+        """
+        CO = self.heart_rate * self.stroke_volume
+        vol_ratio = self.circulating_volume_ml / self.total_BV
+        MAP_base = self.MAP_baseline
+        raw_MAP = MAP_base + (CO / 60.0) * self.SVR
+        if vol_ratio < 0.7:
+            raw_MAP = raw_MAP * (0.5 + 0.5 * vol_ratio / 0.7)
+        raw_MAP = max(30.0, min(180.0, raw_MAP))
+        self.mean_arterial_pressure = raw_MAP  # 直接赋值，无状态记忆
 
     # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
     # 状态变量（进入统一 y 向量）: HR, SV, SVR

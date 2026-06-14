@@ -16,6 +16,13 @@ class GutModule:
     OUTPUTS: tuple[str, ...] = ('motility', 'barrier_integrity', 'microbiome_activity', 'SCFA_mmol_L', 'portal_blood_flow_mL_min', 'amino_absorption_g_min', 'glucose_absorption_g_min', 'fat_absorption_g_min')
     READS_BLOOD: tuple[str, ...] = ('amino_acids_g_L', 'fatty_acids_mmol_L')
     WRITES_BLOOD: tuple[str, ...] = ('amino_acids_g_L', 'fatty_acids_mmol_L')
+
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("motility", "gut_motility"),
+        ("barrier", "barrier_integrity"),
+        ("microbiome", "microbiome_activity"),
+    )
     """
     肠道模块：模拟肠道吸收功能和门静脉血流
 

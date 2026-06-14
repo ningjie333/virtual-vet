@@ -121,6 +121,15 @@ class FluidCompartment:
       3. 更新电解质分布（简化：跟随水分布）
     """
 
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    # FluidCompartment predates the Phase 5 INPUTS/OUTPUTS contract; STATE_VARS
+    # is added standalone here. See src/organs/contracts.py for the pattern.
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("V_vascular", "vascular_volume_ml"),
+        ("V_isf", "isf_volume_ml"),
+        ("V_icf", "icf_volume_ml"),
+    )
+
     def __init__(self, weight_kg: float):
         self.w = weight_kg
 

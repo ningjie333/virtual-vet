@@ -23,6 +23,13 @@ class LungModule:
     OUTPUTS: tuple[str, ...] = ('arterial_PO2_mmHg', 'arterial_PCO2_mmHg', 'arterial_pH', 'arterial_saturation', 'alveolar_PO2_mmHg', 'alveolar_PCO2_mmHg', 'minute_ventilation')
     READS_BLOOD: tuple[str, ...] = ('arterial_PO2_mmHg', 'arterial_PCO2_mmHg', 'arterial_saturation', 'arterial_pH', 'venous_PCO2_mmHg', 'HCO3')
     WRITES_BLOOD: tuple[str, ...] = ('arterial_PO2_mmHg', 'arterial_PCO2_mmHg', 'arterial_pH', 'arterial_saturation')
+
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("RR", "respiratory_rate"),
+        ("TV", "tidal_volume"),
+        ("VQ", "VQ_ratio"),
+    )
     """
     肺气体交换模块：模拟肺通气与气体交换
 

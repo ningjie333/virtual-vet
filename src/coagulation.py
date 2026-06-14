@@ -26,6 +26,18 @@ class CoagulationModule:
     OUTPUTS: tuple[str, ...] = ('PT_sec', 'aPTT_sec', 'coagulation_state', 'fibrinogen_mg_dL', 'factor_VII', 'factor_V', 'factor_II', 'factor_IX', 'factor_X', 'factor_XI', 'factor_VIII')
     READS_BLOOD: tuple[str, ...] = ('cytokine_level', 'PLT', 'coagulation_state', 'fibrinogen_mg_dL')
     WRITES_BLOOD: tuple[str, ...] = ('PT_sec', 'aPTT_sec', 'coagulation_state', 'fibrinogen_mg_dL')
+
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("factor_VII", "factor_VII"),
+        ("factor_V", "factor_V"),
+        ("factor_II", "factor_II"),
+        ("factor_IX", "factor_IX"),
+        ("factor_X", "factor_X"),
+        ("factor_XI", "factor_XI"),
+        ("fibrinogen", "fibrinogen"),
+        ("coagulation_state", "coagulation_state"),
+    )
     """
     凝血模块: 凝血因子动力学 + 临床凝血指标
 

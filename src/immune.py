@@ -30,6 +30,14 @@ class ImmuneModule:
     OUTPUTS: tuple[str, ...] = ('cytokine_level', 'wbc_count', 'crp_level', 'acute_phase_response', 'immune_suppression', 'coagulation_state', 'fever_C')
     READS_BLOOD: tuple[str, ...] = ('cortisol_ug_dL', 'core_temperature_C', 'cytokine_level')
     WRITES_BLOOD: tuple[str, ...] = ('core_temperature_C', 'CRP_mg_L', 'cytokine_level', 'sodium_mEq_L')
+
+    # ── Step 2 (solver-refactor-roadmap-v3): ODE state declaration ──────
+    STATE_VARS: tuple[tuple[str, str], ...] = (
+        ("cytokine", "cytokine_level"),
+        ("acute_phase", "acute_phase_response"),
+        ("wbc", "wbc_count"),
+        ("coagulation_state", "coagulation_state"),
+    )
     """
     免疫/炎症模块: 整合固有免疫应答对生理的影响
 

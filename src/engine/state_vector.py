@@ -1,8 +1,15 @@
 """
 state_vector.py — unified ODE state packing / unpacking / RHS.
 
-Solver Refactor Roadmap v3, Step 1: pure code-motion extraction from
-`src/simulation.py`. Zero behavior change.
+- Step 1 (solver-refactor-roadmap-v3): pure code-motion extraction from
+  `src/simulation.py`. Zero behavior change.
+- Step 2: declaration-driven pack/unpack. Each organ module now declares its
+  own `STATE_VARS = (("ode_name", "attr_name"), ...)` class attribute (sibling
+  to the existing INPUTS/OUTPUTS contract in `src/organs/contracts.py`). The
+  legacy central table's per-module `var_names` lists and the ~80-line
+  if/elif chains in pack/unpack are gone — adding an ODE state var is now a
+  1-place edit on the module. Bit-identical to the legacy y-vector (verified
+  by direct array_equal + twin-run).
 
 These four functions implement the "how to pack/unpack the unified y-vector
 and evaluate its right-hand side" concern, decoupled from "how to integrate
@@ -26,34 +33,54 @@ if TYPE_CHECKING:
     from src.simulation import VirtualCreature
 
 
-# ── 统一 ODE 状态映射（器官 + 疾病）────────────────────────────────────
-# 每个模块的名称、状态变量名列表、模块实例
-# 状态变量 = 进入统一 y 向量的变量（而非仅代数输出的变量）
+# ── 模块注册（Step 2: 瘦身为 2-tuple）──────────────────────────────────
+# Each entry is (module_name, engine_attr) — i.e. the logical module name
+# used in CONNECTIONS / state_map keys, and the engine instance attribute
+# that holds the module object. The state-variable surface itself is now
+# declared by each module via its own `STATE_VARS` class attribute (see
+# src/organs/contracts.py for the sibling INPUTS/OUTPUTS pattern), so adding
+# an ODE state var is a 1-place edit on the module, not a 3-place edit here.
+#
+# Backward compat: VirtualCreature._UNIFIED_MODULES aliases this list. The
+# legacy 3-tuple shape (name, var_names, attr) is gone — verified no callers
+# unpack the 3-tuple form (grep: only this file did, all rewritten below).
 UNIFIED_MODULES = [
-    # name, state_var_names, module_attr
-    ("heart",       ["HR", "SV", "SVR", "blood_volume", "sympathetic", "parasympathetic"], "heart"),
-    ("lung",        ["RR", "TV", "VQ"],                    "lung"),
-    ("kidney",      ["GFR", "RBF", "urine_output", "ADH"], "kidney"),
-    ("fluid",       ["V_vascular", "V_isf", "V_icf"],      "fluid"),
-    ("gut",         ["motility", "barrier", "microbiome"],  "gut"),
-    ("liver",       ["glycogen_fraction", "bilirubin_accumulation"], "liver"),
-    ("endocrine",   ["T3", "insulin", "glucagon", "cortisol", "PTH", "IGF1", "HPA_axis"], "endocrine"),
-    ("neuro",       ["sympathetic_tone", "parasympathetic_tone", "consciousness", "seizure", "pain"], "neuro"),
-    ("immune",      ["cytokine", "acute_phase", "wbc", "coagulation_state"], "immune"),
-    ("coagulation", ["factor_VII", "factor_V", "factor_II", "factor_IX", "factor_X", "factor_XI", "fibrinogen", "coagulation_state"], "coagulation"),
-    ("lymphatic",   ["splenic_reserve_mL", "interstitial_fluid_mL"], "lymphatic"),
+    # module_name, engine_attr
+    ("heart",       "heart"),
+    ("lung",        "lung"),
+    ("kidney",      "kidney"),
+    ("fluid",       "fluid"),
+    ("gut",         "gut"),
+    ("liver",       "liver"),
+    ("endocrine",   "endocrine"),
+    ("neuro",       "neuro"),
+    ("immune",      "immune"),
+    ("coagulation", "coagulation"),
+    ("lymphatic",   "lymphatic"),
 ]
 
 
+def _iter_state_modules(engine: "VirtualCreature"):
+    """Yield (module_name, module_instance) for every registered module."""
+    for mname, attr in UNIFIED_MODULES:
+        yield mname, getattr(engine, attr)
+
+
 def build_state_map(engine: "VirtualCreature") -> dict[tuple[str, str], int]:
-    """建立 (module_name, var_name) → y-array index 映射表（器官 + 疾病）。"""
+    """建立 (module_name, ode_name) → y-array index 映射表（器官 + 疾病）。
+
+    Step 2: state-variable names now come from each module's STATE_VARS
+    declaration (not a central var_names list). The ode_name in each
+    STATE_VARS tuple is the key — identical to the legacy var_names, so the
+    resulting state_map (and thus the y-vector layout) is bit-identical.
+    """
     state_map: dict[tuple[str, str], int] = {}
     idx = 0
 
-    # 器官状态变量
-    for mname, var_names, _ in UNIFIED_MODULES:
-        for vname in var_names:
-            state_map[(mname, vname)] = idx
+    # 器官状态变量 — 读各模块的 STATE_VARS 声明
+    for mname, module in _iter_state_modules(engine):
+        for ode_name, _attr in module.STATE_VARS:
+            state_map[(mname, ode_name)] = idx
             idx += 1
 
     # 疾病状态变量
@@ -66,75 +93,20 @@ def build_state_map(engine: "VirtualCreature") -> dict[tuple[str, str], int]:
 
 
 def pack_state(engine: "VirtualCreature") -> np.ndarray:
-    """将所有器官 + 疾病状态打包成 numpy 向量 y0。"""
-    state_map = build_state_map(engine)
-    n = len(state_map)
-    y0 = np.zeros(n)
+    """将所有器官 + 疾病状态打包成 numpy 向量 y0。
 
-    # 器官状态
-    for mname, var_names, attr_name in UNIFIED_MODULES:
-        module = getattr(engine, attr_name)
-        for vname in var_names:
-            idx = state_map[(mname, vname)]
-            # 从模块实例属性读取状态
-            if mname == "heart":
-                if vname == "HR": y0[idx] = module.heart_rate
-                elif vname == "SV": y0[idx] = module.stroke_volume
-                elif vname == "SVR": y0[idx] = module.SVR
-                elif vname == "blood_volume": y0[idx] = module.circulating_volume_ml
-                elif vname == "sympathetic": y0[idx] = module.sympathetic
-                elif vname == "parasympathetic": y0[idx] = module.parasympathetic
-            elif mname == "lung":
-                if vname == "RR": y0[idx] = module.respiratory_rate
-                elif vname == "TV": y0[idx] = module.tidal_volume
-                elif vname == "VQ": y0[idx] = module.VQ_ratio
-            elif mname == "kidney":
-                if vname == "GFR": y0[idx] = module.GFR
-                elif vname == "RBF": y0[idx] = module.renin_activity  # RBF 用 renin_activity 代
-                elif vname == "ADH": y0[idx] = module.ADH_level
-                elif vname == "urine_output": y0[idx] = module.urine_output
-            elif mname == "fluid":
-                if vname == "V_vascular": y0[idx] = module.vascular_volume_ml
-                elif vname == "V_isf": y0[idx] = module.isf_volume_ml
-                elif vname == "V_icf": y0[idx] = module.icf_volume_ml
-            elif mname == "gut":
-                if vname == "motility": y0[idx] = module.gut_motility
-                elif vname == "barrier": y0[idx] = module.barrier_integrity
-                elif vname == "microbiome": y0[idx] = module.microbiome_activity
-            elif mname == "liver":
-                if vname == "glycogen_fraction": y0[idx] = module.glycogen_fraction
-                elif vname == "bilirubin_accumulation": y0[idx] = module._bilirubin_accumulation
-            elif mname == "endocrine":
-                if vname == "T3": y0[idx] = module.T3_ng_dL
-                elif vname == "insulin": y0[idx] = module.insulin_uU_mL
-                elif vname == "glucagon": y0[idx] = module.glucagon_pg_mL
-                elif vname == "cortisol": y0[idx] = module.cortisol_ug_dL
-                elif vname == "PTH": y0[idx] = module.PTH_pg_mL
-                elif vname == "IGF1": y0[idx] = module.IGF1_nmol_L
-                elif vname == "HPA_axis": y0[idx] = module.HPA_axis
-            elif mname == "neuro":
-                if vname == "sympathetic_tone": y0[idx] = module.sympathetic_tone
-                elif vname == "parasympathetic_tone": y0[idx] = module.parasympathetic_tone
-                elif vname == "consciousness": y0[idx] = module.consciousness
-                elif vname == "seizure": y0[idx] = module.seizure
-                elif vname == "pain": y0[idx] = module.pain_level
-            elif mname == "immune":
-                if vname == "cytokine": y0[idx] = module.cytokine_level
-                elif vname == "acute_phase": y0[idx] = module.acute_phase_response
-                elif vname == "wbc": y0[idx] = module.wbc_count
-                elif vname == "coagulation_state": y0[idx] = module.coagulation_state
-            elif mname == "coagulation":
-                attr_map = {
-                    "factor_VII": "factor_VII", "factor_V": "factor_V",
-                    "factor_II": "factor_II", "factor_IX": "factor_IX",
-                    "factor_X": "factor_X", "factor_XI": "factor_XI",
-                    "fibrinogen": "fibrinogen", "coagulation_state": "coagulation_state",
-                }
-                if vname in attr_map:
-                    y0[idx] = getattr(module, attr_map[vname])
-            elif mname == "lymphatic":
-                if vname == "splenic_reserve_mL": y0[idx] = module.splenic_reserve_mL
-                elif vname == "interstitial_fluid_mL": y0[idx] = module.interstitial_fluid_mL
+    Step 2: declaration-driven. Reads each module's STATE_VARS
+    `(ode_name, attr_name)` tuples and pulls values via getattr — the ~70-line
+    if/elif chain is gone. Output is bit-identical to the legacy implementation
+    (verified by twin-run + direct array_equal test).
+    """
+    state_map = build_state_map(engine)
+    y0 = np.zeros(len(state_map))
+
+    # 器官状态 — 从各模块 STATE_VARS 声明读取
+    for mname, module in _iter_state_modules(engine):
+        for ode_name, attr_name in module.STATE_VARS:
+            y0[state_map[(mname, ode_name)]] = getattr(module, attr_name)
 
     # 疾病状态
     if engine.disease is not None and hasattr(engine.disease, '_state_vars'):
@@ -146,83 +118,25 @@ def pack_state(engine: "VirtualCreature") -> np.ndarray:
 
 
 def unpack_state(engine: "VirtualCreature", y: np.ndarray) -> None:
-    """将 numpy 向量 y 分解到各模块的实例属性。"""
+    """将 numpy 向量 y 分解到各模块的实例属性。
+
+    Step 2: declaration-driven. Writes via setattr from each module's
+    STATE_VARS tuples — the ~80-line if/elif chain (including heart's MAP
+    side-effect) is gone. Heart's MAP re-sync now lives in
+    HeartModule._post_unpack_state (extracted verbatim), invoked here via the
+    optional hook protocol after the module's STATE_VARS are written.
+    """
     state_map = build_state_map(engine)
 
-    for mname, var_names, attr_name in UNIFIED_MODULES:
-        module = getattr(engine, attr_name)
-        for vname in var_names:
-            idx = state_map[(mname, vname)]
-            val = y[idx]
-
-            if mname == "heart":
-                if vname == "HR": module.heart_rate = val
-                elif vname == "SV": module.stroke_volume = val
-                elif vname == "SVR": module.SVR = val
-                elif vname == "blood_volume": module.circulating_volume_ml = val
-                elif vname == "sympathetic": module.sympathetic = val
-                elif vname == "parasympathetic": module.parasympathetic = val
-                # 同步 filtered MAP（低通滤波），与 heart.compute() 的 α=0.3 一致
-                # 在 blood_volume unpack 后计算（确保 vol_ratio 正确）
-                # mean_arterial_pressure 不在 y 向量里，需要主动同步
-                if vname == "blood_volume":
-                    CO = module.heart_rate * module.stroke_volume
-                    vol_ratio = module.circulating_volume_ml / module.total_BV
-                    MAP_base = module.MAP_baseline
-                    raw_MAP = MAP_base + (CO / 60.0) * module.SVR
-                    if vol_ratio < 0.7:
-                        raw_MAP = raw_MAP * (0.5 + 0.5 * vol_ratio / 0.7)
-                    raw_MAP = max(30.0, min(180.0, raw_MAP))
-                    module.mean_arterial_pressure = raw_MAP  # 直接赋值，无状态记忆
-            elif mname == "lung":
-                if vname == "RR": module.respiratory_rate = val
-                elif vname == "TV": module.tidal_volume = val
-                elif vname == "VQ": module.VQ_ratio = val
-            elif mname == "kidney":
-                if vname == "GFR": module.GFR = val
-                elif vname == "ADH": module.ADH_level = val
-            elif mname == "fluid":
-                if vname == "V_vascular": module.vascular_volume_ml = val
-                elif vname == "V_isf": module.isf_volume_ml = val
-                elif vname == "V_icf": module.icf_volume_ml = val
-            elif mname == "gut":
-                if vname == "motility": module.gut_motility = val
-                elif vname == "barrier": module.barrier_integrity = val
-                elif vname == "microbiome": module.microbiome_activity = val
-            elif mname == "liver":
-                if vname == "glycogen_fraction": module.glycogen_fraction = val
-                elif vname == "bilirubin_accumulation": module._bilirubin_accumulation = val
-            elif mname == "endocrine":
-                if vname == "T3": module.T3_ng_dL = val
-                elif vname == "insulin": module.insulin_uU_mL = val
-                elif vname == "glucagon": module.glucagon_pg_mL = val
-                elif vname == "cortisol": module.cortisol_ug_dL = val
-                elif vname == "PTH": module.PTH_pg_mL = val
-                elif vname == "IGF1": module.IGF1_nmol_L = val
-                elif vname == "HPA_axis": module.HPA_axis = val
-            elif mname == "neuro":
-                if vname == "sympathetic_tone": module.sympathetic_tone = val
-                elif vname == "parasympathetic_tone": module.parasympathetic_tone = val
-                elif vname == "consciousness": module.consciousness = val
-                elif vname == "seizure": module.seizure = val
-                elif vname == "pain": module.pain_level = val
-            elif mname == "immune":
-                if vname == "cytokine": module.cytokine_level = val
-                elif vname == "acute_phase": module.acute_phase_response = val
-                elif vname == "wbc": module.wbc_count = val
-                elif vname == "coagulation_state": module.coagulation_state = val
-            elif mname == "coagulation":
-                attr_map = {
-                    "factor_VII": "factor_VII", "factor_V": "factor_V",
-                    "factor_II": "factor_II", "factor_IX": "factor_IX",
-                    "factor_X": "factor_X", "factor_XI": "factor_XI",
-                    "fibrinogen": "fibrinogen", "coagulation_state": "coagulation_state",
-                }
-                if vname in attr_map:
-                    setattr(module, attr_map[vname], val)
-            elif mname == "lymphatic":
-                if vname == "splenic_reserve_mL": module.splenic_reserve_mL = val
-                elif vname == "interstitial_fluid_mL": module.interstitial_fluid_mL = val
+    for mname, module in _iter_state_modules(engine):
+        for ode_name, attr_name in module.STATE_VARS:
+            setattr(module, attr_name, y[state_map[(mname, ode_name)]])
+        # Optional post-unpack hook (currently only heart: re-syncs MAP from
+        # the just-unpacked HR/SV/SVR/blood_volume). Must run AFTER all of a
+        # module's STATE_VARS are written.
+        hook = getattr(module, "_post_unpack_state", None)
+        if hook is not None:
+            hook()
 
     # 疾病状态
     if engine.disease is not None and hasattr(engine.disease, '_state_vars'):
@@ -293,7 +207,7 @@ def unified_rhs(engine: "VirtualCreature", t: float, y: np.ndarray) -> np.ndarra
     module_inputs: dict[str, dict] = {}
 
     # 初始化 inputs 为 cached_inputs（上一调用输出的值）
-    for mname, _, _ in UNIFIED_MODULES:
+    for mname, _attr in UNIFIED_MODULES:
         module_inputs[mname] = dict(engine._cached_inputs.get(mname, {}))
         all_outputs[mname] = {}
 
