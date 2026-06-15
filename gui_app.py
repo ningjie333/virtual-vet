@@ -555,7 +555,11 @@ def api_diagnose():
     """
     提交诊断 + 治疗
     POST body: {"session_id": "case_001", "diagnosis": "pneumonia"}
-    返回: 治疗结果 + 游戏状态
+    或:       {"session_id": "case_020", "diagnosis": ["dilated_cardiomyopathy", "pneumonia"]}
+
+    Q4.1=C (2026-06-14): diagnosis 可以是 str（向后兼容）或 list[str]（多病）。
+    系统自动对 list 中每个 guess admin 对应 protocol（Q4.3=B: 运行时合并）。
+    Q4.2=B: 主诊断必须在 list 中才算 win；合并症是 bonus。
     """
     data = request.get_json() or {}
     session_id = data.get("session_id", _DEFAULT_SESSION_ID)
@@ -602,15 +606,24 @@ def api_diagnose():
         }
 
         if state.phase == "won":
+            # Q4.2 (2026-06-14): 多病 case — game_over 包含合并症信息
+            reason = "诊断正确，治疗有效！患犬正在康复。"
+            treatment_result = result.get("result", {})
+            if treatment_result.get("comorbidity_correct") is True:
+                reason = "诊断全面正确！主诊断和合并症均已识别并治疗。患犬正在康复。"
+            elif treatment_result.get("comorbidity_correct") is False:
+                reason = "主诊断正确，治疗有效！合并症未完全识别，但患犬已脱离危险。"
             response["game_over"] = {
-                "reason": "诊断正确，治疗有效！患犬正在康复。",
+                "reason": reason,
                 "actual_disease": state.disease_name,
+                "target_diseases": state.disease_names,
                 "score": _calc_score(state),
             }
         elif state.phase == "lost":
             response["game_over"] = {
                 "reason": "患犬未能挺过危机，抢救无效。",
                 "actual_disease": state.disease_name,
+                "target_diseases": state.disease_names,
             }
 
         # Persist to SQLite; also record final outcome

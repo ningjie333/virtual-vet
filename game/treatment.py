@@ -63,70 +63,110 @@ def _administer_protocol(engine, disease_name: str) -> list[str]:
 
 def is_correct_treatment(game_state: GameState, disease_guess: str) -> bool:
     """
-    判断治疗选择是否匹配实际疾病。
+    判断治疗选择是否匹配实际疾病（向后兼容单病接口）。
 
-    Args:
-        game_state: 当前游戏状态
-        disease_guess: 玩家选择的疾病名称
-
-    Returns:
-        True 如果猜对了
+    Q4.2 (2026-06-14): 主诊断必须对。合并症是 bonus。
     """
     return disease_guess == game_state.disease_name
 
 
-def apply_treatment(game_state: GameState, disease_guess: str) -> dict:
-    """
-    应用治疗，判定胜负。
+def _resolve_guesses(disease_guess: str | list[str]) -> list[str]:
+    """Normalize disease_guess to a list (Q4.1=C: 支持 list 或 str 输入)。"""
+    if isinstance(disease_guess, list):
+        return [g for g in disease_guess if g]
+    return [disease_guess] if disease_guess else []
 
-    诊断正确 → 执行对应药物协议（给药物，推进引擎让玩家看到生理改善）
-    诊断错误 → 返回误诊提示
-    支持治疗 → 补液 200 mL
+
+def apply_treatment(game_state: GameState, disease_guess: str | list[str]) -> dict:
+    """
+    应用治疗，判定胜负（Q4: 多病支持）。
+
+    Q4.1=C (auto-infer): disease_guess 可以是 list（多病）或 str（单病向后兼容）。
+        系统自动对 list 中每个 guess admin 对应 protocol（Q4.3=B: 运行时合并）。
+    Q4.2=B (主诊断必须对): win 条件 = game_state.disease_name (主诊断) 在 guess list 中。
+        合并症猜对 → bonus 消息；猜错 → 不影响 win 判定。
+    Q4.3=B (运行时合并): 按 guess list 顺序依次 admin 单病 protocol。
 
     Args:
         game_state: 当前游戏状态
-        disease_guess: 玩家选择的疾病名称
+        disease_guess: 玩家选择的疾病名称（str 或 list[str]）
 
     Returns:
         {
             "success": True,
-            "correct": bool,
-            "actual_disease": str,
-            "chosen_disease": str,
-            "phase": str,       # "won" 或 "playing"
-            "message": str,     # 中文结果描述
-            "drugs_given": list, # 已给药物列表（新增）
+            "correct": bool,        # 主诊断是否猜对
+            "actual_disease": str,   # 主诊断
+            "chosen_disease": str | list[str],  # 玩家猜的
+            "phase": str,            # "won" 或 "playing"
+            "message": str,          # 中文结果描述
+            "drugs_given": list,     # 已给药物列表
+            "comorbidity_correct": bool | None,  # 合并症是否猜对 (None=无合并症)
         }
     """
-    correct = is_correct_treatment(game_state, disease_guess)
-    actual = game_state.disease_name
+    guesses = _resolve_guesses(disease_guess)
+    primary = game_state.disease_name
+    all_targets = game_state.disease_names  # [primary, comorbidity1, ...]
 
-    if correct:
-        drugs_given = _administer_protocol(game_state.engine, actual)
-        message = _win_message(actual)
-        phase = "won"
-        logger.info("治疗正确: %s → 给药 %s → phase=won", actual, drugs_given)
-    elif disease_guess == "supportive_care":
-        # 支持治疗：静脉补液 200 mL
+    # Q4.2: 主诊断必须在 guess list 中才算 correct
+    primary_correct = primary in guesses
+
+    # 合并症判定（仅当有多病时有意义）
+    comorbidity_correct: bool | None = None
+    if len(all_targets) > 1:
+        comorbidities = all_targets[1:]  # 除主诊断外的所有疾病
+        comorbidity_correct = all(c in guesses for c in comorbidities)
+
+    # ── supportive_care 特殊处理 ──
+    if len(guesses) == 1 and guesses[0] == "supportive_care":
         _apply_supportive_care(game_state)
-        drugs_given = ["fluid_bolus"]
-        message = "支持治疗已执行：静脉补液 200 mL。患犬暂时感觉好了一些，但根本问题仍未解决。建议继续检查明确诊断。"
-        phase = "playing"
-        logger.info("支持治疗: 补液 200mL")
+        return {
+            "success": True,
+            "correct": False,
+            "actual_disease": primary,
+            "chosen_disease": "supportive_care",
+            "phase": "playing",
+            "message": "支持治疗已执行：静脉补液 200 mL。患犬暂时感觉好了一些，但根本问题仍未解决。建议继续检查明确诊断。",
+            "drugs_given": ["fluid_bolus"],
+            "comorbidity_correct": None,
+        }
+
+    # ── Q4.3=B: 运行时合并 — 按 guess list 顺序依次 admin 单病 protocol ──
+    drugs_given: list[str] = []
+    for guess in guesses:
+        if guess in _DRUG_PROTOCOL:
+            drugs_given.extend(_administer_protocol(game_state.engine, guess))
+
+    # ── Q4.2=B: win 判定 — 主诊断必须对 ──
+    if primary_correct:
+        if comorbidity_correct is True:
+            # 全对：主诊断 + 合并症都猜对
+            message = _win_message(primary)
+            message += "\n\n🎉 额外奖励：合并症也正确识别！诊断全面准确。"
+        elif comorbidity_correct is False:
+            # 主诊断对，合并症错
+            message = _win_message(primary)
+            message += "\n\n💡 提示：合并症未正确识别，但主诊断正确，治疗有效。"
+        else:
+            # 单病 case，无合并症
+            message = _win_message(primary)
+        phase = "won"
+        logger.info("治疗正确: 主诊断=%s, 合并症=%s, 给药=%s → phase=won",
+                     primary, comorbidity_correct, drugs_given)
     else:
-        drugs_given = []
-        message = _loss_message(actual)
+        # 主诊断错
+        message = _loss_message(primary)
         phase = "playing"
-        logger.info("治疗误诊: 猜测=%s, 实际=%s", disease_guess, actual)
+        logger.info("治疗误诊: 猜测=%s, 主诊断=%s", guesses, primary)
 
     return {
         "success": True,
-        "correct": correct,
-        "actual_disease": actual,
+        "correct": primary_correct,
+        "actual_disease": primary,
         "chosen_disease": disease_guess,
         "phase": phase,
         "message": message,
         "drugs_given": drugs_given,
+        "comorbidity_correct": comorbidity_correct,
     }
 
 

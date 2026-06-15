@@ -767,11 +767,18 @@ class TestDrugTreatmentProtocol:
         drug_names = [d.name for d in arf_state.engine.pharmacology.active_drugs]
         assert "fluid_bolus" in drug_names
 
-    def test_incorrect_diagnosis_no_drugs(self, dcm_state):
-        """Incorrect diagnosis should NOT administer any drugs."""
+    def test_incorrect_diagnosis_admins_guessed_protocol(self, dcm_state):
+        """Q4.1=C (2026-06-14): Wrong diagnosis still admins the guessed disease's
+        protocol (auto-infer). Game doesn't end (phase stays 'playing').
+        """
         from game.treatment import apply_treatment
-        apply_treatment(dcm_state, "pneumonia")
-        assert len(dcm_state.engine.pharmacology.active_drugs) == 0
+        result = apply_treatment(dcm_state, "pneumonia")
+        # Pneumonia protocol = fluid_bolus 200mL → should be admined
+        drug_names = [d.name for d in dcm_state.engine.pharmacology.active_drugs]
+        assert "fluid_bolus" in drug_names
+        # But game doesn't end — primary diagnosis was wrong
+        assert result["correct"] is False
+        assert result["phase"] == "playing"
 
     def test_dcm_treatment_returns_correct_result(self, dcm_state):
         """apply_treatment with correct DCM diagnosis should return correct=True."""

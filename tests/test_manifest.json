@@ -231,6 +231,10 @@
     "test_species_params.py": {
       "bundle": "fast-engine",
       "lane": "fast"
+    },
+    "test_multi_disease_treatment.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
     }
   }
 }

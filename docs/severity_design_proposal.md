@@ -399,3 +399,16 @@ setattr(module, attr_name, new_value)        # 立即写回
 - `7d9a42b` 2 comorbidity cases (DCM+肺炎, CKD+肺炎) + 端到端测试
 - `4ce5a0f` 多病诊断 (/api/hint top-2 + /api/diagnosis target_diseases)
 
+
+### ✅ Q4 已决定（2026-06-14）
+
+| 问题 | 决策 | 理由 |
+|------|------|------|
+| Q4.1 治疗输入 | **C. 自动推断** | 零 UI 改动，复用 `/api/diagnose` 流程。玩家通过诊断表达"我认为是什么病"，系统自动 admin 对应 protocol |
+| Q4.2 Win/loss | **B. 主诊断必须对** | 降低难度。合并症猜对 → bonus 消息；猜错 → 不影响 win 判定 |
+| Q4.3 Protocol 存法 | **B. 运行时合并** | 保持 `treatments.json` 单病条目，运行时按 guess list 顺序依次 admin |
+
+实施：
+- `game/treatment.py`: `apply_treatment` 接受 `str | list[str]`，`_resolve_guesses` 归一化，`comorbidity_correct` 字段
+- `gui_app.py`: `/api/diagnose` accept list or string，`game_over` 包含 `target_diseases` + comorbidity 消息
+- `tests/test_multi_disease_treatment.py`: 16 用例全过
