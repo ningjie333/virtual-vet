@@ -227,6 +227,10 @@
     "test_multi_disease_diagnosis.py": {
       "bundle": "fast-runtime",
       "lane": "fast"
+    },
+    "test_species_params.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
     }
   }
 }

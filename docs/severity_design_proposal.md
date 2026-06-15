@@ -338,3 +338,64 @@ setattr(module, attr_name, new_value)        # 立即写回
 
 **工作量**：~20 行常量 + 3 个 lookup helper（统一抽 `NORMAL_HR[species]` 形式），改动局部，
 不影响疾病 ODE。可与方向二实施一起做。
+
+---
+
+## 方向三 (合并症) 治疗半边 — Q4（2026-06-14 记入调研项）
+
+**状态**：⏸ **未做**。这是重要工程，**需要设计调研 + 决策讨论**才能动手写代码，不能直接 commit。
+
+### 现状（2026-06-14）
+
+方向三的**诊断半边**已落地（Q1 engine / Q2 spec / game-layer wiring / comorbidity cases / 多病 hint & target_diseases），但**治疗半边**还没碰：
+
+| 组件 | 现状 | 多病需要 |
+|------|------|---------|
+| `treatments.json` | 1 个 disease → 1 个 drug protocol | 1 个 case → N 个 disease → N 个 protocol？合并 protocol？ |
+| `game/treatment.py::is_correct_treatment` | `guess == state.disease_name` | 单数猜 → 集合匹配（猜 1 个算部分对？猜全算全对？）|
+| `apply_treatment` | 跑 guess 对应的 protocol | 多病 case 怎么 admin？ |
+| Win/loss 消息 | 单病 win/loss 文案 | 多病 case 怎么算 "已治愈"？ |
+| UI 提示 | 选 1 个 disease 治疗 | 多病 case 怎么选？dropdown list？ |
+
+### 3 个待决策的设计问题
+
+**Q4.1：治疗输入的"颗粒度"**
+
+- **A. 一次性治疗所有**：case start 时固定给"主诊断 + 合并症"的合并 protocol，玩家无需选
+- **B. 玩家逐个选**：UI 让玩家在 dropdown 选要治哪个 disease；选错（或不完整）算 partial lose
+- **C. 自动推断**：基于玩家提交的诊断（`/api/diagnose` 时的 guess list），自动 admin 所有猜中的 protocol
+
+**Q4.2：Win/loss 条件**
+
+- **A. 严格全对**：所有 `state.disease_names` 都被正确诊断 + 正确治疗才 win
+- **B. 主诊断必须对**：仅要求 `disease_name`（主诊断）猜对 + 治对，合并症错也 win
+- **C. 加权进度**：每猜对 1 个病算 N% 进度（如 2 病 = 50%/50%），> 80% 算 win
+
+**Q4.3：多病 protocol 在 `treatments.json` 的存法**
+
+- **A. 复用单病条目**：`treatments.json` 加 `"dilated_cardiomyopathy + pneumonia"` 这种 **组合 key** 的 protocol
+- **B. 运行时合并**：保持单病 protocol，运行时按 `state.disease_names` 依次 admin（顺序可配置）
+- **C. 共享 protocol**：识别 common syndrome (e.g., "心源性肺水肿") 用 1 个 protocol 覆盖
+
+### 跟已有代码的耦合点
+
+- `gui_app.py:570-606` (treatment API) 需要扩展
+- `game/treatment.py:64-101` (`is_correct_treatment` + `apply_treatment`) 核心改动
+- `treatments.json` 现有结构（disease → [drug_steps]）需扩
+- `tests/test_treatment*.py` 现有断言需重写
+- `docs/disease_references_plan.md` 如果有 plan 要更新
+
+### 建议调研路径
+
+1. **本周不动代码**——只设计 + 讨论，写调研结论到本节下方
+2. **临床专家 review**：跟合作兽医确认"方向三 3 个场景里，玩家应该怎么被奖励/惩罚"
+3. **技术 review**：`treatments.json` 的修改是否向后兼容已有 19 个 case
+4. **做完调研再 commit 改动**
+
+### 相关 commits（诊断半边已完成）
+
+- `379557f` Q1 engine: `self.diseases` list + chained-rebase spec
+- `db9958e` game-layer wiring: PresentationRequest/GameState/gui_app
+- `7d9a42b` 2 comorbidity cases (DCM+肺炎, CKD+肺炎) + 端到端测试
+- `4ce5a0f` 多病诊断 (/api/hint top-2 + /api/diagnosis target_diseases)
+

@@ -9,9 +9,93 @@
 # A类: 随体重变化的参数 (函数)
 # ============================================================
 
-def total_blood_volume_ml(weight_kg: float) -> float:
-    """总血容量: 80-90 mL/kg, 取 86"""
-    return 86.0 * weight_kg
+# ── Species-aware blood volume (mL/kg) ──────────────────────────────────
+# Q3 (2026-06-14): 犬 86 / 猫 55 / 马 76 来自 severity_design_proposal.md §方向二
+# 原总血容量函数固定 86.0 mL/kg（犬），猫/马需物种感知
+BLOOD_VOLUME_ML_KG_CANINE = 86.0    # 犬 80-90, 取 86 (Guyton 14e Ch20)
+BLOOD_VOLUME_ML_KG_FELINE = 55.0    # 猫 40-70, 取 55 (Nelson & Couto 5e Ch22)
+BLOOD_VOLUME_ML_KG_EQUINE = 76.0    # 马 70-100, 取 76 (Merck Vet Manual)
+
+# ── Species fever threshold (°C) ────────────────────────────────────────
+# Q3 (2026-06-14): 犬 39.2 / 猫 39.5 / 马 38.5
+# REF: Merck Vet Manual | Canine fever > 39.2°C (102.5°F)
+# REF: Merck Vet Manual | Feline fever > 39.5°C (103.1°F)
+# REF: Merck Vet Manual | Equine fever > 38.5°C (101.3°F)
+FEVER_THRESHOLD_C_CANINE = 39.2     # 犬发热阈值 °C
+FEVER_THRESHOLD_C_FELINE = 39.5     # 猫发热阈值 °C
+FEVER_THRESHOLD_C_EQUINE = 38.5     # 马发热阈值 °C
+
+
+# ── 3-way species lookup helpers ────────────────────────────────────────
+# Q3 (2026-06-14): 统一 canine/feline/equine 的 3-way lookup 函数。
+# 照 base_DO2_normal_ml_min 的 Hb if-else 范本，但用 canine/feline/equine
+# 字符串（与 engine species 一致），不用 dog/cat（那是历史遗留）。
+#
+# 使用方式:
+#   from src.parameters import species_hr, species_rr, species_paco2, fever_threshold_c
+#   hr = species_hr("canine")  # 85
+#   rr = species_rr("feline", stress=True)  # 50
+
+
+def species_hr(species: str = "canine", stress: bool = False) -> float:
+    """按物种返回静息或应激心率 (bpm)。"""
+    if stress:
+        if species == "feline":
+            return HEART_RATE_STRESS_BPM_FELINE
+        if species == "equine":
+            return HEART_RATE_STRESS_BPM_EQUINE
+        return HEART_RATE_STRESS_BPM_CANINE
+    if species == "feline":
+        return HEART_RATE_REST_BPM_FELINE
+    if species == "equine":
+        return HEART_RATE_REST_BPM_EQUINE
+    return HEART_RATE_REST_BPM_CANINE
+
+
+def species_rr(species: str = "canine", stress: bool = False) -> float:
+    """按物种返回静息或应激呼吸频率 (/min)。"""
+    if stress:
+        if species == "feline":
+            return RESPIRATORY_RATE_STRESS_FELINE
+        if species == "equine":
+            return RESPIRATORY_RATE_STRESS_EQUINE
+        return RESPIRATORY_RATE_STRESS_CANINE
+    if species == "feline":
+        return RESPIRATORY_RATE_REST_FELINE
+    if species == "equine":
+        return RESPIRATORY_RATE_REST_EQUINE
+    return RESPIRATORY_RATE_REST_CANINE
+
+
+def species_paco2(species: str = "canine") -> float:
+    """按物种返回正常 PaCO2 (mmHg)。"""
+    if species == "feline":
+        return ARTERIAL_PCO2_NORMAL_FELINE
+    if species == "equine":
+        return ARTERIAL_PCO2_NORMAL_EQUINE
+    return ARTERIAL_PCO2_NORMAL_CANINE
+
+
+def fever_threshold_c(species: str = "canine") -> float:
+    """按物种返回发热阈值 (°C)。"""
+    if species == "feline":
+        return FEVER_THRESHOLD_C_FELINE
+    if species == "equine":
+        return FEVER_THRESHOLD_C_EQUINE
+    return FEVER_THRESHOLD_C_CANINE
+
+
+def total_blood_volume_ml(weight_kg: float, species: str = "canine") -> float:
+    """总血容量 (mL), 按物种校准。
+
+    Q3 (2026-06-14): 从固定 86 mL/kg (犬 only) 升级为 3-species lookup。
+    向后兼容: 不传 species 时默认 canine。
+    """
+    if species == "feline":
+        return BLOOD_VOLUME_ML_KG_FELINE * weight_kg
+    if species == "equine":
+        return BLOOD_VOLUME_ML_KG_EQUINE * weight_kg
+    return BLOOD_VOLUME_ML_KG_CANINE * weight_kg
 
 def stroke_volume_ml(weight_kg: float) -> float:
     """犬每搏输出量: 1.0-1.5 mL/kg, 取 1.0 (危重基准线)"""
@@ -65,10 +149,12 @@ def baseline_urine_output_ml_min(weight_kg: float) -> float:
 # --- 心血管系统 ---
 # REF: textbook:nelson | Nelson & Couto 5e Ch22 | Canine normal resting HR 60-140 bpm
 HEART_RATE_REST_BPM = 85                          # 犬静息心率 bpm
+HEART_RATE_REST_BPM_CANINE = 85                   # 犬显式别名 (Q3 对齐 3-way lookup)
 # REF: Ninomiya 1988 PMID:3236570 | Cat resting HR 164±10 bpm; UC Davis CVET 100-140
 HEART_RATE_REST_BPM_FELINE = 150                  # 猫静息心率 bpm (120-180 范围内)
 # REF: textbook:nelson | Nelson & Couto 5e Ch22 | Estimated maximum ~180 bpm
 HEART_RATE_STRESS_BPM = 180                       # 犬应激心率上限 bpm
+HEART_RATE_STRESS_BPM_CANINE = 180                # 犬显式别名 (Q3)
 HEART_RATE_STRESS_BPM_FELINE = 250                # 猫应激心率上限 bpm
 # REF: Merck Vet Manual; Reed & Bayly Equine Internal Medicine | Horse resting HR 28-44 bpm
 HEART_RATE_REST_BPM_EQUINE = 35                   # 马静息心率 bpm (28-44 范围内)
@@ -117,12 +203,16 @@ PULMONARY_ARTERIAL_PRESSURE_MMHG = 15.0           # 肺动脉压 mmHg
 # --- 呼吸系统 ---
 # REF: textbook:nelson | Nelson & Couto 5e Ch6 | Normal RR 10-30 /min (resting)
 RESPIRATORY_RATE_REST = 18                        # 犬静息呼吸频率 /min
+RESPIRATORY_RATE_REST_CANINE = 18                 # 犬显式别名 (Q3)
 # REF: Dijkstra 2018 PMID:29680402 | Cat resting RR 20-30 /min; UC Davis CVET 20-30
 RESPIRATORY_RATE_REST_FELINE = 25                 # 猫静息呼吸频率 /min
 # REF: Merck Vet Manual; BMC Vet Res 2016 | Horse resting RR 8-16 /min, typical ~12
 RESPIRATORY_RATE_REST_EQUINE = 12                 # 马静息呼吸频率 /min
 RESPIRATORY_RATE_STRESS = 40                      # 犬应激呼吸频率 /min
+RESPIRATORY_RATE_STRESS_CANINE = 40               # 犬显式别名 (Q3)
 RESPIRATORY_RATE_STRESS_FELINE = 50               # 猫应激呼吸频率 /min
+# REF: Fregin 1990 | Horse exercise RR 60-120 /min, 轻度应激取 60
+RESPIRATORY_RATE_STRESS_EQUINE = 60               # 马应激呼吸频率 /min
 
 # 气体分压 (mmHg)
 # REF: textbook:guyton | Guyton 14e Ch40 | Standard atmospheric 760 mmHg (sea level)
@@ -138,6 +228,7 @@ ALVEOLAR_PCO2_NORMAL = 40.0                       # 正常肺泡CO2分压
 ARTERIAL_PO2_NORMAL = 95.0                        # 犬正常动脉血氧分压 mmHg
 # REF: textbook:nelson | Nelson & Couto 5e Ch6 | Normal PaCO2 35-45 mmHg
 ARTERIAL_PCO2_NORMAL = 40.0                       # 犬正常动脉血CO2分压 mmHg
+ARTERIAL_PCO2_NORMAL_CANINE = 40.0                # 犬显式别名 (Q3)
 # REF: Merck Veterinary Manual | Cat PaCO2 29-42 mmHg
 ARTERIAL_PCO2_NORMAL_FELINE = 35.0                # 猫正常动脉血CO2分压 mmHg
 # REF: Sherlock et al. 2019 PMID:31471125 (n=139) | Horse PaCO2 36.3-54.0, median 45.2
