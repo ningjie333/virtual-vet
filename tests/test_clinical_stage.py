@@ -87,3 +87,49 @@ class TestListSupportedDiseases:
     def test_contains_expected(self):
         diseases = set(list_supported_diseases())
         assert diseases == {"pneumonia", "dilated_cardiomyopathy", "acute_renal_failure"}
+
+
+class TestDiseaseMarkerViewIntegration:
+    """clinical_stage is injected into DiseaseMarkerView for game-layer access."""
+
+    def test_pneumonia_severe_produces_severe_stage(self):
+        """severe pneumonia after 10min warmup → clinical_stage='severe'."""
+        from src.simulation import VirtualCreature
+        from src.diseases import create_disease
+        from src.report_engine import _build_disease_marker_view
+
+        vc = VirtualCreature(body_weight_kg=20.0, species='canine', dt=5.0,
+                             legacy_clinical_signs_enabled=False)
+        d = create_disease('pneumonia', severity='severe')
+        vc.attach_disease(d)
+        vc.simulate(10)
+        view = _build_disease_marker_view(vc)
+        assert view.clinical_stage == "severe"
+
+    def test_pneumonia_mild_produces_mild_or_moderate(self):
+        """mild pneumonia after 2min warmup → clinical_stage is mild or moderate."""
+        from src.simulation import VirtualCreature
+        from src.diseases import create_disease
+        from src.report_engine import _build_disease_marker_view
+
+        vc = VirtualCreature(body_weight_kg=20.0, species='canine', dt=5.0,
+                             legacy_clinical_signs_enabled=False)
+        d = create_disease('pneumonia', severity='mild')
+        vc.attach_disease(d)
+        vc.simulate(2)
+        view = _build_disease_marker_view(vc)
+        assert view.clinical_stage in ("mild", "moderate")
+
+    def test_unsupported_disease_returns_unknown(self):
+        """Disease without clinical_stage rules → 'unknown'."""
+        from src.simulation import VirtualCreature
+        from src.diseases import create_disease
+        from src.report_engine import _build_disease_marker_view
+
+        vc = VirtualCreature(body_weight_kg=20.0, species='canine', dt=5.0,
+                             legacy_clinical_signs_enabled=False)
+        d = create_disease('sepsis', severity='moderate')
+        vc.attach_disease(d)
+        vc.simulate(5)
+        view = _build_disease_marker_view(vc)
+        assert view.clinical_stage == "unknown"

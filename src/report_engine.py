@@ -160,6 +160,14 @@ def _build_disease_marker_view(creature: VirtualCreature) -> DiseaseMarkerView |
         if value is not None:
             values[attr_name] = value
 
+    # Phase 1 (2026-06-14): 注入 clinical_stage 计算字段
+    # 游戏层可通过 disease.clinical_stage 读取（经 __getattr__）
+    # 报告引擎的 findings_rules 不受影响（它们有自己的阈值系统）
+    from src.clinical_stage import compute_clinical_stage
+    disease_name = getattr(disease, "name", "")
+    sv = state_vars if isinstance(state_vars, dict) else {}
+    values["clinical_stage"] = compute_clinical_stage(disease_name, sv)
+
     return DiseaseMarkerView(
         active=bool(getattr(disease, "active", False)),
         values=values,
