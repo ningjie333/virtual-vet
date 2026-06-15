@@ -598,6 +598,7 @@ class VirtualCreature:
                     },
                     "lung": {"arterial_PO2": self.blood.arterial_PO2_mmHg},
                     "kidney": {"GFR_ml_min": self.kidney.GFR},
+                    "immune": {"antibiotic_effect": self.immune.antibiotic_effect},
                 }
                 for d in active_diseases:
                     d._current_time_s = self.current_time_s
@@ -1046,6 +1047,7 @@ class VirtualCreature:
             },
             "lung": {"arterial_PO2": self.blood.arterial_PO2_mmHg},
             "kidney": {"GFR_ml_min": self.kidney.GFR},
+            "immune": {"antibiotic_effect": self.immune.antibiotic_effect},
         }
 
     def _ivp_rhs(self, t: float, y: np.ndarray) -> np.ndarray:

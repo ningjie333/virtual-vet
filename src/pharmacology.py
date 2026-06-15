@@ -218,6 +218,37 @@ class FluidBolus(Drug):
         return []
 
 
+class AmoxicillinClavulanate(Drug):
+    """
+    广谱抗生素（阿莫西林克拉维酸钾）→ 增强免疫清除细菌能力。
+
+    犬口服半衰期 ≈ 1-2 小时，取 1.5 小时。
+    PD 效果：增强免疫清除率（通过 immune.antibiotic_effect FactorCommand）。
+
+    临床用途：犬细菌性肺炎首选抗生素（Nelson & Couto 5e Ch12）。
+    剂量：12.5-25 mg/kg PO q12h，取 12.5 mg/kg。
+    """
+
+    def __init__(self):
+        super().__init__(
+            name="amoxicillin_clavulanate",
+            half_life_s=5400.0,  # 1.5 小时
+            emax=0.8,  # 最多增强 80% 免疫清除
+            ec50=0.1,  # EC50 ≈ 0.1 mg/kg
+            hill=1.5,
+        )
+
+    def factor_commands(self, pd_effect: float) -> list[FactorCommand]:
+        """抗生素：设置 immune.antibiotic_effect。"""
+        from src.common_types import FactorCommand
+        if pd_effect <= 0.0:
+            return []
+        return [
+            FactorCommand(target="immune.antibiotic_effect", op="set",
+                          value=round(pd_effect, 4)),
+        ]
+
+
 # ── Drug Registry ────────────────────────────────────────────────────────────
 
 _DRUG_REGISTRY: dict[str, type[Drug]] = {
@@ -225,6 +256,7 @@ _DRUG_REGISTRY: dict[str, type[Drug]] = {
     "furosemide": Furosemide,
     "epinephrine": Epinephrine,
     "fluid_bolus": FluidBolus,
+    "amoxicillin_clavulanate": AmoxicillinClavulanate,
 }
 
 

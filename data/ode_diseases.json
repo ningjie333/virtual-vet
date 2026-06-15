@@ -45,7 +45,7 @@
           null
         ],
         "ode_type": "custom",
-        "derivative_fn": "(growth_rate - immune_clearance * (1 + 0.5 * fever_state)) * bacterial_load"
+        "derivative_fn": "(growth_rate - immune_clearance * (1 + 0.5 * fever_state + engine.get('immune', {}).get('antibiotic_effect', 0))) * bacterial_load"
       },
       "fever_state": {
         "initial": 0.0,

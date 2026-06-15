@@ -27,7 +27,7 @@ class ImmuneModule:
 
     # ── Phase 5: I/O contract (declarative, no behavior change) ────────
     INPUTS: tuple[str, ...] = ('endocrine_cortisol',)
-    OUTPUTS: tuple[str, ...] = ('cytokine_level', 'wbc_count', 'crp_level', 'acute_phase_response', 'immune_suppression', 'coagulation_state', 'fever_C')
+    OUTPUTS: tuple[str, ...] = ('cytokine_level', 'wbc_count', 'crp_level', 'acute_phase_response', 'immune_suppression', 'coagulation_state', 'fever_C', 'antibiotic_effect')
     READS_BLOOD: tuple[str, ...] = ('cortisol_ug_dL', 'core_temperature_C', 'cytokine_level')
     WRITES_BLOOD: tuple[str, ...] = ('core_temperature_C', 'CRP_mg_L', 'cytokine_level', 'sodium_mEq_L')
 
@@ -74,6 +74,10 @@ class ImmuneModule:
 
         # 免疫抑制
         self.immune_suppression = 0.0      # 免疫抑制水平 (0-1)
+
+        # 抗生素增强（FactorCommand 写入，疾病 ODE 读取）
+        # 用于肺炎等细菌感染：抗生素增强免疫清除率
+        self.antibiotic_effect = 0.0       # 抗生素增强效果 (0-1, 0=无抗生素)
 
         # 凝血状态
         self.coagulation_state = 0.0       # 高凝状态 (0=正常, 1=DIC)

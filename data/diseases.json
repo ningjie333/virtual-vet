@@ -325,6 +325,10 @@
     ],
     "pneumonia": [
       {
+        "drug_name": "amoxicillin_clavulanate",
+        "dose_mg_kg": 12.5
+      },
+      {
         "drug_name": "fluid_bolus",
         "volume_ml": 200
       }
