@@ -717,6 +717,14 @@ class VirtualCreature:
         # signal_time = t (before +=dt) — Euler publishes at pre-step time
         fluid_state = run_post_dispatch(self, dt, signal_time=t)
 
+        # Post-coupling safety clamp: RAAS coupling rule multiplies heart.SVR
+        # every step (factor = 1 + 0.2 * renin). Over many steps this compounds
+        # even with baroreceptor_feedback trying to reduce SVR. Clamp to a
+        # physiological maximum to prevent SVR runaway. (Pre-existing issue,
+        # surfaced by decompensation spiral testing, 2026-06-15.)
+        svr_phys_max = self.heart.SVR_baseline * 4.0  # 4× baseline ≈ 5.6 PRU
+        self.heart.SVR = min(self.heart.SVR, svr_phys_max)
+
         # Step 8: history recording (shared with Radau via _record_history)
         # P0 0b: was inline divergence with Radau; now single source of truth
         if self._record_history_enabled:

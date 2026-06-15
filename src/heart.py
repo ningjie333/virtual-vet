@@ -49,6 +49,7 @@ class HeartModule:
         ("blood_volume", "circulating_volume_ml"),
         ("sympathetic", "sympathetic"),
         ("parasympathetic", "parasympathetic"),
+        ("ISCHEMIA", "myocardial_ischemia"),
     )
     """
     心血管模块：模拟心脏泵血功能与血压调节
@@ -113,6 +114,12 @@ class HeartModule:
 
         # 收缩力因子（由 ToxicologyModule 调制，1.0 = 正常）
         self.contractility_factor = 1.0
+
+        # Layer 2 (2026-06-15): 心肌缺血积累状态（0-1，0=正常，1=完全缺血）
+        # 与 Layer 1 (_coronary_perfusion_effect) 配合：
+        # Layer 1 = 瞬时代数效应（MAP→冠脉因子），Layer 2 = 时间积累效应（τ=300s）
+        # 正反馈：MAP↓ → CPP↓ → ischemia↑ → contractility↓ → MAP↓↓
+        self.myocardial_ischemia = 0.0
 
         # 前负荷因子（由心包积液等疾病调制，1.0 = 正常）
         # 心包积液 → 舒张期心脏受压 → 前负荷下降 → SV 下降（不是收缩力问题）
@@ -191,6 +198,9 @@ class HeartModule:
         effective_target *= pH_factor
         coronary_factor = self._coronary_perfusion_effect(self.mean_arterial_pressure)
         effective_target *= coronary_factor
+        # Layer 2: 缺血因子（时间积累效应，与 Layer 1 冠脉因子叠加）
+        ischemic_factor = max(0.2, 1.0 - self.myocardial_ischemia * 0.8)
+        effective_target *= ischemic_factor
 
         # Frank-Starling: τ = 1/alpha_sv ≈ 3.3s
         # 连续形式: τ · dSV/dt + SV = effective_target
@@ -240,6 +250,24 @@ class HeartModule:
         alpha_svr = 0.1
         dSVR = (target_SVR - self.SVR) * alpha_svr  # τ=10s
 
+        # ── Layer 2: 心肌缺血 ODE (2026-06-15, decompensation spiral) ──────
+        # 正反馈：MAP↓ → CPP↓ → ischemia↑ → contractility↓ → MAP↓↓
+        # 冠脉灌注不足有两个驱动因素：
+        #   1. 压力驱动：CPP (MAP - CVP) 低于冠脉自动调节下限
+        #   2. 容量驱动：严重失血时即使 MAP 被 baroreflex 代偿到 74-94，
+        #      冠脉血流仍不足（总血容量太低，最大血管扩张也无法维持灌注）
+        CVP = max(0.0, CENTRAL_VENOUS_PRESSURE_MMHG * (1.0 - 0.5 * (1.0 - vol_ratio)))
+        CPP = raw_MAP - CVP
+        # 压力驱动：CPP < 60 mmHg（冠脉自动调节下限，Guyton 14e Ch20）
+        pressure_drive = max(0.0, (60.0 - CPP) / 60.0)
+        # 容量驱动：vol_ratio < 0.5（失血 >50%）时缺血开始积累
+        # 系数 2.0：Class IV 失血（70%+）时冠脉灌注严重不足，即使 MAP 被代偿
+        volume_drive = max(0.0, 1.0 - vol_ratio / 0.5) * 2.0
+        # 取两者最大值（任一因素即可触发缺血）
+        ischemia_drive = max(pressure_drive, volume_drive)
+        tau_ischemia = 200.0  # 3.3 分钟时间常数（Class IV 失血需快速响应）
+        dISCHEMIA = ischemia_drive / tau_ischemia
+
         dydt = {
             "HR": dHR,
             "SV": dSV,
@@ -247,6 +275,7 @@ class HeartModule:
             "blood_volume": -blood_loss_rate_ml_s,  # 负值 = 血容量减少
             "sympathetic": d_sym,
             "parasympathetic": d_para,
+            "ISCHEMIA": dISCHEMIA,
         }
 
         outputs = {
@@ -329,21 +358,23 @@ class HeartModule:
         生理机制：
         - 冠脉血流主要发生在舒张期，依赖舒张压（≈ MAP - 10）
         - 冠肌自主调节范围：MAP 60-140 mmHg（通过小动脉舒张/收缩）
-        - MAP < 60：自主调节失效，冠脉血流线性下降
+        - MAP < 70：自主调节开始受限，冠脉血流开始下降
         - MAP < 40：严重心肌缺血，无氧代谢主导
         - 缺血后果：ATP↓ → Na⁺/K⁺ 泵失效 → 细胞内 Ca²⁺↑ → 收缩带坏死
 
-        量化关系：
-        - MAP ≥ 60：完全灌注（因子 = 1.0）
-        - MAP 40-60：线性下降 1.0 → 0.4
+        量化关系（Fix-B Layer 1, 2026-06-15）：
+        - MAP ≥ 70：完全灌注（因子 = 1.0）
+        - MAP 40-70：线性下降 1.0 → 0.4
         - MAP < 40：极重度缺血（因子 ≤ 0.4）
 
         这是正反馈回路：MAP↓ → 冠脉灌注↓ → 心肌缺血 → 收缩力↓ → MAP↓↓
+        与 Layer 2 (myocardial_ischemia ODE) 配合：Layer 1 处理瞬时代数效应，
+        Layer 2 处理时间积累效应（τ=300s）。
         """
-        if map_mmHg >= 60.0:
+        if map_mmHg >= 70.0:
             return 1.0
         elif map_mmHg >= 40.0:
-            return 0.4 + 0.6 * (map_mmHg - 40.0) / 20.0
+            return 0.4 + 0.6 * (map_mmHg - 40.0) / 30.0
         else:
             return max(0.1, 0.4 * map_mmHg / 40.0)
 
@@ -382,10 +413,17 @@ class HeartModule:
         coronary_factor = self._coronary_perfusion_effect(self.mean_arterial_pressure)
         effective_target *= coronary_factor
 
+        # Layer 2: 缺血因子（时间积累效应，与 Layer 1 冠脉因子叠加）
+        ischemic_factor = max(0.2, 1.0 - self.myocardial_ischemia * 0.8)
+        effective_target *= ischemic_factor
+
         # 低通滤波
         alpha = 0.3
         self.stroke_volume = alpha * self.stroke_volume + (1 - alpha) * effective_target
-        self.stroke_volume = max(self.base_SV * 0.15, self.stroke_volume)
+        # Layer 2: 缺血严重时允许 SV 降到更低（base_SV * 0.05 = 1.0 mL）
+        # 原 clamp 0.15 太高，baroreflex 通过 HR↑ 完美代偿，MAP 降不下来
+        sv_floor = self.base_SV * (0.15 if self.myocardial_ischemia < 0.3 else 0.05)
+        self.stroke_volume = max(sv_floor, self.stroke_volume)
 
     def _baroreceptor_feedback(self, MAP: float, dt: float,
                                chemoreceptor_drive: float = 0.0):
@@ -422,8 +460,14 @@ class HeartModule:
 
         # HR 计算：副交感在MAP偏高时减速，交感在MAP偏低时加速
         # 副交感主导：增益 40 > 交感 15（Ursino 1998）
-        HR_para = -self.parasympathetic * 40.0 * max(0.0, -error)
-        HR_symp = self.sympathetic * 15.0 * max(0.0, error)
+        # Layer 2: 心肌缺血降低副交感基线（迷走撤退）+ 削弱交感增益
+        # 生理：严重缺血时迷走张力急剧下降（Guyton 14e Ch18），
+        # 同时 β1 受体下调导致交感响应减弱
+        ischemic_para_baseline_factor = max(0.05, 1.0 - self.myocardial_ischemia * 0.95)
+        ischemic_symp_factor = max(0.3, 1.0 - self.myocardial_ischemia * 0.7)
+        effective_para = self.parasympathetic * ischemic_para_baseline_factor
+        HR_para = -effective_para * 40.0 * max(0.0, -error)
+        HR_symp = self.sympathetic * 15.0 * max(0.0, error) * ischemic_symp_factor
         # Chemoreceptor 直连：chemo_drive → HR 升速（bpm/s），量纲正确 × dt
         # 最大约 15 bpm/s，与 Tucker 1984 数据一致（PaO₂=29 时 HR +8 bpm over ~10s）
         chemo_HR = chemoreceptor_drive * 15.0
@@ -446,9 +490,14 @@ class HeartModule:
         # raw_MAP → baroreflex → sympathetic(τ=5s) → SVR(此处，原瞬时) → raw_MAP 环路里，
         # SVR 是唯一无阻尼环节。加 τ=10s 后 SVR 不再当步全跳，环路净增益 < 1，极限环消失。
         # 见 docs/coupling_inventory.md 'RAAS Oscillation Root Cause'。
+        # Layer 2: 心肌缺血限制 SVR 代偿上限（严重缺血时血管平滑肌对儿茶酚胺反应减弱）
+        # 生理：严重休克时血管扩张物质（NO、腺苷）释放增加，对抗交感收缩
         SVR_increase = 1.0 + 2.0 * self.sympathetic * max(0.0, error)
-        svr_target = min(self.SVR_max, self.SVR_baseline * SVR_increase)
+        ischemic_svr_factor = max(0.3, 1.0 - self.myocardial_ischemia * 0.7)
+        svr_target = min(self.SVR_max * ischemic_svr_factor, self.SVR_baseline * SVR_increase)
         self.SVR = self._first_order_relax(self.SVR, svr_target, dt, SVR_BAROREFLEX_TAU_SEC)
+        # Hard safety clamp: SVR must never exceed physiological maximum
+        self.SVR = min(self.SVR, self.SVR_max * 1.5)  # allow 50% overshoot during transients
 
     @staticmethod
     def _clamp(value: float, lo: float, hi: float) -> float:
@@ -498,6 +547,17 @@ class HeartModule:
         # Step 4: 压力感受器（含化学感受器直连路径）
         self._baroreceptor_feedback(raw_MAP, dt,
                                     chemoreceptor_drive=chemoreceptor_drive)
+
+        # Step 4.5: 心肌缺血 ODE (Layer 2, 2026-06-15, decompensation spiral)
+        # 与 derivatives() 中的逻辑一致，供 Euler 路径使用
+        CVP = self.central_venous_pressure
+        CPP = raw_MAP - CVP
+        pressure_drive = max(0.0, (60.0 - CPP) / 60.0)
+        volume_drive = max(0.0, 1.0 - vol_ratio / 0.5) * 2.0
+        ischemia_drive = max(pressure_drive, volume_drive)
+        tau_ischemia = 200.0
+        dISCHEMIA = ischemia_drive / tau_ischemia
+        self.myocardial_ischemia = min(1.0, self.myocardial_ischemia + dISCHEMIA * dt)
 
         # 低通滤波平滑 MAP
         alpha = 0.1
