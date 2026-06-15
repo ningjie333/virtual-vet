@@ -235,6 +235,10 @@
     "test_multi_disease_treatment.py": {
       "bundle": "fast-engine",
       "lane": "fast"
+    },
+    "test_clinical_stage.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
     }
   }
 }
