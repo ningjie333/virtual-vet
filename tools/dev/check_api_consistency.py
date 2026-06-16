@@ -11,6 +11,7 @@
 import ast
 import re
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -298,6 +299,241 @@ FIELD_TYPE_MAP: dict[str, str] = {
 }
 
 
+# ─── AST 字段提取：自动从 gui_app.py 提取真实返回字段 ──────────────────
+# 替代手抄的 BACKEND_RESPONSE_FIELDS。手抄字典已 6 个幽灵字段（ap/max_ap/
+# stress/ap_cost/combo_bonus/time_used）+ 漏 5+ 真实字段（time_elapsed_min/
+# time_budget_min/time_remaining_min/time_cost_min/active_signs/game_over）。
+#
+# BACKEND_RESPONSE_FIELDS 保留作为 dry-run 对照组，不做删除（用户决策）。
+
+@dataclass(frozen=True)
+class ResponseField:
+    """一个返回字段（顶级或嵌套子字段）。"""
+    name: str
+    parent: str | None = None  # 嵌套 dict 的父 key，如 "game_state"
+
+    @property
+    def dotted(self) -> str:
+        return f"{self.parent}.{self.name}" if self.parent else self.name
+
+
+@dataclass(frozen=True)
+class ResponseSchema:
+    """一个 @app.route handler 的返回结构。"""
+    api_func: str
+    base_fields: tuple[ResponseField, ...] = ()
+    conditional_fields: tuple[ResponseField, ...] = ()
+    nested_dicts: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    source_line: int = 0
+    pattern: str = "unrecognized"  # "inline" | "response_var" | "unrecognized"
+
+
+def _iter_stmts_in_order(node: ast.AST):
+    """按源码顺序递归产出 stmt（ast.walk 不保序，需要手写）。
+    递归进入 With/AsyncWith/If/For/AsyncFor/While/Try 的所有子块。
+    """
+    yield node
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.stmt, ast.expr)):
+            yield from _iter_stmts_in_order(child)
+
+
+def _is_jsonify_call(node: ast.AST) -> bool:
+    """检查节点是否是 jsonify(...) 调用。
+    支持两种形式：
+    - `jsonify(x)` → Name(id='jsonify') （from flask import jsonify）
+    - `flask.jsonify(x)` → Attribute(attr='jsonify')
+    """
+    if not (isinstance(node, ast.Call) and node.args):
+        return False
+    func = node.func
+    if isinstance(func, ast.Name) and func.id == "jsonify":
+        return True
+    if isinstance(func, ast.Attribute) and func.attr == "jsonify":
+        return True
+    return False
+
+
+def _find_return_jsonify(node: ast.FunctionDef) -> ast.Return | None:
+    """按源码顺序找最后一个 return jsonify(X) 的 ast.Return。
+    必须递归（return 可能在 with/if 块内），但排除条件 early-return 错误路径。
+    """
+    last: ast.Return | None = None
+    for child in _iter_stmts_in_order(node):
+        if not isinstance(child, ast.Return):
+            continue
+        if _is_jsonify_call(child.value):
+            last = child
+    return last
+
+
+def _find_dict_assignment(node: ast.FunctionDef, var: str
+                          ) -> ast.Assign | None:
+    """按源码顺序找 `var = {...}` 的 ast.Assign。"""
+    for child in _iter_stmts_in_order(node):
+        if not isinstance(child, ast.Assign):
+            continue
+        if len(child.targets) != 1:
+            continue
+        tgt = child.targets[0]
+        if (isinstance(tgt, ast.Name) and tgt.id == var
+                and isinstance(child.value, ast.Dict)):
+            return child
+    return None
+
+
+def _find_subscript_assignments(node: ast.FunctionDef, var: str,
+                                 after_lineno: int) -> list[str]:
+    """找 `var["k"] = v` 中所有的字符串 key（按源码顺序）。"""
+    keys: list[str] = []
+    for child in _iter_stmts_in_order(node):
+        if not isinstance(child, ast.Assign) or len(child.targets) != 1:
+            continue
+        if child.lineno <= after_lineno:
+            continue
+        tgt = child.targets[0]
+        if not (isinstance(tgt, ast.Subscript)
+                and isinstance(tgt.value, ast.Name)
+                and tgt.value.id == var
+                and isinstance(tgt.slice, ast.Constant)
+                and isinstance(tgt.slice.value, str)):
+            continue
+        keys.append(tgt.slice.value)
+    return keys
+
+
+def _fields_from_dict(d: ast.Dict, parent: str | None
+                      ) -> tuple[tuple[ResponseField, ...], dict[str, tuple[str, ...]]]:
+    """递归展开 dict literal，返回 (flat fields, nested map)。
+    nested map 仅用于 dry-run 报告，fix_types_ts() 不递归插入嵌套字段。
+    """
+    flat: list[ResponseField] = []
+    nested: dict[str, list[str]] = {}
+    for k_node, v_node in zip(d.keys, d.values):
+        if not (isinstance(k_node, ast.Constant) and isinstance(k_node.value, str)):
+            continue
+        key = k_node.value
+        if isinstance(v_node, ast.Dict):
+            child_names: list[str] = []
+            for ck in v_node.keys:
+                if isinstance(ck, ast.Constant) and isinstance(ck.value, str):
+                    child_names.append(ck.value)
+            nested[key] = child_names
+            flat.append(ResponseField(name=key, parent=parent))
+        else:
+            flat.append(ResponseField(name=key, parent=parent))
+    return tuple(flat), {k: tuple(v) for k, v in nested.items()}
+
+
+def _analyze_handler(node: ast.FunctionDef) -> ResponseSchema:
+    """分析单个 @app.route handler。"""
+    ret = _find_return_jsonify(node)
+    if ret is None:
+        return ResponseSchema(api_func=node.name, source_line=node.lineno,
+                              pattern="unrecognized")
+    arg = ret.value.args[0]
+    if isinstance(arg, ast.Dict):
+        # 模式 1: 直接 return jsonify({...})
+        base_fields, nested = _fields_from_dict(arg, parent=None)
+        return ResponseSchema(
+            api_func=node.name,
+            base_fields=base_fields,
+            nested_dicts=nested,
+            source_line=node.lineno,
+            pattern="inline",
+        )
+    if isinstance(arg, ast.Name):
+        # 模式 2: response = {...}; return jsonify(response)
+        assign = _find_dict_assignment(node, arg.id)
+        if assign is None:
+            return ResponseSchema(api_func=node.name, source_line=node.lineno,
+                                  pattern="unrecognized")
+        base_fields, nested = _fields_from_dict(assign.value, parent=None)
+        # dedup 但保序：response["game_over"] 在 won/lost 各自赋值一次，
+        # 最终 schema 里 game_over 只算一个字段
+        seen: set[str] = set()
+        cond_keys: list[str] = []
+        for k in _find_subscript_assignments(node, arg.id, assign.lineno):
+            if k in seen:
+                continue
+            seen.add(k)
+            cond_keys.append(k)
+        cond_fields = tuple(ResponseField(name=k) for k in cond_keys)
+        return ResponseSchema(
+            api_func=node.name,
+            base_fields=base_fields,
+            conditional_fields=cond_fields,
+            nested_dicts=nested,
+            source_line=node.lineno,
+            pattern="response_var",
+        )
+    return ResponseSchema(api_func=node.name, source_line=node.lineno,
+                          pattern="unrecognized")
+
+
+def extract_response_schemas(gui_app_path: Path) -> dict[str, ResponseSchema]:
+    """扫描 gui_app.py，返回 api_func_name → ResponseSchema。
+    API_FUNC_TO_INTERFACE 的 key 是 camelCase（前端约定），但 gui_app.py
+    用 snake_case。需要做转换：administerDrug → administer_drug。
+    特殊：getGameState → game_state（前端习惯加 get_，后端函数名省略）。
+    """
+    src = gui_app_path.read_text(encoding="utf-8")
+    tree = ast.parse(src, filename=str(gui_app_path))
+    target_funcs: set[str] = set()
+    for camel in API_FUNC_TO_INTERFACE:
+        snake = re.sub(r"([A-Z])", r"_\1", camel).lower().lstrip("_")
+        # getGameState → game_state（后端函数名省略 get_ 前缀）
+        if snake.startswith("get_"):
+            snake = snake[4:]
+        target_funcs.add(f"api_{snake}")
+    return {
+        f.name: _analyze_handler(f)
+        for f in ast.walk(tree)
+        if isinstance(f, ast.FunctionDef) and f.name in target_funcs
+    }
+
+
+def diff_extraction_vs_legacy(legacy: dict[str, list[str]],
+                              extracted: dict[str, ResponseSchema]) -> int:
+    """dry-run：对比手抄字典 vs AST 提取，差异逐项打印（不写文件）。"""
+    print("=" * 60)
+    print("DRY-RUN: 手抄 BACKEND_RESPONSE_FIELDS vs AST 提取")
+    print("=" * 60)
+    total_added = 0
+    total_removed = 0
+    all_keys = sorted(set(legacy) | set(extracted))
+    for api_func in all_keys:
+        old = set(legacy.get(api_func, []))
+        schema = extracted.get(api_func)
+        if schema is None:
+            print(f"  [{api_func}] legacy 存在，AST 未提取到（unrecognized 模式）")
+            continue
+        new = {f.name for f in schema.base_fields} | \
+              {f.name for f in schema.conditional_fields}
+        added = new - old
+        removed = old - new
+        if not (added or removed) and not schema.nested_dicts:
+            print(f"  [unchanged] {api_func}: {len(new)} fields")
+            continue
+        if not (added or removed):
+            print(f"  [unchanged] {api_func}: {len(new)} fields, "
+                  f"含嵌套 {list(schema.nested_dicts)}")
+            continue
+        total_added += len(added)
+        total_removed += len(removed)
+        print(f"  [DIFF] {api_func} (pattern={schema.pattern}):")
+        if added:
+            print(f"    + AST adds (真实存在):    {sorted(added)}")
+        if removed:
+            print(f"    - legacy has (幽灵/已删):  {sorted(removed)}")
+        for parent, children in schema.nested_dicts.items():
+            print(f"    ~ nested {parent}: {list(children)} (仅报告，不插入 types.ts)")
+    print()
+    print(f"Summary: +{total_added} 真实字段, -{total_removed} 幽灵字段")
+    print("=" * 60)
+    return 0
+
+
 def parse_types_ts_interfaces(filepath: Path) -> dict[str, list[str]]:
     """用正则解析 types.ts，提取所有 interface 的字段名。"""
     src = filepath.read_text(encoding="utf-8")
@@ -328,16 +564,32 @@ def parse_types_ts_interfaces(filepath: Path) -> dict[str, list[str]]:
     return interfaces
 
 
-def fix_types_ts(filepath: Path) -> int:
-    """将后端返回字段同步到 types.ts 中缺失的可选字段。返回修复数量。"""
+def fix_types_ts(filepath: Path,
+                 schemas: dict[str, ResponseSchema] | None = None) -> int:
+    """将后端返回字段同步到 types.ts 中缺失的可选字段。返回修复数量。
+
+    Args:
+        filepath: types.ts 路径
+        schemas: 预提取的 ResponseSchema 字典（None 时内部 AST 提取）。
+                 嵌套 dict 字段不插入（保持与历史行为一致）。
+    """
     src = filepath.read_text(encoding="utf-8")
     interfaces = parse_types_ts_interfaces(filepath)
     fixed = 0
 
+    if schemas is None:
+        schemas = extract_response_schemas(GUI_APP)
+
     for api_func, interface_name in API_FUNC_TO_INTERFACE.items():
         if interface_name not in interfaces:
             continue
-        backend_fields = BACKEND_RESPONSE_FIELDS.get(f"api_{api_func}", [])
+        schema = schemas.get(f"api_{api_func}")
+        if schema is None:
+            # AST 未能提取（unrecognized）→ 退回手抄字典保底
+            backend_fields = BACKEND_RESPONSE_FIELDS.get(f"api_{api_func}", [])
+        else:
+            backend_fields = ([f.name for f in schema.base_fields]
+                              + [f.name for f in schema.conditional_fields])
         existing_fields = set(interfaces[interface_name])
         missing = [f for f in backend_fields if f not in existing_fields]
 
@@ -380,7 +632,13 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="API 端点一致性检查 + 类型同步")
     parser.add_argument("--fix", action="store_true", help="自动同步后端返回字段到 types.ts")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="仅显示 AST 提取 vs 手抄字典的 diff，不写文件")
     args = parser.parse_args()
+
+    if args.dry_run:
+        schemas = extract_response_schemas(GUI_APP)
+        return diff_extraction_vs_legacy(BACKEND_RESPONSE_FIELDS, schemas)
 
     if args.fix:
         print("=" * 50)
