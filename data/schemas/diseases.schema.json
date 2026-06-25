@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://virtual-vet.app/schemas/diseases.schema.json",
+  "title": "Diseases Schema",
+  "description": "Schema for data/diseases.json - disease definitions, clues, and treatments",
+  "type": "object",
+  "required": ["disease_names", "clues", "clue_descriptions", "treatment_protocols", "messages"],
+  "additionalProperties": false,
+  "properties": {
+    "disease_names": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "clues": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "clue_descriptions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "treatment_protocols": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["drug_name"],
+          "properties": {
+            "drug_name": {
+              "type": "string"
+            },
+            "dose_mg_kg": {
+              "type": "number"
+            },
+            "volume_ml": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "messages": {
+      "type": "object",
+      "required": ["win", "loss"],
+      "properties": {
+        "win": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "loss": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

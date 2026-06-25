@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://virtual-vet.app/schemas/exam_templates.schema.json",
+  "title": "Exam Templates Schema",
+  "description": "Schema for data/exam_templates.json - exam report generation templates",
+  "type": "object",
+  "patternProperties": {
+    "^_": {}
+  },
+  "additionalProperties": {
+    "type": "object",
+    "required": ["name", "test_type", "handler", "vitals"],
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "test_type": {
+        "type": "string"
+      },
+      "handler": {
+        "type": "string"
+      },
+      "vitals": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "extra_params": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "param": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "normal_range": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "value_formula": {
+              "type": "string",
+              "minLength": 1
+            },
+            "formula": {
+              "type": "string"
+            },
+            "default_value": {
+              "type": "number"
+            },
+            "is_text_result": {
+              "type": "boolean"
+            },
+            "text_values": {
+              "type": "object"
+            },
+            "note": {
+              "type": "string"
+            },
+            "field": {
+              "type": "string"
+            }
+          },
+          "required": ["source"]
+        }
+      },
+      "thresholds": {
+        "type": "object",
+        "additionalProperties": {
+          "type": ["number", "string"]
+        }
+      },
+      "tag_rules": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["clue_id", "condition"],
+          "properties": {
+            "clue_id": {
+              "type": "string"
+            },
+            "condition": {
+              "type": "string",
+              "minLength": 1
+            },
+            "requires": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "findings_rules": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "if": {
+                "type": ["string", "boolean"]
+              },
+              "text": {
+                "type": "string"
+              },
+              "texts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "else": {
+                "type": "boolean"
+              },
+              "fs_formula": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

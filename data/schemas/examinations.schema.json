@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://virtual-vet.app/schemas/examinations.schema.json",
+  "title": "Examinations Schema",
+  "description": "Schema for data/examinations.json - exam type definitions",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "required": ["name", "category", "tier", "time_cost_min", "latency_min", "description", "params"],
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string",
+        "enum": ["基础检查", "快速检查", "核心诊断", "影像学", "金标准"]
+      },
+      "tier": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5
+      },
+      "time_cost_min": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "latency_min": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "description": {
+        "type": "string"
+      },
+      "params": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
