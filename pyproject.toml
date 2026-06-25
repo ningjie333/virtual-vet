@@ -11,6 +11,9 @@ dependencies = [
     "scipy>=1.15.3",
 ]
 
+[project.scripts]
+vet-monitor = "vet_monitor:main"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Global per-test timeout (pytest-timeout). 60s is well above the core/fast
