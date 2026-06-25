@@ -65,7 +65,7 @@
 | blood.Glu 不存在 | clinical_signs_engine | 6 条规则永不触发 | alias + 单位转换 |
 | blood.bun 不存在 | clinical_signs_engine | 2 条规则永不触发 | alias 映射 |
 
-## 待修复
+## 已修复 (追加)
 
-- [ ] blood.beta_hydroxybutyrate 不存在，ketotic_breath 规则永不触发
-- [ ] pH clamp [7.0, 7.8] 下限可能太低（正常犬 pH 最低约 7.35）
+- [x] ketotic_breath: blood.beta_hydroxybutyrate → disease.ketone_accumulation (commit b1c9139)
+- [x] pH clamp [7.0, 7.8]: 验证合理，DKA 公式 max(6.95, 7.40-anion_gap*0.4) → pH≈7.0 at max severity
