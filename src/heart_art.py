@@ -30,7 +30,13 @@ try:
     import curses
     HAS_CURSES = True
 except ImportError:
-    HAS_CURSES = False
+    # windows-curses provides curses on Windows
+    try:
+        import _curses
+        import curses
+        HAS_CURSES = True
+    except ImportError:
+        HAS_CURSES = False
 
 
 # ── ANSI color helpers ────────────────────────────────────────
