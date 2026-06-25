@@ -522,6 +522,20 @@ class ClinicalSignsEngine:
             b = getattr(self._creature, "blood", None)
             if b is None:
                 return None
+            # Shorthand mappings: rule name → actual blood attribute
+            _BLOOD_ALIASES = {
+                "Glu": "glucose_mmol_L",   # rules use mg/dL, engine stores mmol/L
+                "bun": "bun_mg_dL",        # shorthand for BUN
+            }
+            if attr in _BLOOD_ALIASES:
+                real_attr = _BLOOD_ALIASES[attr]
+                raw = getattr(b, real_attr, None)
+                if raw is None:
+                    return None
+                # Glu needs unit conversion
+                if attr == "Glu":
+                    return _mmol_to_mg_dL(float(raw))
+                return float(raw)
             raw = getattr(b, attr, None)
             if raw is None:
                 return None
