@@ -33,6 +33,196 @@ logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────
+# AST nodes for pre-compiled boolean expressions
+# ──────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class _ASTComparison:
+    """A leaf comparison: left operand, operator, right operand (as strings)."""
+    left: str
+    op: str   # ">=", "<=", "!=", "==", ">", "<"
+    right: str
+
+
+@dataclass(frozen=True)
+class _ASTBoolLiteral:
+    """A boolean literal (True / False)."""
+    value: bool
+
+
+@dataclass(frozen=True)
+class _ASTAnd:
+    """Conjunction of child nodes."""
+    children: tuple  # tuple[_ASTNode, ...]
+
+
+@dataclass(frozen=True)
+class _ASTOr:
+    """Disjunction of child nodes."""
+    children: tuple  # tuple[_ASTNode, ...]
+
+
+# Union type for type hints (Python 3.12 compatible)
+_ASTNode = _ASTComparison | _ASTBoolLiteral | _ASTAnd | _ASTOr
+
+
+# ──────────────────────────────────────────────
+# Expression compiler (string → AST, runs once)
+# ──────────────────────────────────────────────
+
+# Comparison operators ordered by length (longest first) to avoid
+# partial matches (e.g., ">=" must be tried before ">").
+_COMP_OPS = (">=", "<=", "!=", "==", ">", "<")
+
+
+def _compile_expr(expr: str) -> _ASTNode:
+    """
+    Parse a boolean expression string into an AST.
+
+    Called once per rule at engine init.  Supports:
+      - OR / AND chaining (OR has lower precedence than AND)
+      - Parentheses grouping
+      - Comparisons: >=, <=, >, <, ==, !=
+      - Boolean literals: True, False
+
+    Uses a token-based approach: first split the expression into tokens
+    (parentheses, operators, and operands), then parse the token list.
+    """
+    expr = expr.strip()
+    if not expr:
+        return _ASTBoolLiteral(False)
+
+    tokens = _tokenize(expr)
+    node, rest = _parse_or(tokens)
+    if rest:
+        logger.warning("Unparsed tail in expression: %r  tokens=%r", expr, rest)
+    return node
+
+
+def _tokenize(expr: str) -> list[str]:
+    """
+    Split expression into tokens: '(', ')', 'OR', 'AND', comparison ops,
+    and operand strings.
+
+    Handles whitespace and ensures operators are properly separated.
+    """
+    tokens: list[str] = []
+    i = 0
+    n = len(expr)
+    while i < n:
+        ch = expr[i]
+        # Skip whitespace
+        if ch in " \t":
+            i += 1
+            continue
+        # Parentheses
+        if ch == "(":
+            tokens.append("(")
+            i += 1
+            continue
+        if ch == ")":
+            tokens.append(")")
+            i += 1
+            continue
+        # Two-char comparison operators
+        if i + 1 < n and expr[i:i+2] in (">=", "<=", "!=", "=="):
+            tokens.append(expr[i:i+2])
+            i += 2
+            continue
+        # Single-char comparison operators
+        if ch in "><":
+            tokens.append(ch)
+            i += 1
+            continue
+        # Keywords: OR, AND (must be surrounded by whitespace)
+        if expr[i:i+4] == " OR " or (i + 3 == n and expr[i:] == " OR"):
+            tokens.append("OR")
+            i += 3 if i + 3 == n else 4
+            continue
+        if expr[i:i+5] == " AND " or (i + 4 == n and expr[i:] == "AND"):
+            tokens.append("AND")
+            i += 4 if i + 4 == n else 5
+            continue
+        # Operand: consume until whitespace, parenthesis, or operator
+        j = i
+        while j < n:
+            c = expr[j]
+            if c in " \t()":
+                break
+            # Check for two-char operator start
+            if j + 1 < n and expr[j:j+2] in (">=", "<=", "!=", "=="):
+                break
+            # Check for single-char operator
+            if c in "><":
+                break
+            j += 1
+        if j > i:
+            tokens.append(expr[i:j])
+            i = j
+        else:
+            # Should not happen, but skip to avoid infinite loop
+            i += 1
+    return tokens
+
+
+def _parse_or(tokens: list[str]) -> tuple[_ASTNode, list[str]]:
+    """Parse OR-separated chain from token list."""
+    left, tokens = _parse_and(tokens)
+    children = [left]
+    while tokens and tokens[0] == "OR":
+        right, tokens = _parse_and(tokens[1:])
+        children.append(right)
+    if len(children) == 1:
+        return children[0], tokens
+    return _ASTOr(tuple(children)), tokens
+
+
+def _parse_and(tokens: list[str]) -> tuple[_ASTNode, list[str]]:
+    """Parse AND-separated chain from token list."""
+    left, tokens = _parse_primary(tokens)
+    children = [left]
+    while tokens and tokens[0] == "AND":
+        right, tokens = _parse_primary(tokens[1:])
+        children.append(right)
+    if len(children) == 1:
+        return children[0], tokens
+    return _ASTAnd(tuple(children)), tokens
+
+
+def _parse_primary(tokens: list[str]) -> tuple[_ASTNode, list[str]]:
+    """Parse a primary: parenthesised group, boolean literal, or comparison."""
+    if not tokens:
+        return _ASTBoolLiteral(False), []
+
+    tok = tokens[0]
+
+    # Parenthesised group
+    if tok == "(":
+        node, rest = _parse_or(tokens[1:])
+        if rest and rest[0] == ")":
+            rest = rest[1:]
+        return node, rest
+
+    # Boolean literals
+    if tok == "True":
+        return _ASTBoolLiteral(True), tokens[1:]
+    if tok == "False":
+        return _ASTBoolLiteral(False), tokens[1:]
+
+    # Comparison: operand op operand
+    # The current token is the left operand
+    left = tok
+    if len(tokens) >= 3 and tokens[1] in _COMP_OPS:
+        op = tokens[1]
+        right = tokens[2]
+        return _ASTComparison(left, op, right), tokens[3:]
+
+    # Fallback: treat as boolean literal False
+    return _ASTBoolLiteral(False), tokens[1:]
+
+
+# ──────────────────────────────────────────────
 # Data types
 # ──────────────────────────────────────────────
 
@@ -113,6 +303,9 @@ class ClinicalSignsEngine:
 
         # Conversion note: engine stores Glu in mmol/L; symptom rules use mg/dL
         self._glu_conversion_factor = 18.018  # mmol/L → mg/dL
+
+        # Pre-compiled AST cache: rule_string → _ASTNode
+        self._ast_cache: dict[str, _ASTNode] = {}
 
     # ── Public API ────────────────────────────────────────────────
 
@@ -387,92 +580,39 @@ class ClinicalSignsEngine:
 
         return None
 
-    # ── Boolean expression engine ───────────────────────────────
+    # ── Boolean expression engine (AST-based) ───────────────────
+
+    def _get_ast(self, expr: str) -> _ASTNode:
+        """Return cached AST for a rule string, compiling on first access."""
+        ast = self._ast_cache.get(expr)
+        if ast is None:
+            ast = _compile_expr(expr)
+            self._ast_cache[expr] = ast
+        return ast
 
     def _eval_boolean_expr(self, expr: str, state: dict, disease: Any) -> bool:
         """
-        Evaluate a simple boolean expression string.
+        Evaluate a boolean expression string using a pre-compiled AST.
 
-        Supports:
-          - OR / AND chaining
-          - Parentheses grouping
-          - Comparisons: >=, <=, >, <, ==, !=
-          - Threshold references (e.g., bun_uremia → resolved from species thresholds)
-
-        Examples:
-          "BUN > bun_uremia OR K > k_hyperkalemia"
-          "HCT < hct_anemia OR (PaO2 < pao2_hypoxemia AND pH < ph_metabolic_acidosis)"
+        The expression is compiled once on first access and cached.
+        Subsequent calls only traverse the AST (no string parsing).
         """
         if not expr or not expr.strip():
             return False
+        ast = self._get_ast(expr.strip())
+        return self._eval_ast(ast, state, disease)
 
-        expr = expr.strip()
-
-        # ── OR handling ───────────────────────────────────────────
-        or_result = False
-        any_or = False
-        or_depth = 0
-        part_start = 0
-        i = 0
-        while i < len(expr):
-            # Lookahead: detect " OR " or "AND " at current position (before whitespace skip)
-            if i + 4 <= len(expr) and expr[i:i+4] == " OR ":
-                if or_depth == 0:
-                    any_or = True
-                    or_result = or_result or self._eval_boolean_expr(
-                        expr[part_start:i], state, disease
-                    )
-                    i += 4  # skip " OR "
-                    part_start = i
-                    continue
-            elif i + 5 <= len(expr) and expr[i:i+5] == " AND ":
-                pass  # AND is handled below; don't consume here
-            elif expr[i] == "(":
-                or_depth += 1
-            elif expr[i] == ")":
-                or_depth -= 1
-            i += 1
-
-        if any_or:
-            # Evaluate final segment and return
-            if part_start < len(expr):
-                or_result = or_result or self._eval_boolean_expr(
-                    expr[part_start:], state, disease
-                )
-            return or_result
-
-        # ── AND handling (only when no OR present) ────────────────
-        and_result = True
-        any_and = False
-        and_depth = 0
-        part_start = 0
-        i = 0
-        while i < len(expr):
-            if i + 5 <= len(expr) and expr[i:i+5] == " AND ":
-                if and_depth == 0:
-                    any_and = True
-                    and_result = and_result and self._eval_boolean_expr(
-                        expr[part_start:i], state, disease
-                    )
-                    i += 5  # skip " AND "
-                    part_start = i
-                    continue
-            elif expr[i] == "(":
-                and_depth += 1
-            elif expr[i] == ")":
-                and_depth -= 1
-            i += 1
-
-        if any_and and part_start < len(expr):
-            # Only evaluate final segment if we found at least one AND
-            and_result = and_result and self._eval_boolean_expr(
-                expr[part_start:], state, disease
-            )
-        elif not any_and:
-            # Single term (no AND): evaluate as one comparison
-            return self._eval_comparison_expr(expr, state, disease)
-
-        return and_result
+    def _eval_ast(self, node: _ASTNode, state: dict, disease: Any) -> bool:
+        """Recursively evaluate a pre-compiled AST node."""
+        if isinstance(node, _ASTBoolLiteral):
+            return node.value
+        if isinstance(node, _ASTComparison):
+            return self._eval_comparison(node.left, node.op, node.right, state, disease)
+        if isinstance(node, _ASTOr):
+            return any(self._eval_ast(c, state, disease) for c in node.children)
+        if isinstance(node, _ASTAnd):
+            return all(self._eval_ast(c, state, disease) for c in node.children)
+        return False
 
     def _eval_comparison_expr(self, expr: str, state: dict, disease: Any) -> bool:
         """Evaluate a single comparison expression like 'BUN > 80' or 'K < 6.5'."""
