@@ -302,6 +302,11 @@ class TrendWidget(Static):
 class PatientMonitor(App):
     """Real-time patient monitor with animated heart and vital signs."""
 
+    BINDINGS = [
+        ("q", "quit", "Quit"),
+        ("space", "toggle_pause", "Pause/Resume"),
+    ]
+
     CSS = """
     Screen {
         background: #0a0e14;
@@ -364,6 +369,7 @@ class PatientMonitor(App):
         super().__init__(**kwargs)
         self._creature = creature
         self._disease = disease_name
+        self._paused = False
 
     def compose(self) -> ComposeResult:
         c = self._creature
@@ -401,10 +407,14 @@ class PatientMonitor(App):
     def on_ready(self) -> None:
         self.set_interval(1.0, self._update_time)
 
+    def action_toggle_pause(self) -> None:
+        self._paused = not self._paused
+
     def _update_time(self) -> None:
         t = self._creature.current_time_s
+        status = "[red]PAUSED[/]" if self._paused else "[green]RUNNING[/]"
         footer = self.query_one("#footer-bar")
-        footer.update(f"  Disease: [yellow]{self._disease}[/]  |  Time: {t/60:.0f}h {(t%3600)/60:.0f}m  |  Q=quit  Space=pause")
+        footer.update(f"  Disease: [yellow]{self._disease}[/]  |  {status}  |  Time: {t/60:.0f}h {(t%3600)/60:.0f}m  |  Q=quit  Space=pause")
 
 
 # ── CLI ───────────────────────────────────────────────────────
