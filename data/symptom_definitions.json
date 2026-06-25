@@ -813,9 +813,9 @@
       "rule_type": "multi_parameter",
       "params": [
         "pH",
-        "blood.beta_hydroxybutyrate"
+        "disease.ketone_accumulation"
       ],
-      "rule": "pH < 7.25 AND blood.beta_hydroxybutyrate > 3.0",
+      "rule": "pH < 7.25 AND disease.ketone_accumulation > 0.3",
       "clue_id": "ketotic_breath",
       "description": "呼出气有烂苹果味（丙酮）。DKA的示病症状。",
       "organ_system": "endocrine",
