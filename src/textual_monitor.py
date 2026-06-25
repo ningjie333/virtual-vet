@@ -162,7 +162,8 @@ class VitalWidget(Static):
     """Single vital sign with color-coded value."""
 
     def __init__(self, label: str, unit: str, creature: Any,
-                 getter: str, lo: float, hi: float, crit_lo: float, crit_hi: float, **kwargs):
+                 getter: str, lo: float, hi: float, crit_lo: float, crit_hi: float,
+                 multiplier: float = 1.0, **kwargs):
         super().__init__(**kwargs)
         self._label = label
         self._unit = unit
@@ -172,6 +173,7 @@ class VitalWidget(Static):
         self._hi = hi
         self._crit_lo = crit_lo
         self._crit_hi = crit_hi
+        self._multiplier = multiplier
 
     def on_mount(self) -> None:
         self.set_interval(0.25, self.refresh)
@@ -182,7 +184,7 @@ class VitalWidget(Static):
             obj = self._creature
             for p in parts:
                 obj = getattr(obj, p)
-            value = float(obj)
+            value = float(obj) * self._multiplier
         except (AttributeError, TypeError):
             value = 0.0
 
@@ -377,7 +379,7 @@ class PatientMonitor(App):
                 with Vertical(id="vitals-panel"):
                     yield VitalWidget("  HR", "bpm", c, "heart.heart_rate", 60, 140, 40, 180, classes="vital-row")
                     yield VitalWidget(" MAP", "mmHg", c, "heart.mean_arterial_pressure", 70, 120, 50, 160, classes="vital-row")
-                    yield VitalWidget("SpO2", "%", c, "blood.arterial_saturation", 95, 100, 80, 100, classes="vital-row")
+                    yield VitalWidget("SpO2", "%", c, "blood.arterial_saturation", 95, 100, 80, 100, multiplier=100, classes="vital-row")
                     yield VitalWidget("Temp", "°C", c, "blood.core_temperature_C", 37.5, 39.5, 36, 40.5, classes="vital-row")
                     yield VitalWidget("  RR", "br/m", c, "lung.respiratory_rate", 10, 30, 5, 50, classes="vital-row")
 
