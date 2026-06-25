@@ -149,8 +149,10 @@ class BloodCompartment:
         """
         计算血液氧含量 (mL O2/100mL blood)
         氧含量 = 血红蛋白 × 1.34 × 饱和度 + 溶解氧(0.003 × PO2)
+        Hb 从 HCT 推算：Hb(g/dL) ≈ HCT(%) / 3.1（犬）
         """
-        Hb_g_dL = 14.0 if is_arterial else 14.0  # 犬血红蛋白 g/dL
+        hct_pct = (self.red_cell_volume_ml / self.total_volume_ml) * 100 if self.total_volume_ml > 0 else 45.0
+        Hb_g_dL = hct_pct / 3.1  # 犬 HCT/Hb ≈ 3.1
         O2_bound = Hb_g_dL * 1.34 * saturation
         O2_dissolved = 0.003 * PO2_mmHg
         return O2_bound + O2_dissolved

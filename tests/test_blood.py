@@ -5,21 +5,25 @@ Unit tests for BloodCompartment class in src/blood.py
 from src.blood import BloodCompartment
 
 
-# Expected O2 content formula: Hb(14) * 1.34 * sat + 0.003 * PO2
+# Hb derived from HCT: default plasma_fraction=0.55 → HCT=45% → Hb=45/3.1≈14.52
 
 def test_arterial_O2_content_normal():
-    """Normal arterial: PO2=95, sat=0.97, Hb=14 => ~18.47 mL O2/100mL"""
+    """Normal arterial: PO2=95, sat=0.97, Hb from HCT → ~19.07 mL O2/100mL"""
     blood = BloodCompartment(total_volume_ml=1000)
+    hct = (blood.red_cell_volume_ml / blood.total_volume_ml) * 100  # 45%
+    hb = hct / 3.1
     result = blood.get_arterial_O2_content()
-    expected = 14.0 * 1.34 * 0.97 + 0.003 * 95.0  # = 18.4702
+    expected = hb * 1.34 * 0.97 + 0.003 * 95.0
     assert abs(result - expected) < 0.01, f"Expected {expected}, got {result}"
 
 
 def test_venous_O2_content_normal():
-    """Normal venous: PO2=40, sat=0.70, Hb=14 => ~12.88 mL O2/100mL"""
+    """Normal venous: PO2=40, sat=0.70, Hb from HCT → ~13.36 mL O2/100mL"""
     blood = BloodCompartment(total_volume_ml=1000)
+    hct = (blood.red_cell_volume_ml / blood.total_volume_ml) * 100
+    hb = hct / 3.1
     result = blood.get_venous_O2_content()
-    expected = 14.0 * 1.34 * 0.70 + 0.003 * 40.0  # = 12.876
+    expected = hb * 1.34 * 0.70 + 0.003 * 40.0
     assert abs(result - expected) < 0.01, f"Expected {expected}, got {result}"
 
 
@@ -48,10 +52,12 @@ def test_O2_content_hyperoxia():
 
 
 def test_O2_content_formula():
-    """Verify the formula: Hb * 1.34 * sat + 0.003 * PO2 (Hb=14)"""
+    """Verify the formula: Hb(from HCT) * 1.34 * sat + 0.003 * PO2"""
     blood = BloodCompartment(total_volume_ml=1000)
+    hct = (blood.red_cell_volume_ml / blood.total_volume_ml) * 100
+    hb = hct / 3.1
     result = blood.calculate_O2_content(PO2_mmHg=95.0, saturation=0.97)
-    expected = 14.0 * 1.34 * 0.97 + 0.003 * 95.0
+    expected = hb * 1.34 * 0.97 + 0.003 * 95.0
     assert abs(result - expected) < 1e-6, f"Expected {expected}, got {result}"
 
 
