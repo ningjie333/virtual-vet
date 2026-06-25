@@ -292,6 +292,25 @@ def snapshot(disease_name: str = "pneumonia", severity: str = "moderate",
     return "\n".join(output_lines)
 
 
+# ── Disease aliases ────────────────────────────────────────────
+
+_DISEASE_ALIASES = {
+    "dka": "diabetic_ketoacidosis",
+    "arf": "acute_renal_failure",
+    "dcm": "dilated_cardiomyopathy",
+    "gdv": "gastric_dilatation_volvulus",
+    "imha": "immune_mediated_hemolytic_anemia",
+    "dic": "disseminated_intravascular_coagulation",
+    "ckd": "ckd_anemia",
+    "ivdd": "ivdd",
+    "bloat": "gastric_dilatation_volvulus",
+}
+
+
+def _resolve_disease(name: str) -> str:
+    return _DISEASE_ALIASES.get(name.lower(), name)
+
+
 # ── CLI ───────────────────────────────────────────────────────
 
 def main():
@@ -305,10 +324,12 @@ def main():
     parser.add_argument("--beats", type=int, default=3, help="Number of heartbeat cycles to show")
     args = parser.parse_args()
 
+    disease = _resolve_disease(args.disease)
+
     if args.once:
-        print(snapshot(args.disease, args.severity, args.steps, args.beats))
+        print(snapshot(disease, args.severity, args.steps, args.beats))
     else:
-        run_interactive(args.disease, args.severity)
+        run_interactive(disease, args.severity)
 
 
 if __name__ == "__main__":
