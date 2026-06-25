@@ -331,11 +331,70 @@ def _curses_main(stdscr: Any, creature_fn: Any) -> None:
         time.sleep(beat_period / 12)
 
 
-def run_interactive(disease_name: str = "pneumonia", severity: str = "moderate") -> None:
-    if not HAS_CURSES:
-        print("curses not available.", file=sys.stderr)
-        sys.exit(1)
+def _ansi_loop(creature_fn: Any) -> None:
+    """ANSI-based interactive loop (works on Windows Terminal)."""
+    import time
+    import sys
 
+    # Platform-specific non-blocking key read
+    if sys.platform == "win32":
+        import msvcrt
+        def _key_ready():
+            return msvcrt.kbhit()
+        def _read_key():
+            return msvcrt.getch().decode("utf-8", errors="ignore").lower()
+    else:
+        import select
+        def _key_ready():
+            return select.select([sys.stdin], [], [], 0)[0]
+        def _read_key():
+            return sys.stdin.read(1).lower()
+
+    creature = creature_fn()
+    phase = 0
+    paused = False
+
+    # Hide cursor
+    print("\033[?25l", end="", flush=True)
+
+    try:
+        while True:
+            # Check for keypress (non-blocking)
+            if _key_ready():
+                key = _read_key()
+                if key == "q":
+                    break
+                elif key == " ":
+                    paused = not paused
+                elif key == "r":
+                    creature = creature_fn()
+
+            if not paused:
+                creature.step()
+                phase = (phase + 1) % 12
+
+            # Render
+            lines = render_heart_display(creature, phase)
+            output = "\033[H"
+            for line in lines:
+                output += line + "\033[K\n"
+
+            hr = getattr(creature.heart, "heart_rate", 80)
+            status = "PAUSED" if paused else "BEATING"
+            output += f"\033[K  HR={hr:.0f} | {status} | Q=quit Space=pause R=reset\033[K"
+
+            print(output, end="", flush=True)
+
+            # Sleep based on HR
+            beat_period = 60.0 / max(hr, 1)
+            time.sleep(beat_period / 12)
+
+    finally:
+        # Show cursor
+        print("\033[?25h", end="", flush=True)
+
+
+def run_interactive(disease_name: str = "pneumonia", severity: str = "moderate") -> None:
     from src.simulation import VirtualCreature
     from src.diseases import create_disease
 
@@ -345,7 +404,12 @@ def run_interactive(disease_name: str = "pneumonia", severity: str = "moderate")
         c.attach_disease(d)
         return c
 
-    curses.wrapper(lambda s: _curses_main(s, make))
+    if HAS_CURSES:
+        curses.wrapper(lambda s: _curses_main(s, make))
+    else:
+        # ANSI fallback for Windows
+        print("\033[2J", end="", flush=True)  # clear screen
+        _ansi_loop(make)
 
 
 # ── Snapshot ──────────────────────────────────────────────────
