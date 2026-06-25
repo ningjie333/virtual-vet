@@ -350,7 +350,8 @@ def build_dashboard(creature: Any, width: int = 78, use_color: bool = True) -> l
             state["RR"] = getattr(lung, "respiratory_rate", None)
             po2 = getattr(creature.blood, "arterial_PO2_mmHg", None)
             if po2 is not None:
-                state["SpO2"] = max(0, min(100, (po2 - 40) / 20 * 50 + 50)) if po2 > 40 else po2
+                # Hill equation: SO2 = PO2^n / (P50^n + PO2^n), n=2.7, P50=26.6
+                state["SpO2"] = 100 * po2**2.7 / (26.6**2.7 + po2**2.7) if po2 > 0 else 0
         blood = getattr(creature, "blood", None)
         if blood:
             state["Temp"] = getattr(blood, "core_temperature_C", None)
@@ -515,19 +516,28 @@ def snapshot(disease_name: str = "pneumonia", severity: str = "moderate",
     return "\n".join(lines)
 
 
-# ── CLI ───────────────────────────────────────────────────────
+# ── CLI entry point ───────────────────────────────────────────
 
-if __name__ == "__main__":
+def main():
+    # Ensure project root is on sys.path (needed when installed as console_scripts)
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+
     import argparse
-    parser = argparse.ArgumentParser(description="Virtual Vet ASCII Dashboard")
-    parser.add_argument("--once", action="store_true", help="Single snapshot mode")
+    parser = argparse.ArgumentParser(prog="vet-monitor", description="Virtual Vet ASCII patient monitor")
+    parser.add_argument("--once", action="store_true", help="Single snapshot (pipe-friendly)")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors")
-    parser.add_argument("--disease", default="pneumonia", help="Disease name")
+    parser.add_argument("--disease", default="pneumonia", help="Disease name (pneumonia, dka, ckd, etc.)")
     parser.add_argument("--severity", default="moderate", help="mild/moderate/severe")
-    parser.add_argument("--steps", type=int, default=600, help="Steps before snapshot")
+    parser.add_argument("--steps", type=int, default=600, help="Simulation steps before snapshot")
     args = parser.parse_args()
 
     if args.once:
         print(snapshot(args.disease, args.severity, args.steps, not args.no_color))
     else:
         run_interactive(args.disease, args.severity)
+
+
+if __name__ == "__main__":
+    main()
