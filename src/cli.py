@@ -36,6 +36,7 @@ examples:
     p_dash.add_argument("--severity", default="moderate", choices=["mild", "moderate", "severe"])
     p_dash.add_argument("--steps", type=int, default=0, help="Pre-simulate N steps")
     p_dash.add_argument("--live", action="store_true", help="Real-time interactive mode (Textual)")
+    p_dash.add_argument("--once", action="store_true", help="Alias for snapshot mode (default)")
     p_dash.add_argument("--no-color", action="store_true", help="Disable ANSI colors")
 
     # ── heart ─────────────────────────────────────────────────
