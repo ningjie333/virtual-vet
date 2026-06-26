@@ -45,8 +45,8 @@ examples:
     p_heart.add_argument("--severity", default="moderate", choices=["mild", "moderate", "severe"])
     p_heart.add_argument("--steps", type=int, default=0, help="Pre-simulate N steps")
     p_heart.add_argument("--style", default="life",
-                         choices=["life", "realistic", "ecg", "simple"],
-                         help="Animation style (default: life)")
+                         choices=["life"],
+                         help="Animation style (only 'life' supported)")
     p_heart.add_argument("--once", action="store_true", help="Snapshot mode")
     p_heart.add_argument("--frames", type=int, default=10, help="Frames in snapshot mode")
 
@@ -96,28 +96,14 @@ def _cmd_dashboard(args):
 
 def _cmd_heart(args):
     from src.cli_common import create_creature, resolve_disease
+    from src.heart_v2 import snapshot, run_interactive
+
     disease = resolve_disease(args.disease)
     creature = create_creature(disease, args.severity, steps=args.steps)
 
     if args.once:
-        if args.style == "life":
-            from src.heart_v2 import snapshot
-        elif args.style == "realistic":
-            from src.heart_realistic import snapshot
-        elif args.style == "ecg":
-            from src.heart_art import snapshot
-        else:
-            from src.ascii_heart import snapshot
         print(snapshot(disease, args.severity, 0, args.frames))
     else:
-        if args.style == "life":
-            from src.heart_v2 import run_interactive
-        elif args.style == "realistic":
-            from src.heart_realistic import run_interactive
-        elif args.style == "ecg":
-            from src.heart_art import run_interactive
-        else:
-            from src.ascii_heart import run_interactive
         run_interactive(disease, args.severity)
 
 
