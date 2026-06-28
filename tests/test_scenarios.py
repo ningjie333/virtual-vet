@@ -441,38 +441,42 @@ class TestDeterminePhase:
 
     def test_determine_phase_stable(self, healthy_creature):
         """Healthy creature should return 'stable'."""
-        from game.action_system import determine_phase
-        assert determine_phase(healthy_creature) == "stable"
+        from src.clinical_interpreter import DefaultClinicalInterpreter
+        interp = DefaultClinicalInterpreter()
+        assert interp.phase(interp.snapshot(healthy_creature)) == "stable"
 
     def test_determine_phase_moderate_pneumonia_fixture(self, pneumonia_creature):
         """The moderate-pneumonia scenario fixture should match its current phase contract."""
-        from game.action_system import determine_phase
-        phase = determine_phase(pneumonia_creature)
+        from src.clinical_interpreter import DefaultClinicalInterpreter
+        interp = DefaultClinicalInterpreter()
+        phase = interp.phase(interp.snapshot(pneumonia_creature))
         assert phase == "worsening"
 
     def test_moderate_pneumonia_coarse_dt_no_spurious_bradycardia(self):
         """Coarse presentation-step pneumonia should not artifactually collapse HR."""
         from src.simulation import VirtualCreature
         from src.diseases import create_disease
-        from game.action_system import determine_phase
+        from src.clinical_interpreter import DefaultClinicalInterpreter
 
+        interp = DefaultClinicalInterpreter()
         e = VirtualCreature(body_weight_kg=20.0, dt=10.0)
         e.attach_disease(create_disease("pneumonia", severity="moderate"))
         e.simulate(2.0)
 
         assert e.heart.heart_rate >= 60.0
-        assert determine_phase(e) == "stable"
+        assert interp.phase(interp.snapshot(e)) == "stable"
 
     def test_determine_phase_critical(self):
         """Creature with severe abnormalities should return 'critical' or 'moribund'."""
         from src.simulation import VirtualCreature
         from src.diseases import create_disease
-        from game.action_system import determine_phase
+        from src.clinical_interpreter import DefaultClinicalInterpreter
+        interp = DefaultClinicalInterpreter()
         e = VirtualCreature(body_weight_kg=20.0, dt=15.0)
         d = create_disease("pneumonia", severity="severe")
         e.attach_disease(d)
         e.simulate(30.0)  # 初始值已校准，30min 足够达到 critical
-        phase = determine_phase(e)
+        phase = interp.phase(interp.snapshot(e))
         assert phase in ("critical", "moribund")
 
     @pytest.mark.slower
@@ -480,12 +484,13 @@ class TestDeterminePhase:
         """Creature near death should return 'moribund'."""
         from src.simulation import VirtualCreature
         from src.diseases import create_disease
-        from game.action_system import determine_phase
+        from src.clinical_interpreter import DefaultClinicalInterpreter
+        interp = DefaultClinicalInterpreter()
         e = VirtualCreature(body_weight_kg=20.0, dt=5.0)
         d = create_disease("pneumonia", severity="severe")
         e.attach_disease(d)
         e.simulate(30.0)  # 初始值已校准，30min 足够达到 moribund
-        phase = determine_phase(e)
+        phase = interp.phase(interp.snapshot(e))
         assert phase in ("critical", "moribund")
 
 
@@ -528,27 +533,6 @@ class TestDeathTimer:
         state = check_death(state, "stable")
         assert state.death_timer is None
         assert state.phase == "playing"
-
-
-# =============================================================================
-#  ACTION SYSTEM — DO2 COMPUTATION TESTS
-# =============================================================================
-
-class TestComputeDO2:
-
-    def test_compute_DO2_healthy(self, healthy_creature):
-        """Healthy dog should have DO2 near 1.0."""
-        from game.action_system import compute_DO2
-        do2 = compute_DO2(healthy_creature)
-        assert 0.5 <= do2 <= 1.0
-
-    def test_compute_DO2_hypoxic(self, pneumonia_creature):
-        """Dog with low SpO2 should have lower DO2."""
-        from game.action_system import compute_DO2
-        do2 = compute_DO2(pneumonia_creature)
-        # Pneumonia dog with moderate severity — DO2 should be reasonable
-        # (error-driven HR compensates, so DO2 may be near or slightly above 1.0)
-        assert 0.0 <= do2 <= 1.1
 
 
 # =============================================================================

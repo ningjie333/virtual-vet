@@ -6,6 +6,9 @@ Treatment — 治疗判定与药物协议执行。
   - 诊断正确 → 执行对应药物协议（而非直接宣布胜利）
   - 诊断错误 → 返回误诊提示
   - 支持治疗 → 补液，不结束游戏
+
+pharmacology 状态写操作通过 `runtime.treatment`（TreatmentProtocol），
+本模块只保留疾病→药物协议映射（_DRUG_PROTOCOL）与游戏胜负判定逻辑。
 """
 
 from __future__ import annotations
@@ -13,10 +16,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from game.action_system import GameState
+    from game.runtime import GameRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -30,32 +34,30 @@ _WIN_MESSAGES: dict[str, str] = _DISEASE_DATA["messages"]["win"]
 _LOSS_MESSAGES: dict[str, str] = _DISEASE_DATA["messages"]["loss"]
 
 
-def _ensure_pharmacology(engine) -> None:
-    """确保引擎已挂载 PharmacologyState。"""
-    from src.pharmacology import PharmacologyState
-
-    if not hasattr(engine, "pharmacology") or engine.pharmacology is None:
-        engine.pharmacology = PharmacologyState(weight_kg=engine.w)
-
-
-def _administer_protocol(engine, disease_name: str) -> list[str]:
+def _administer_protocol(engine, disease_name: str, runtime: "GameRuntime") -> list[str]:
     """
     根据疾病名称执行对应的药物协议。
+
+    通过 runtime.treatment（TreatmentProtocol）写入 pharmacology 状态，
+    不再直接调用 engine.pharmacology.administer_drug。
 
     Returns:
         已给药物名称列表。
     """
-    _ensure_pharmacology(engine)
     protocol = _DRUG_PROTOCOL.get(disease_name, [])
     given: list[str] = []
     for entry in protocol:
         if "volume_ml" in entry:
-            engine.pharmacology.administer_drug(
-                entry["drug_name"], volume_ml=entry["volume_ml"]
+            runtime.treatment.administer_drug(
+                engine,
+                entry["drug_name"],
+                volume_ml=entry["volume_ml"],
             )
         else:
-            engine.pharmacology.administer_drug(
-                entry["drug_name"], dose_mg_kg=entry["dose_mg_kg"]
+            runtime.treatment.administer_drug(
+                engine,
+                entry["drug_name"],
+                dose_mg_kg=entry["dose_mg_kg"],
             )
         given.append(entry["drug_name"])
     return given
@@ -77,7 +79,12 @@ def _resolve_guesses(disease_guess: str | list[str]) -> list[str]:
     return [disease_guess] if disease_guess else []
 
 
-def apply_treatment(game_state: GameState, disease_guess: str | list[str]) -> dict:
+def apply_treatment(
+    game_state: GameState,
+    disease_guess: str | list[str],
+    *,
+    runtime: Optional["GameRuntime"] = None,
+) -> dict:
     """
     应用治疗，判定胜负（Q4: 多病支持）。
 
@@ -90,6 +97,7 @@ def apply_treatment(game_state: GameState, disease_guess: str | list[str]) -> di
     Args:
         game_state: 当前游戏状态
         disease_guess: 玩家选择的疾病名称（str 或 list[str]）
+        runtime: GameRuntime 实例（用于 pharmacology 网关）；None 时回退到 default_runtime()
 
     Returns:
         {
@@ -103,6 +111,10 @@ def apply_treatment(game_state: GameState, disease_guess: str | list[str]) -> di
             "comorbidity_correct": bool | None,  # 合并症是否猜对 (None=无合并症)
         }
     """
+    if runtime is None:
+        from game.runtime import default_runtime
+        runtime = default_runtime()
+
     guesses = _resolve_guesses(disease_guess)
     primary = game_state.disease_name
     all_targets = game_state.disease_names  # [primary, comorbidity1, ...]
@@ -118,7 +130,7 @@ def apply_treatment(game_state: GameState, disease_guess: str | list[str]) -> di
 
     # ── supportive_care 特殊处理 ──
     if len(guesses) == 1 and guesses[0] == "supportive_care":
-        _apply_supportive_care(game_state)
+        _apply_supportive_care(game_state, runtime)
         return {
             "success": True,
             "correct": False,
@@ -134,7 +146,7 @@ def apply_treatment(game_state: GameState, disease_guess: str | list[str]) -> di
     drugs_given: list[str] = []
     for guess in guesses:
         if guess in _DRUG_PROTOCOL:
-            drugs_given.extend(_administer_protocol(game_state.engine, guess))
+            drugs_given.extend(_administer_protocol(game_state.engine, guess, runtime))
 
     # ── Q4.2=B: win 判定 — 主诊断必须对 ──
     if primary_correct:
@@ -170,7 +182,7 @@ def apply_treatment(game_state: GameState, disease_guess: str | list[str]) -> di
     }
 
 
-def _apply_supportive_care(game_state: GameState) -> None:
+def _apply_supportive_care(game_state: GameState, runtime: "GameRuntime") -> None:
     """
     支持治疗：静脉补液 200 mL。
 
@@ -178,9 +190,14 @@ def _apply_supportive_care(game_state: GameState) -> None:
       - 增加循环血容量 → Frank-Starling 机制提升 SV → MAP 暂时改善
       - 肾脏灌注可能短暂改善 → 尿量可能略增
       - 不解决根本疾病，引擎继续推进疾病进程
+
+    通过 runtime.treatment 写入 pharmacology 状态。
     """
-    _ensure_pharmacology(game_state.engine)
-    game_state.engine.pharmacology.administer_drug("fluid_bolus", volume_ml=200.0)
+    runtime.treatment.administer_drug(
+        game_state.engine,
+        "fluid_bolus",
+        volume_ml=200.0,
+    )
     logger.info("支持治疗: 补液 200mL")
 
 

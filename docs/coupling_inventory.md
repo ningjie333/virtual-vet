@@ -267,6 +267,15 @@ not a defect to fix.
 > two must be combined — either alone is insufficient (Phase-1-only broke
 > blood_loss_severe twin-run; Phase-2-only didn't suppress the MAP cycle).
 > The RCA below is preserved for the record.
+>
+> **Naming note (R7, 2026-06-28):** references to `determine_phase` below
+> describe the function as it existed at fix time. The function has since
+> been deleted from `game/action_system.py`; its logic now lives in
+> `DefaultClinicalInterpreter.phase(snapshot)`. The test method names
+> `test_determine_phase_*` in `tests/test_scenarios.py` are retained as
+> historical names — they now invoke the interpreter seam
+> (`interp.phase(interp.snapshot(engine))`) rather than the deleted
+> free function.
 
 **Symptom (pre-fix):** `test_scenarios.test_determine_phase_moderate_pneumonia_fixture`
 asserts phase == "worsening" but gets "moribund". Root cause is a **period-2

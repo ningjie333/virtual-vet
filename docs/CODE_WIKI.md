@@ -1064,23 +1064,21 @@ class LifePhase(Enum):
 |-------------|------|
 | `examine` | 调 `interpreter.report()` 生成报告，按 `latency_min` 入队 `PendingReport` 或直接入 `state.reports` |
 | `treat` | 调 `apply_treatment`，正确则 `phase="won"` |
-| `administer_drug` | 挂载 `PharmacologyState` 并给药 |
+| `administer_drug` | 通过 `runtime.treatment.administer_drug(...)` 给药（pharmacology 懒挂载由 `DefaultTreatment` 内部处理） |
 | `wait` | 消耗 10 分钟 |
 
-**流程**：推进 `time_elapsed_min` → `runtime.advance_and_refresh(engine, time_cost)` → `_process_pending_reports` 处理延迟报告到期 → `_apply_night_modifiers` 夜间 HR 修正 → `interpreter.phase(snapshot)` 阶段判定 → `check_death` 死亡检测 → 时间耗尽检测。
+**流程**：推进 `time_elapsed_min` → `runtime.advance_and_refresh(engine, time_cost)` → `_process_pending_reports` 处理延迟报告到期 → `runtime.modifier.apply_night_modifiers(state)` 夜间 HR 修正 → `interpreter.phase(snapshot)` 阶段判定 → `check_death` 死亡检测 → 时间耗尽检测。
 
 **返回结构**：`{success, time_cost_min, time_elapsed_min, time_remaining_min, action_started_at_s, state_time_s, result, new_reports, pending_count, phase, medical_phase, engine_summary}`。
 
 **其他函数**：
 - `check_death(state, medical_phase) -> GameState` — 濒死倒计时（`MORIBUND_TURNS_REMAINING`）+ 死亡判定
-- `determine_phase(engine) -> str` — **Legacy 兼容**，新代码应用 `runtime.interpreter.phase`
-- `_engine_summary(engine, elapsed_min) -> dict` — **Legacy 兼容**
 - `_process_pending_reports(state, elapsed_min) -> list[dict]` — 延迟报告到期处理
 - `_annotate_report_timing(report, *, observed_at_s, report_basis, available_after_min)` — 报告时序注解
-- `_apply_night_modifiers(state)` — 夜间心率修正（22:00-06:00 HR×0.85）
-- `compute_DO2(engine)` — 氧输送指数计算
 
 **时间预算常量**：`TIME_BUDGET_EASY=120 / TIME_BUDGET_NORMAL=90 / TIME_BUDGET_HARD=60` 分钟。
+
+> R7 (2026-06-28): 已删除 `compute_DO2` / `determine_phase` / `_engine_summary` / `_apply_night_modifiers` 四个 legacy/死代码函数。临床 phase/summary/report 一律通过 `runtime.interpreter` 获取；夜间修正通过 `runtime.modifier`（`GameplayModifierProtocol`）；给药通过 `runtime.treatment`（`TreatmentProtocol`）。
 
 ### 6.4 `game/case_generator.py` — 病例生成器
 

@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from game.gameplay_modifier import DefaultGameplayModifier, GameplayModifierProtocol
 from game.runtime import GameRuntime
+from game.treatment_protocol import DefaultTreatment, TreatmentProtocol
 from src.clinical_interpreter import DefaultClinicalInterpreter
 from src.clinical_signs_engine import ClinicalSignsEngine
 from src.engine_advancer import EngineAdvancerProtocol, PhysicalMinuteAdvancer
@@ -29,6 +31,8 @@ def build_external_interpretation_bundle(
     species: str | None = None,
     symptom_definitions: dict | None = None,
     advancer: EngineAdvancerProtocol | None = None,
+    modifier: GameplayModifierProtocol | None = None,
+    treatment: TreatmentProtocol | None = None,
 ) -> ExternalInterpretationBundle:
     """
     Build an outer-owned interpretation stack for one engine.
@@ -54,6 +58,8 @@ def build_external_interpretation_bundle(
         advancer=advancer or PhysicalMinuteAdvancer(),
         interpreter=interpreter,
         refresher=refresher,
+        modifier=modifier or DefaultGameplayModifier(),
+        treatment=treatment or DefaultTreatment(),
     )
     return ExternalInterpretationBundle(
         signs_engine=signs_engine,

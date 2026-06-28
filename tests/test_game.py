@@ -799,31 +799,33 @@ class TestDrugTreatmentProtocol:
 
 
 # =============================================================================
-#  SECTION 7: Action System — determine_phase & check_death
+#  SECTION 7: Action System — clinical phase & check_death
 # =============================================================================
 
 class TestDeterminePhase:
 
     def test_healthy_dog_is_stable(self, healthy_creature):
-        from game.action_system import determine_phase
-        phase = determine_phase(healthy_creature)
+        from src.clinical_interpreter import DefaultClinicalInterpreter
+        interp = DefaultClinicalInterpreter()
+        phase = interp.phase(interp.snapshot(healthy_creature))
         assert phase == "stable"
 
     def test_arf_dog_phase_matches_fixture_contract(self, arf_creature_for_phase):
         """Moderate-ARF phase fixture should map to the current semantic contract."""
-        from game.action_system import determine_phase
-        phase = determine_phase(arf_creature_for_phase)
+        from src.clinical_interpreter import DefaultClinicalInterpreter
+        interp = DefaultClinicalInterpreter()
+        phase = interp.phase(interp.snapshot(arf_creature_for_phase))
         assert phase == "moribund"
 
     def test_all_phases_valid_value(self):
-        """determine_phase must return one of the four valid phases."""
-        # We test with creatures; the set of valid returns is fixed
+        """Clinical phase must return one of the four valid phases."""
         valid = {"stable", "worsening", "critical", "moribund"}
-        from game.action_system import determine_phase
+        from src.clinical_interpreter import DefaultClinicalInterpreter
         from src.simulation import VirtualCreature
+        interp = DefaultClinicalInterpreter()
         e = VirtualCreature(body_weight_kg=20.0)
         e.simulate(1.0)
-        assert determine_phase(e) in valid
+        assert interp.phase(interp.snapshot(e)) in valid
 
 
 class TestCheckDeath:
@@ -986,20 +988,6 @@ class TestProcessAction:
         result = process_action(state, "wait", runtime=game_runtime)
         assert result["medical_phase"] in ("stable", "worsening", "critical", "moribund")
         assert advancer.calls == [10.0]
-
-
-class TestComputeDO2:
-    """Test DO2 computation."""
-
-    def test_healthy_dog_do2_near_one(self, healthy_creature):
-        from game.action_system import compute_DO2
-        do2 = compute_DO2(healthy_creature)
-        assert 0.5 <= do2 <= 1.0
-
-    def test_do2_clamped_to_valid_range(self, healthy_creature):
-        from game.action_system import compute_DO2
-        do2 = compute_DO2(healthy_creature)
-        assert 0.0 <= do2 <= 1.0
 
 
 # =============================================================================

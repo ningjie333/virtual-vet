@@ -168,6 +168,10 @@
       "bundle": "fast-runtime",
       "lane": "fast"
     },
+    "test_sidecar.py": {
+      "bundle": "heavy-runtime",
+      "lane": "heavy"
+    },
     "test_simulation.py": {
       "bundle": "heavy-engine",
       "lane": "heavy"

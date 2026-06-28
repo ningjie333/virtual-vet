@@ -2,7 +2,7 @@
 
 Concrete refactor sketch for the layer between the physiology kernel and the outer game/application shell.
 
-Last reviewed: 2026-06-09
+Last reviewed: 2026-06-28
 
 ## Why This Layer Exists
 
@@ -41,21 +41,22 @@ This layer should translate kernel state into clinically legible outputs without
   - `get_active_signs()`
   - `get_sign_tags()`
 - `game/action_system.py`
-  - `determine_phase(engine)`
-  - `_engine_summary(engine, elapsed_min)`
+  - ~~`determine_phase(engine)`~~ — removed in R7 (2026-06-28); logic now lives in `DefaultClinicalInterpreter.phase(snapshot)`
+  - ~~`_engine_summary(engine, elapsed_min)`~~ — removed in R7 (2026-06-28); logic now lives in `DefaultClinicalInterpreter.summary(snapshot, elapsed_min)`
 
 ### Why the boundary is still blurry
 
-- `game/action_system.py` still computes medical phase by directly reading engine internals
-- `_engine_summary()` still directly assembles clinical-facing values out of raw engine state
-- `src/simulation.py` still creates `ClinicalSignsEngine` inside `attach_disease()`
+- ~~`game/action_system.py` still computes medical phase by directly reading engine internals~~ — resolved in R7; `action_system` now consumes `runtime.interpreter.phase(...)`
+- ~~`_engine_summary()` still directly assembles clinical-facing values out of raw engine state~~ — resolved in R7; `action_system` now consumes `runtime.interpreter.summary(...)`
+- `src/simulation.py` still creates `ClinicalSignsEngine` inside `attach_disease()` — resolved in R6 (legacy stubs retained for backward compat, `legacy_clinical_signs_enabled=False` by default)
 - `src/report_engine.get_state()` is effectively a snapshot adapter, but it is not yet treated as a first-class interface
 
-Update as of 2026-06-09:
+Update as of 2026-06-09, last touched 2026-06-28 (R7):
 
 - the shared state adapter now lives in `src/clinical_state.py`
 - `DefaultClinicalInterpreter` is the preferred public interface
-- `determine_phase()`, `_engine_summary()`, and `game.test_translator.translate()` now remain only as legacy compatibility entry points
+- `determine_phase()`, `_engine_summary()` were retained as legacy compatibility entry points until R6; in R7 (2026-06-28) they were deleted outright and all call sites in `game/action_system.py`, `game/case_generator.py`, and tests were routed through `DefaultClinicalInterpreter` (see `docs/architecture-improvement-plan.md` § R7)
+- `game.test_translator.translate()` remains as a legacy compatibility entry point
 
 ## Desired Layer Split
 
@@ -242,29 +243,29 @@ Target role:
 
 - implementation detail behind `ClinicalInterpreter.report()`
 
-### Move out of game layer
+### Moved out of game layer (R7, 2026-06-28)
 
-`game.action_system.determine_phase(engine)`
-
-Current role:
-
-- legacy compatibility entry point
-
-Target role:
-
-- `ClinicalInterpreter.phase(snapshot)`
-
-### Move out of game layer
-
-`game.action_system._engine_summary(engine, elapsed_min)`
+`game.action_system.determine_phase(engine)` — **deleted**
 
 Current role:
 
-- legacy compatibility entry point
+- ~~legacy compatibility entry point~~
 
 Target role:
 
-- `ClinicalInterpreter.summary(snapshot, elapsed_min)`
+- `ClinicalInterpreter.phase(snapshot)` — realized via `DefaultClinicalInterpreter.phase(snapshot)`
+
+### Moved out of game layer (R7, 2026-06-28)
+
+`game.action_system._engine_summary(engine, elapsed_min)` — **deleted**
+
+Current role:
+
+- ~~legacy compatibility entry point~~
+
+Target role:
+
+- `ClinicalInterpreter.summary(snapshot, elapsed_min)` — realized via `DefaultClinicalInterpreter.summary(snapshot, elapsed_min)`
 
 ### Decouple from kernel lifecycle later
 
@@ -282,7 +283,7 @@ This does not have to move in phase 1, but it should be documented as temporary.
 
 ## Recommended Migration Order
 
-### Phase 1: Add seam, keep behavior
+### Phase 1: Add seam, keep behavior — **DONE**
 
 1. add `ClinicalSnapshot`
 2. add `ClinicalInterpreterProtocol`
@@ -295,17 +296,17 @@ Result:
 - no numerical behavior change
 - cleaner dependency direction
 
-### Phase 2: Reduce kernel knowledge in application code
+### Phase 2: Reduce kernel knowledge in application code — **DONE (R7, 2026-06-28)**
 
-1. delete or shrink direct raw-state helpers in `action_system.py`
-2. route report/phase/summary through interpreter everywhere
-3. make tests consume interpreter seam intentionally
+1. ~~delete or shrink direct raw-state helpers in `action_system.py`~~ — `determine_phase`, `_engine_summary`, `compute_DO2`, `_apply_night_modifiers` deleted; night-modifier and pharmacology灰区收敛到 `GameplayModifierProtocol` / `TreatmentProtocol` (see `docs/architecture-improvement-plan.md` § R7)
+2. route report/phase/summary through interpreter everywhere — done in `game/action_system.py`, `game/case_generator.py`, `game/treatment.py`
+3. make tests consume interpreter seam intentionally — `TestDeterminePhase` in `tests/test_game.py` and `tests/test_scenarios.py` now call `interp.phase(interp.snapshot(engine))`
 
-### Phase 3: Move interpretation lifecycle out of kernel
+### Phase 3: Move interpretation lifecycle out of kernel — **PARTIALLY DONE (R6, 2026-06-28)**
 
-1. stop constructing `ClinicalSignsEngine` inside `VirtualCreature.attach_disease()`
-2. initialize interpretation objects in an outer composition layer
-3. keep the kernel free of report/sign-engine ownership
+1. stop constructing `ClinicalSignsEngine` inside `VirtualCreature.attach_disease()` — done; `_ClinicalSignsEngine` removed from kernel, `legacy_clinical_signs_enabled=False` by default, stubs retained for backward compat
+2. initialize interpretation objects in an outer composition layer — done via `build_external_interpretation_bundle` and `game/persistence_adapter.py`
+3. keep the kernel free of report/sign-engine ownership — done
 
 ## What This Layer Is Not
 

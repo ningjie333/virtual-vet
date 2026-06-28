@@ -14,6 +14,7 @@ from typing import Optional
 
 from src.diseases import list_diseases, create_disease
 from src.presentation_state import PresentationRequest, build_presented_engine
+from src.clinical_interpreter import DefaultClinicalInterpreter
 from game.action_system import GameState
 
 logger = logging.getLogger(__name__)
@@ -93,11 +94,12 @@ def _init_engine(weight_kg: float, disease, rng: random.Random):
         )
     )
 
+    snap = DefaultClinicalInterpreter().snapshot(engine)
     logger.info(
         "引擎初始化: weight=%.1fkg, 疾病发展 %.1f min, HR=%.0f, SpO2=%.1f%%",
         weight_kg, pre_visit_min,
-        engine.history["HR_bpm"][-1] if engine.history["HR_bpm"] else 0,
-        (engine.history["saturation"][-1] * 100) if engine.history["saturation"] else 0,
+        snap.hr_bpm,
+        snap.spo2_pct * 100,
     )
     return engine
 

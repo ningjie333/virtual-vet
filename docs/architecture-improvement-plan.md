@@ -325,3 +325,67 @@ P0–P2 完成后，进一步审视发现 6 条结构性根因。本节记录已
 **未涉及（留给后续）**：
 - C4 `SessionContext` 聚合类（需要先重构测试访问模式）
 - CODE_WIKI "已知灰区" #4（前端 `BACKEND_RESPONSE_FIELDS` 类似手抄模式已在 check_api_consistency.py 解决，但其他类似模式可能存在）
+
+---
+
+### R7 — 游戏层灰区收敛（Protocol 化）
+
+**现状**：R6 后游戏层对内核的依赖仍有 4 处灰区（CODE_WIKI 标记）：
+1. `engine.heart.HR_rest` / `engine.heart.heart_rate` 直写（夜间修正）
+2. `engine.history[` 键名依赖（case_generator 日志 + 死代码 `compute_DO2`/`determine_phase`/`_engine_summary`）
+3. `engine.pharmacology` 懒挂载 + `administer_drug` 直调
+4. `to_persistence_snapshot` 透传（persistence_adapter 仅 1 行委托）
+
+**修复（两阶段）**：
+
+**阶段 1 — 清理腐烂代码（灰区 #2 清除）**：
+- 删除 [game/action_system.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/game/action_system.py) 三个死函数：`compute_DO2` / `determine_phase` / `_engine_summary`（仅 tests 调用，生产无调用点）
+- 删除死代码块：`_PT` / `_THRESHOLDS` / `_DO2_*` / `_LACTATE_*` / `_URINE_*` / `_COMPAT_INTERPRETER`（旧版 phase 判定的本地阈值副本，现在 phase 判定由 [src/clinical_interpreter.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/src/clinical_interpreter.py) 独立承担）
+- 删除 3 个无用 import：`DefaultClinicalInterpreter` / `base_cardiac_output_ml_min` / `ARTERIAL_SATURATION_NORMAL` / `LUNG_DIFFUSION_COEFFICIENT`
+- 修改 [game/case_generator.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/game/case_generator.py) 日志读取：`engine.history["HR_bpm"][-1]` → `DefaultClinicalInterpreter().snapshot(engine).hr_bpm`
+- 修改 [tests/test_game.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/tests/test_game.py) / [tests/test_scenarios.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/tests/test_scenarios.py) `TestDeterminePhase`：改用 `interp.phase(interp.snapshot(engine))`；删除 `TestComputeDO2` 类
+
+**阶段 2 — 新增 mutation 类 Protocol（灰区 #1/#3 收敛）**：
+- 新增 [game/gameplay_modifier.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/game/gameplay_modifier.py)：`GameplayModifierProtocol` + `DefaultGameplayModifier`，迁移 `_apply_night_modifiers` 逻辑（灰区 #1 收纳器）
+- 新增 [game/treatment_protocol.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/game/treatment_protocol.py)：`TreatmentProtocol` + `DefaultTreatment`，迁移 pharmacology 懒挂载 + `administer_drug` 逻辑（灰区 #3 收纳器）
+- 扩展 [game/runtime.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/game/runtime.py) `GameRuntime` dataclass：从 3 协作者（advancer/interpreter/refresher）扩展到 5 协作者（再增 modifier/treatment），新字段带 `default_factory` 保持向后兼容
+- 修改 [game/runtime_composition.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/game/runtime_composition.py) `build_external_interpretation_bundle`：支持注入 modifier/treatment
+- 修改 [game/action_system.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/game/action_system.py) `process_action`：
+  - `administer_drug` action 内联 pharmacology 懒挂载 → `runtime.treatment.administer_drug(...)`
+  - `_apply_night_modifiers(state)` → `runtime.modifier.apply_night_modifiers(state)`
+  - 删除 `_apply_night_modifiers` 函数与 `time_manager` import
+- 修改 [game/treatment.py](file:///c:/Users/ZhuanZ（无密码）/Desktop/Claudecode/01_代码实验/virtual-vet/game/treatment.py)：
+  - `apply_treatment` 加 `runtime` keyword-only 参数（None 时回退 `default_runtime()`）
+  - `_administer_protocol` / `_apply_supportive_care` 改用 `runtime.treatment.administer_drug(...)`
+  - 删除 `_ensure_pharmacology`（逻辑迁入 `DefaultTreatment`）
+
+**设计原则**：
+- interpreter 是只读契约，不承担 mutation
+- advancer 主管时间推进，不混淆玩法修正
+- modifier 是"游戏玩法 → 内核状态写"的唯一合规通道
+- treatment 是"游戏给药 → 内核 pharmacology 写"的唯一合规通道
+- Protocol 实现内部是"灰区收纳器"，把散落在游戏层的直写集中到一处可控实现（不消除灰区，而是收敛到边界）
+
+**验证**：
+- `gate_check.py --closure` 通过
+- `gate_check.py --quick` 通过
+- core channel 984 测试通过
+- interface 70 测试通过
+- test_action_runtime_seam + test_game + test_multi_disease_treatment + test_time_management 197 测试通过
+- test_pharmacology + test_scenarios 77 测试通过
+- Grep 独立验证：`engine.heart.HR_rest` / `engine.heart.heart_rate` / `engine.pharmacology =` / `engine.pharmacology.administer_drug` 直写仅存在于 Protocol 实现内部（gameplay_modifier.py / treatment_protocol.py），业务代码 0 直写
+
+**收益**：
+- 游戏层对内核的依赖从"10 模块 17 符号 + 4 灰区"收窄为"5 个 Protocol + 1 灰区"（仅剩 #4 persistence_adapter 透传）
+- `GameRuntime` 成为游戏层与内核之间的唯一合规边界
+- 重内核 `VirtualCreature` 只是 Protocol 的一个 full-fidelity impl，未来若有明确场景可实现 lightweight impl
+
+**风险**：低。
+- 阶段 1 删除的是死代码（仅 tests 调用），tests 改用 interpreter.snapshot 等价替换
+- 阶段 2 新字段带 `default_factory`，现有 `GameRuntime(advancer=..., refresher=...)` 调用自动获得默认 modifier/treatment，无需改 fake runtime
+- `apply_treatment` 的 `runtime` 参数默认 None 回退 `default_runtime()`，向后兼容
+- Protocol 实现内部仍直写 engine 字段（预期行为，灰区收纳器不消除灰区而是收敛到边界）
+
+**未涉及（留给阶段 3）**：
+- 灰区 #4：`persistence_adapter` 实质吸收 `to_persistence_snapshot` 的 25 字段构造逻辑（机械迁移，工作量中等）
+- 阶段 4（按需）：定义 `GameKernelProtocol` 聚合接口 + 实现 `LightweightGameKernel`（仅在确有场景时再做，配 twin-run 验证保真度）

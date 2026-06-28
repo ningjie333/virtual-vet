@@ -6,10 +6,8 @@ Action System — 玩家行动处理系统（v2：时间预算版）。
   - process_action()：处理玩家行动（检查/治疗/等待），推进游戏时间
   - check_death()：濒死倒计时 + 死亡判定
 
-兼容性说明:
-  - `determine_phase()` 和 `_engine_summary()` 为 legacy compatibility API
-  - 新代码应优先通过 `GameRuntime.advance_and_refresh(...)` 与
-    `GameRuntime.interpreter` 获取临床 phase / summary / report
+临床 phase / summary / report 一律通过 `GameRuntime.advance_and_refresh(...)`
+与 `GameRuntime.interpreter` 获取，不再保留 legacy 直读入口。
 
 时间系统（v2）:
   - 删除 AP 系统，改用真实时间预算（分钟）
@@ -28,15 +26,8 @@ from pathlib import Path
 from typing import Optional
 
 from game.runtime import GameRuntime, default_runtime
-from src.clinical_interpreter import DefaultClinicalInterpreter
 from src.simulation import VirtualCreature
-from src.parameters import base_cardiac_output_ml_min, ARTERIAL_SATURATION_NORMAL, LUNG_DIFFUSION_COEFFICIENT
 from src.exam_registry import get_exam_registry
-from game.time_manager import (
-    is_night_time,
-    get_night_hr_factor,
-    format_game_time,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -64,42 +55,6 @@ TIME_BUDGET_HARD = _TB["hard_min"]
 
 # ── 检查类型注册表（从 data/examinations.json 加载） ──
 _exam_reg = get_exam_registry()
-
-# ── 病情阶段判定阈值 ──
-_PT = _GC["phase_thresholds"]
-_THRESHOLDS = {
-    "MAP": (
-        _PT["MAP"]["low_moribund"], _PT["MAP"]["low_critical"],
-        _PT["MAP"]["low_worsening"], _PT["MAP"]["high_worsening"],
-        _PT["MAP"]["high_critical"], _PT["MAP"]["high_moribund"],
-    ),
-    "SpO2": (
-        _PT["SpO2"]["low_moribund"], _PT["SpO2"]["low_critical"],
-        _PT["SpO2"]["low_worsening"], _PT["SpO2"]["high_worsening"],
-        _PT["SpO2"]["high_critical"], _PT["SpO2"]["high_moribund"],
-    ),
-    "HR": (
-        _PT["HR"]["low_moribund"], _PT["HR"]["low_critical"],
-        _PT["HR"]["low_worsening"], _PT["HR"]["high_worsening"],
-        _PT["HR"]["high_critical"], _PT["HR"]["high_moribund"],
-    ),
-    "pH": (
-        _PT["pH"]["low_moribund"], _PT["pH"]["low_critical"],
-        _PT["pH"]["low_worsening"], _PT["pH"]["high_worsening"],
-        _PT["pH"]["high_critical"], _PT["pH"]["high_moribund"],
-    ),
-}
-
-_DO2_WARN = _PT["DO2"]["warn"]
-_DO2_CRIT = _PT["DO2"]["critical"]
-_DO2_MORIB = _PT["DO2"]["moribund"]
-
-_LACTATE_WARN = _PT["lactate"]["warn"]
-_LACTATE_CRIT = _PT["lactate"]["critical"]
-
-_URINE_OLIGURIA = _PT["urine"]["oliguria"]
-_URINE_ANURIA = _PT["urine"]["anuria"]
-_COMPAT_INTERPRETER = DefaultClinicalInterpreter()
 
 
 def _get_exam_config(test_type: str) -> tuple[int, int, int]:
@@ -148,33 +103,6 @@ class GameState:
         return max(0, self.time_budget_min - self.time_elapsed_min)
 
 
-def compute_DO2(engine: VirtualCreature) -> float:
-    """计算氧输送指数 DO₂（相对值，健康犬 ≈ 1.0）。"""
-    hist = engine.history
-
-    def _last(key: str, fallback):
-        vals = hist.get(key, [])
-        return vals[-1] if vals else fallback
-
-    weight_kg = engine.w
-    normal_co = base_cardiac_output_ml_min(weight_kg)
-    co = _last("CO_ml_min", normal_co)
-    sao2 = _last("saturation", ARTERIAL_SATURATION_NORMAL)
-    do2 = (co / normal_co) * sao2
-    return max(0.0, min(1.0, do2))
-
-
-def determine_phase(engine: VirtualCreature) -> str:
-    """
-    Legacy compatibility API.
-
-    新代码应通过 `runtime.interpreter.phase(runtime.interpreter.snapshot(engine))`
-    获取医学阶段。此函数保留仅用于兼容旧调用点和现有测试。
-    """
-    snapshot = _COMPAT_INTERPRETER.snapshot(engine)
-    return _COMPAT_INTERPRETER.phase(snapshot)
-
-
 def check_death(state: GameState, medical_phase: str) -> GameState:
     """死亡检测逻辑（基于医学阶段更新游戏阶段）。"""
     if medical_phase == "moribund":
@@ -193,16 +121,6 @@ def check_death(state: GameState, medical_phase: str) -> GameState:
             state.death_timer = None
 
     return state
-
-
-def _engine_summary(engine: VirtualCreature, elapsed_min: int = 0) -> dict:
-    """
-    Legacy compatibility API.
-
-    新代码应通过 `runtime.interpreter.summary(...)` 获取临床摘要。
-    """
-    snapshot = _COMPAT_INTERPRETER.snapshot(engine)
-    return _COMPAT_INTERPRETER.summary(snapshot, elapsed_min)
 
 
 def _process_pending_reports(state: GameState, elapsed_min: int) -> list[dict]:
@@ -239,40 +157,6 @@ def _annotate_report_timing(
     report["available_after_min"] = available_after_min
     report["available_at_s"] = observed_at_s + (available_after_min * 60.0)
     return report
-
-
-def _apply_night_modifiers(state: GameState) -> None:
-    """应用夜间修正到引擎状态。"""
-    clock_min = state.time_elapsed_min
-    engine = state.engine
-    hr_factor = get_night_hr_factor(clock_min)
-
-    if state._original_hr_rest is None:
-        state._original_hr_rest = engine.heart.HR_rest
-
-    if is_night_time(clock_min):
-        night_hr_rest = max(50.0, state._original_hr_rest * hr_factor)
-        engine.heart.HR_rest = night_hr_rest
-        if engine.heart.heart_rate > night_hr_rest:
-            engine.heart.heart_rate = max(
-                night_hr_rest,
-                engine.heart.heart_rate * 0.95,
-            )
-    else:
-        engine.heart.HR_rest = state._original_hr_rest
-        if engine.heart.heart_rate < state._original_hr_rest:
-            engine.heart.heart_rate = min(
-                state._original_hr_rest,
-                engine.heart.heart_rate * 1.05,
-            )
-
-    logger.debug(
-        "夜间修正: is_night=%s, HR_factor=%.2f, HR_rest=%.1f, clock=%s",
-        is_night_time(clock_min),
-        hr_factor,
-        engine.heart.HR_rest,
-        format_game_time(clock_min),
-    )
 
 
 def process_action(
@@ -354,7 +238,7 @@ def process_action(
         from game.treatment import apply_treatment
         disease_guess = params.get("disease_guess", "")
         state.treatment_applied = disease_guess
-        treatment_result = apply_treatment(state, disease_guess)
+        treatment_result = apply_treatment(state, disease_guess, runtime=runtime)
         result = treatment_result
         if treatment_result["correct"]:
             state.phase = "won"
@@ -365,17 +249,13 @@ def process_action(
         drug_name = params.get("drug_name", "")
         dose_mg_kg = params.get("dose_mg_kg", 0.0)
         volume_ml = params.get("volume_ml", 0.0)
-        if (
-            not hasattr(state.engine, "pharmacology")
-            or state.engine.pharmacology is None
-        ):
-            from src.pharmacology import PharmacologyState
-            state.engine.pharmacology = PharmacologyState(weight_kg=state.engine.w)
         try:
-            if volume_ml > 0:
-                state.engine.pharmacology.administer_drug(drug_name, volume_ml=volume_ml)
-            else:
-                state.engine.pharmacology.administer_drug(drug_name, dose_mg_kg=dose_mg_kg)
+            runtime.treatment.administer_drug(
+                state.engine,
+                drug_name,
+                dose_mg_kg=dose_mg_kg,
+                volume_ml=volume_ml,
+            )
             logger.info("给药 %s (%.2f mg/kg)", drug_name, dose_mg_kg)
         except KeyError:
             logger.warning("未知药物: %s", drug_name)
@@ -424,8 +304,8 @@ def process_action(
     # ── 处理延迟报告（时间流逝后检查是否有报告到期）──
     new_reports = _process_pending_reports(state, time_cost)
 
-    # ── 夜间修正 ──
-    _apply_night_modifiers(state)
+    # ── 夜间修正（通过 modifier 协议，灰区 #1 收纳）──
+    runtime.modifier.apply_night_modifiers(state)
 
     # ── 阶段判定 ──
     snapshot = interpreter.snapshot(state.engine)
