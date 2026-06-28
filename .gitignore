@@ -12,11 +12,24 @@ vet-game-frontend/vite-project/dist/
 vet-game-frontend/static/
 static/
 
+# Python coverage (pytest-cov)
+.coverage
+coverage.xml
+htmlcov/
+results/test_effectiveness/
+
 # IDE
 .vscode/
 .idea/
+.trae/
+.claude/
+.cursor/
+.codegraph/
 *.swp
 *~
+
+# Design drafts (local-only, not for review)
+DESIGN.md
 
 # OS
 .DS_Store
@@ -46,6 +59,11 @@ data/game_sessions.db-wal
 
 # External dev cache on D: drive (uv/npm/pip caches outside repo)
 D:/
+
+# Path-injection artifacts (fullwidth Unicode chars in directory names,
+# see AGENTS.md gate_check.py orphan-cache detector)
+*D[：:]dev-cache*
+*cache*
 
 # External references (downloaded docs, not project-owned)
 cvs-reference/

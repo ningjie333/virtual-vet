@@ -411,6 +411,7 @@ def main():
     group.add_argument("--quick", action="store_true", help="快速模式（默认）")
     group.add_argument("--full", action="store_true", help="完整模式")
     group.add_argument("--modules", action="store_true", help="模块化模式：只跑改动 src/ 涉及的测试")
+    group.add_argument("--closure", action="store_true", help="工作流闭环检查（复查阶段强制校验：错误消息统一 + 字段契约）")
     group.add_argument("--fix", action="store_true", help="自动修复可修复的问题")
     group.add_argument("--schema", action="store_true", help="JSON Schema 验证")
     group.add_argument("--verify-refs", action="store_true", help="验证参数文献溯源覆盖率")
@@ -434,6 +435,8 @@ def main():
         return run_verify_refs()
     elif args.modules:
         return run_modules()
+    elif args.closure:
+        return run_checker("工作流闭环", "check_workflow_closure.py")
     elif args.full:
         return run_quick()
     else:
