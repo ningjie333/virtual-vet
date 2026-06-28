@@ -16,11 +16,33 @@ Disease Module Framework — 疾病扰动模块框架
 
 import logging
 from abc import ABC, abstractmethod
+from enum import Enum
 
 from ..common_types import FactorCommand
 from ..logger_config import get_logger
 
 logger = get_logger(__name__)
+
+
+class DiseaseState(Enum):
+    """R5 Stage 2: 疾病生命周期状态机。
+
+    状态转换图：
+        INCUBATING ──activate()──> ACTIVE ──deactivate()──> RESOLVED
+                                         │
+                                         └──(宿主死亡)──> DEAD
+
+    - INCUBATING: 已构造但未激活（病原体未侵入）
+    - ACTIVE: 已激活，每步 compute() 返回 FactorCommand
+    - RESOLVED: 已治愈/自愈，compute() 返回空列表（仍留在 engine.diseases 列表）
+    - DEAD: 宿主因此疾病死亡（compute() 返回空列表）
+
+    RESOLVED/DEAD 疾病可通过 detach_disease() 从引擎移除。
+    """
+    INCUBATING = "incubating"
+    ACTIVE = "active"
+    RESOLVED = "resolved"
+    DEAD = "dead"
 
 # ---------- 全局疾病注册表 ----------
 _DISEASE_REGISTRY: dict[str, type] = {}
@@ -118,20 +140,45 @@ class DiseaseModule(ABC):
 
     def __init__(self, name: str):
         self.name = name
-        self.active = False        # 是否已激活（病原体已侵入）
+        self._state = DiseaseState.INCUBATING  # R5 Stage 2: 生命周期状态
         self.activated_at_s = 0.0  # 激活时间（仿真秒）
 
+    @property
+    def active(self) -> bool:
+        """R5 Stage 2: 向后兼容 — active = (state == ACTIVE)。"""
+        return self._state == DiseaseState.ACTIVE
+
+    @active.setter
+    def active(self, value: bool):
+        """R5 Stage 2: 向后兼容 setter — True→ACTIVE, False→RESOLVED。"""
+        if value and self._state != DiseaseState.ACTIVE:
+            self._state = DiseaseState.ACTIVE
+        elif not value and self._state == DiseaseState.ACTIVE:
+            self._state = DiseaseState.RESOLVED
+
     def activate(self, current_time_s: float):
-        """激活疾病（病原体侵入宿主）"""
-        self.active = True
+        """激活疾病（病原体侵入宿主）：INCUBATING → ACTIVE"""
+        self._state = DiseaseState.ACTIVE
         self.activated_at_s = current_time_s
         logger.info("Disease activated: %s at t=%.1fs", self.name, current_time_s)
 
     def deactivate(self):
-        """清除疾病（治愈/死亡后重置）"""
-        self.active = False
-        self.activated_at_s = 0.0
-        logger.info("Disease deactivated: %s", self.name)
+        """治愈/停止疾病：ACTIVE → RESOLVED（不清空 _state_vars，保留历史）"""
+        if self._state == DiseaseState.ACTIVE:
+            self._state = DiseaseState.RESOLVED
+            self.activated_at_s = 0.0  # 向后兼容：reset 激活时间
+            logger.info("Disease deactivated: %s", self.name)
+
+    def mark_dead(self):
+        """标记宿主因此疾病死亡：ACTIVE → DEAD"""
+        if self._state == DiseaseState.ACTIVE:
+            self._state = DiseaseState.DEAD
+            logger.info("Disease marked DEAD: %s", self.name)
+
+    @property
+    def state(self) -> DiseaseState:
+        """R5 Stage 2: 当前生命周期状态。"""
+        return self._state
 
     @property
     def elapsed_since_activation_s(self) -> float:

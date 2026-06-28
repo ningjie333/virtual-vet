@@ -27,6 +27,7 @@ from . import DiseaseModule, register_disease
 from ..config_validation import validate_ode_diseases, ValidationError
 from ..common_types import FactorCommand
 from ..logger_config import get_logger
+from ..engine.numerics import first_order_lag
 
 logger = get_logger(__name__)
 
@@ -174,7 +175,7 @@ def _solve_algebraic(
 def _solve_first_order_lag(
     value: float, params: dict, state_vars: dict, engine_state: dict, dt: float
 ) -> float:
-    """一阶滞后: dS/dt = (target - S) / tau"""
+    """一阶滞后: dS/dt = (target - S) / tau — delegates to shared numerics helper."""
     tau = params.get("tau", 1.0)
     if tau <= 0:
         return value
@@ -185,8 +186,7 @@ def _solve_first_order_lag(
         target = _eval_fn(params["target_fn"], namespace)
     else:
         target = params.get("target", 0.0)
-    rate = (target - value) / tau
-    new_val = value + rate * dt
+    new_val = first_order_lag(value, target, dt, tau)
     lo = params.get("_clamp_lo", 0.0)
     hi = params.get("_clamp_hi", 1.0)
     return _clamp(new_val, lo, hi)
@@ -251,12 +251,7 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
         self._severity = severity
 
         # 应用严重程度预设
-        presets = config.get("severity_presets", {})
-        self._params: dict[str, Any] = {}
-        if severity in presets:
-            self._params.update(presets[severity])
-        elif "moderate" in presets:
-            self._params.update(presets["moderate"])
+        self._params: dict[str, Any] = self._build_params(config, severity)
 
         # NOTE: _TIME_SCALE=14 已删除。
         # 原设计意图：让"1 游戏分钟 = 14 真实分钟"的疾病进展。
@@ -264,14 +259,62 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
         #        游戏层负责时间映射。
         # 引用：BioGears/HumMod 等主流引擎均按真实时间运行，不缩放。
 
-        # 初始化状态变量
+        # 初始化状态变量 + 构建 _var_meta
         self._state_vars: dict[str, float] = {}
         self._var_meta: dict[str, dict] = {}
+        self._init_state_vars_and_meta(config)
+
+        # 缓存 outputs 配置，预编译表达式
+        self._outputs = []
+        for output in config.get("outputs", []):
+            out = dict(output)
+            if "fn" in out and isinstance(out["fn"], str):
+                out["fn"] = _compile_expr(out["fn"])
+            if "condition" in out and isinstance(out["condition"], str):
+                out["condition"] = _compile_expr(out["condition"])
+            self._outputs.append(out)
+
+        # R5 Stage 2: 自动治愈条件（可选配置）
+        # resolve_when: [{"var": "bacterial_load", "op": "lt", "threshold": 0.01}, ...]
+        # 当所有条件满足时，疾病自动从 ACTIVE → RESOLVED
+        self._resolve_when = config.get("resolve_when", [])
+
+        # R5 Stage 3: 动态严重程度触发条件（可选配置）
+        # worsen_when / improve_when: 同 resolve_when 格式
+        # 满足条件时自动升级/降级 severity（需配置 severity_order）
+        self._worsen_when = config.get("worsen_when", [])
+        self._improve_when = config.get("improve_when", [])
+        self._severity_order = config.get("severity_order", ["mild", "moderate", "severe"])
+
+        logger.info(
+            "ConfigDrivenDiseaseModule created: %s (severity=%s, vars=%s)",
+            name, severity, list(self._state_vars.keys()),
+        )
+
+    @staticmethod
+    def _build_params(config: dict, severity: str) -> dict[str, Any]:
+        """从 config 的 severity_presets 构建 _params 字典。"""
+        presets = config.get("severity_presets", {})
+        params: dict[str, Any] = {}
+        if severity in presets:
+            params.update(presets[severity])
+        elif "moderate" in presets:
+            params.update(presets["moderate"])
+        return params
+
+    def _init_state_vars_and_meta(self, config: dict) -> None:
+        """初始化 _state_vars（仅构造时）+ 构建 _var_meta（可重用）。
+
+        R5 Stage 3: 抽取为独立方法，使 set_severity() 可重建 _var_meta
+        而不重置 _state_vars（保留疾病进展历史）。
+        """
         for var_name, var_conf in config.get("state_variables", {}).items():
-            initial = var_conf.get("initial", 0.0)
-            if "initial_key" in var_conf:
-                initial = self._params.get(var_conf["initial_key"], initial)
-            self._state_vars[var_name] = initial
+            # 仅首次构造时初始化 _state_vars
+            if var_name not in self._state_vars:
+                initial = var_conf.get("initial", 0.0)
+                if "initial_key" in var_conf:
+                    initial = self._params.get(var_conf["initial_key"], initial)
+                self._state_vars[var_name] = initial
             lo, hi = _get_clamp(var_conf.get("clamp"))
             raw_params = {**self._params, **var_conf.get("params", {})}
             # 将顶层求解器字段下沉到 params（保持求解器查找一致）
@@ -298,20 +341,38 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
                 "params": raw_params,
             }
 
-        # 缓存 outputs 配置，预编译表达式
-        self._outputs = []
-        for output in config.get("outputs", []):
-            out = dict(output)
-            if "fn" in out and isinstance(out["fn"], str):
-                out["fn"] = _compile_expr(out["fn"])
-            if "condition" in out and isinstance(out["condition"], str):
-                out["condition"] = _compile_expr(out["condition"])
-            self._outputs.append(out)
+    def set_severity(self, new_severity: str) -> bool:
+        """R5 Stage 3: 动态变更严重程度。
 
+        重新应用 severity_presets 到 _params 并重建 _var_meta（保留 _state_vars）。
+        疾病进展历史不受影响——只有 ODE 参数（rate、K、clearance 等）更新。
+
+        Args:
+            new_severity: 新的严重程度（必须在 severity_order 中）
+
+        Returns:
+            True 若 severity 变更成功，False 若 new_severity 无效或与当前相同
+        """
+        if new_severity == self._severity:
+            return False
+        if new_severity not in self._severity_order:
+            logger.warning("Unknown severity '%s' for %s", new_severity, self.name)
+            return False
+        old_severity = self._severity
+        self._severity = new_severity
+        self._params = self._build_params(self._config, new_severity)
+        self._var_meta = {}  # 清空旧 meta
+        self._init_state_vars_and_meta(self._config)  # 重建（_state_vars 保留）
         logger.info(
-            "ConfigDrivenDiseaseModule created: %s (severity=%s, vars=%s)",
-            name, severity, list(self._state_vars.keys()),
+            "Disease severity changed: %s %s → %s",
+            self.name, old_severity, new_severity,
         )
+        return True
+
+    @property
+    def severity(self) -> str:
+        """R5 Stage 3: 当前严重程度。"""
+        return self._severity
 
     def compute(self, dt: float, engine_state: dict) -> list[FactorCommand]:
         if not self.active:
@@ -330,6 +391,21 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
             old_val = self._state_vars[var_name]
             new_val = solver(old_val, meta["params"], self._state_vars, engine_state, dt)
             self._state_vars[var_name] = new_val
+
+        # R5 Stage 2: 检查自动治愈条件
+        if self._resolve_when and self._check_conditions(self._resolve_when):
+            self.deactivate()
+            return []  # 本步不再输出指令（已治愈）
+
+        # R5 Stage 3: 检查自动恶化/好转条件
+        if self._worsen_when and self._check_conditions(self._worsen_when):
+            idx = self._severity_order.index(self._severity)
+            if idx < len(self._severity_order) - 1:
+                self.set_severity(self._severity_order[idx + 1])
+        elif self._improve_when and self._check_conditions(self._improve_when):
+            idx = self._severity_order.index(self._severity)
+            if idx > 0:
+                self.set_severity(self._severity_order[idx - 1])
 
         # Step 2: 计算 FactorCommand 输出
         commands = []
@@ -350,6 +426,25 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
             commands.append(cmd)
 
         return commands
+
+    def _check_conditions(self, conditions: list) -> bool:
+        """R5 Stage 2/3: 检查条件列表是否全部满足（供 resolve_when/worsen_when/improve_when 复用）。"""
+        for cond in conditions:
+            var = cond.get("var")
+            op = cond.get("op", "lt")
+            threshold = cond.get("threshold", 0.0)
+            val = self._state_vars.get(var, 0.0)
+            if op == "lt" and not (val < threshold):
+                return False
+            elif op == "gt" and not (val > threshold):
+                return False
+            elif op == "le" and not (val <= threshold):
+                return False
+            elif op == "ge" and not (val >= threshold):
+                return False
+            elif op == "eq" and not (abs(val - threshold) < 1e-9):
+                return False
+        return True
 
     def compute_derivatives(self, engine_state: dict) -> dict[str, float]:
         """返回所有状态变量的导数（供 solve_ivp Radau 调用）。
@@ -385,10 +480,58 @@ class ConfigDrivenDiseaseModule(DiseaseModule):
         return derivatives
 
     def summary(self) -> dict:
-        result = {"name": self.name, "active": self.active}
+        result = {
+            "name": self.name,
+            "active": self.active,
+            "state": self.state.value,  # R5 Stage 2: 生命周期状态
+            "severity": self._severity,  # R5 Stage 3: 严重程度
+        }
         for var_name, value in self._state_vars.items():
             result[var_name] = round(value, 4)
         return result
+
+    def full_state(self) -> dict:
+        """R5 Stage 4: 返回完整精度状态（供持久化/恢复用）。
+
+        与 summary() 的区别：
+        - summary() 四舍五入到 4 位（人类可读）
+        - full_state() 保留完整精度（机器可恢复）
+        - full_state() 额外包含 activated_at_s（用于恢复时间线）
+        """
+        return {
+            "name": self.name,
+            "state": self.state.value,
+            "severity": self._severity,
+            "activated_at_s": self.activated_at_s,
+            "state_vars": dict(self._state_vars),  # 完整精度
+        }
+
+    def restore_state(self, state_dict: dict) -> None:
+        """R5 Stage 4: 从 full_state() 输出恢复状态。
+
+        恢复 _state_vars（完整精度）、_severity、_state、activated_at_s。
+        不重建 _var_meta — 由 set_severity() 在需要时触发。
+        """
+        from src.diseases import DiseaseState
+        # 恢复 severity（可能需要重建 _params + _var_meta）
+        new_severity = state_dict.get("severity", self._severity)
+        if new_severity != self._severity:
+            self.set_severity(new_severity)
+        # 恢复生命周期状态
+        state_str = state_dict.get("state", "incubating")
+        try:
+            self._state = DiseaseState(state_str)
+        except ValueError:
+            self._state = DiseaseState.INCUBATING
+        # 恢复激活时间
+        self.activated_at_s = state_dict.get("activated_at_s", 0.0)
+        # 恢复状态变量（完整精度）
+        saved_vars = state_dict.get("state_vars", {})
+        for var_name in self._state_vars:
+            if var_name in saved_vars:
+                self._state_vars[var_name] = saved_vars[var_name]
+        logger.info("Disease state restored: %s (severity=%s, state=%s)",
+                     self.name, self._severity, self._state.value)
 
     def __getattr__(self, name: str):
         """允许通过属性访问状态变量（如 module.cellular_toxicity）。"""

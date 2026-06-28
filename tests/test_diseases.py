@@ -139,6 +139,8 @@ class TestPneumonia:
         expected_keys = {
             "name",
             "active",
+            "state",
+            "severity",
             "alveolar_exudate",
             "bacterial_load",
             "fever_state",
@@ -147,6 +149,8 @@ class TestPneumonia:
         assert set(s.keys()) == expected_keys
         assert s["name"] == "pneumonia"
         assert s["active"] is True
+        assert s["state"] == "active"  # R5 Stage 2
+        assert s["severity"] == "moderate"  # R5 Stage 3
 
 
 # ===========================================================================
@@ -240,6 +244,8 @@ class TestAcuteRenalFailure:
         expected_keys = {
             "name",
             "active",
+            "state",
+            "severity",
             "nephron_damage",
             "gfr_decline",
             "potassium_shift",
@@ -514,6 +520,8 @@ class TestPhosphorusPoisoning:
         expected_keys = {
             "name",
             "active",
+            "state",
+            "severity",
             "cellular_toxicity",
             "myocardial_depression",
             "metabolic_acidosis",

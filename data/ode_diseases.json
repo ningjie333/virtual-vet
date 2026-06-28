@@ -1854,13 +1854,13 @@
       },
       {
         "target": "blood.potassium",
-        "op": "add",
-        "fn": "hyperkalemia"
+        "op": "set",
+        "fn": "min(8.0, 4.2 + hyperkalemia)"
       },
       {
         "target": "blood.sodium_mEq_L",
-        "op": "add",
-        "fn": "-cortisol_deficiency * 12.0"
+        "op": "set",
+        "fn": "max(135.0, 145.0 - cortisol_deficiency * 12.0)"
       },
       {
         "target": "heart.heart_rate",
@@ -1868,8 +1868,8 @@
         "fn": "0.05 * (86.7 - engine['heart']['heart_rate_bpm'])"
       },
       {
-        "target": "heart.SVR",
-        "op": "multiply",
+        "target": "heart.cortisol_factor",
+        "op": "set",
         "fn": "max(0.5, 1.0 - 0.4 * cortisol_deficiency)"
       }
     ],
