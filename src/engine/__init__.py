@@ -1,19 +1,10 @@
 """
-Engine subpackage — Phase 4 architectural refactor.
+Engine subpackage — architectural refactor.
 
 This subpackage centralises engine-level data structures and protocols:
-- `topology`: module coupling graph (CONNECTIONS, _PARAM_PATHS, future INPUTS/OUTPUTS)
+- `topology`: module coupling graph (CONNECTIONS, _PARAM_PATHS)
 - `factor_pipeline`: FactorCommand dispatch (apply_factor, FactorCommandRegistry)
-
-Phase 1 (this PR): extract these from simulation.py and common_types.py.
-Zero behavior change — pure import reorganisation.
-
-Refactor roadmap (post-Phase 1):
-- Phase 2: solvers/ extraction (Euler + Radau as SolverStrategy)
-- Phase 3: reporter/events/lifecycle/disease extraction
-- Phase 4: signal_bus.py + BloodShim (replace self.blood shared mutable bus)
-- Phase 5: per-module INPUTS/OUTPUTS declaration migration
-- Phase 6: remove BloodShim, pure SignalBus
+- `step_contract`: StepGuard runtime ordering contracts (R3)
 """
 from .topology import (
     Topology,
@@ -26,9 +17,9 @@ from .factor_pipeline import (
     FactorCommandRegistry,
     _get_param_path,
 )
-from .signal_bus import (
-    SignalBus,
-    BloodShim,
+from .step_contract import (
+    StepGuard,
+    StepContractError,
 )
 
 __all__ = [
@@ -39,6 +30,6 @@ __all__ = [
     "apply_factor",
     "FactorCommandRegistry",
     "_get_param_path",
-    "SignalBus",
-    "BloodShim",
+    "StepGuard",
+    "StepContractError",
 ]

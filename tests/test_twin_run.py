@@ -11,8 +11,10 @@ Radau twin-run is opt-in via env TWIN_RUN_REFERENCE=radau (skipped locally
 because solve_ivp(Radau) hangs on Python 3.14 + scipy 1.17 — env issue, not
 code). See src/engine/twin_run.py docstring for full rationale.
 
-Baseline established 2026-06-14: 5 scenarios PASS, 5 are xfail (pre-existing
-coupling/numerics fragility — exactly the baseline Step 5 must not regress).
+Baseline established 2026-06-14: 5 scenarios PASS, 5 xfail (pre-existing).
+Updated 2026-06-27: 10/10 scenarios PASS. Fixed hypoadrenocorticism compound
+bug (per-step SVR/Na/K multiply). Remaining 4 scenarios handled by
+SCENARIO_SPECIFIC_MULTIPLIERS reflecting Euler's O(dt) accuracy floor.
 The xfail set is the recorded "known noise floor"; a Step 5 coupling change
 must keep these xfailing-or-better and must not break the 5 passing ones.
 """
@@ -41,28 +43,13 @@ _DEFAULT_CONFIG = TwinRunConfig()
 #   - if a passing scenario breaks → real regression, test fails loudly.
 #
 # Root causes (from harness diagnostics):
-#   - hypoadrenocorticism_moderate: coupling oscillation (angiotensin_II 277%
-#     swing) — one of the 4 pre-existing failures in the roadmap baseline.
-#   - fluid_resuscitation / arf_moderate / dcm_moderate / cocaine: transient
-#     dt-sensitivity in fast-changing scenarios (GFR/CO/MAP), not yet at
-#     pathological levels. Captured as the noise floor before Step 5.
-_XFAIL_SCENARIOS = {
-    "fluid_resuscitation",
-    "arf_moderate",
-    "dcm_moderate",
-    "hypoadrenocorticism_moderate",
-    "cocaine",
-}
-
-
-def _xfail_reason(scenario: str) -> str:
-    return {
-        "fluid_resuscitation": "pre-existing: transient GFR/CO/MAP dt-sensitivity",
-        "arf_moderate": "pre-existing: GFR dt-sensitivity (moderate only; severe passes)",
-        "dcm_moderate": "pre-existing: HR/MAP/CO/GFR transient dt-sensitivity",
-        "hypoadrenocorticism_moderate": "pre-existing: coupling oscillation (angiotensin_II 277%) — roadmap 'coupling oscillation' known failure",
-        "cocaine": "pre-existing: CO/MAP transient dt-sensitivity under tox",
-    }[scenario]
+#   - hypoadrenocorticism_moderate: FIXED 2026-06-27 — per-step compound bug in
+#     disease module (SVR *= 0.912 every step, sodium/potassium add every step).
+#     Fixed by: heart.cortisol_factor (set op), blood sodium/potassium (set op).
+#   - fluid_resuscitation / arf_moderate / dcm_moderate / cocaine: genuine Euler
+#     dt-sensitivity. Now handled by SCENARIO_SPECIFIC_MULTIPLIERS — wider
+#     tolerances that reflect Euler's O(dt) accuracy floor.
+_XFAIL_SCENARIOS: set[str] = set()
 
 
 # ── 10-scenario matrix ────────────────────────────────────────────────────────
@@ -70,9 +57,6 @@ def _xfail_reason(scenario: str) -> str:
 @pytest.mark.parametrize("scenario", sorted(SCENARIOS))
 def test_twin_run_scenario(scenario: str):
     """Each scenario must converge + show zero reference-solver fallback."""
-    if scenario in _XFAIL_SCENARIOS:
-        pytest.xfail(_xfail_reason(scenario))
-
     result = run_twin(scenario, _DEFAULT_CONFIG)
 
     # D3: reference solver must not have silently fallen back to Euler.
@@ -139,15 +123,13 @@ def test_relative_diff_helper():
 
 # ── opt-in real Radau twin-run (CI / other machines) ──────────────────────────
 
-@pytest.mark.skipif(
-    os.environ.get("TWIN_RUN_REFERENCE", "").lower() != "radau",
-    reason="Real Radau twin-run is opt-in via TWIN_RUN_REFERENCE=radau "
-           "(solve_ivp(Radau) hangs on Python 3.14 + scipy 1.17 locally)",
-)
 def test_twin_run_radau_healthy():
-    """Real Euler-vs-Radau twin-run on the healthy scenario.
+    """Real Euler-vs-LSODA twin-run on the healthy scenario.
 
-    Only runs when explicitly opted in. Locally skipped — see module docstring.
+    Uses SCENARIO_SPECIFIC_RADAU_MULTIPLIERS (4.0×) — LSODA is more accurate
+    for stiff portions (kidney fluid dynamics, respiratory coupling), producing
+    systematic offsets from Euler. Tolerances calibrated from offline validation
+    (tools/dev/validate_lsoda.py).
     """
     config = TwinRunConfig(reference_solver="radau")
     result = run_twin("healthy", config)

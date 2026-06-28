@@ -18,17 +18,77 @@ for backward compatibility (it just delegates to this function).
 
 C7 blood_volume guard: preserved. `heart.blood_volume` cannot go negative
 on `add` or `set` operations.
+
+P0.2: Per-step baseline idempotency
+  - snapshot_baselines(engine) captures all writable param values at
+    step start.  Called once at the top of _step_euler / _step_radau.
+  - First multiply / add on a target uses the step-baseline as the
+    base (prevents exponential compounding across steps).  Subsequent
+    writes to the same target chain from the current value (preserves
+    intra-step chaining for coupling, tox, lifecycle, multi-disease).
+  - set operations are naturally idempotent and pop the baseline.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from src.common_types import FactorCommand
 from .topology import _PARAM_PATHS
 
+if TYPE_CHECKING:
+    from src.engine.step_contract import StepGuard
+
 logger = logging.getLogger(__name__)
+
+# ── P0.2: per-step baseline tracking ─────────────────────────────────
+_step_baselines: dict[str, float] = {}
+
+
+def snapshot_baselines(engine: Any, guard: "StepGuard | None" = None) -> None:
+    """Capture current values of all writable parameters.
+
+    Call once at the start of each simulation step.  Resets the
+    per-step tracking so that the first multiply / add on each target
+    uses the step-start value as the base.
+
+    R3 contract:
+        requires_not  INV_BASELINES_CLEARED (cannot snapshot after clear in same step)
+        sets          INV_BASELINES_SNAPSHOTTED
+    """
+    if guard is not None:
+        from src.engine.step_contract import INV_BASELINES_CLEARED
+        guard.require_invariant_not(INV_BASELINES_CLEARED)
+
+    _step_baselines.clear()
+    for target, (module_name, attr_name) in _PARAM_PATHS.items():
+        module = getattr(engine, module_name, None)
+        if module is None:
+            continue
+        val = getattr(module, attr_name, None)
+        if val is not None:
+            _step_baselines[target] = float(val)
+
+    if guard is not None:
+        from src.engine.step_contract import INV_BASELINES_SNAPSHOTTED
+        guard.set_invariant(INV_BASELINES_SNAPSHOTTED)
+
+
+def clear_baselines(guard: "StepGuard | None" = None) -> None:
+    """Clear per-step baseline tracking.
+
+    Called at end of each step to prevent stale baselines from leaking
+    into tests that don't call step().
+
+    R3 contract:
+        sets  INV_BASELINES_CLEARED
+    """
+    _step_baselines.clear()
+
+    if guard is not None:
+        from src.engine.step_contract import INV_BASELINES_CLEARED
+        guard.set_invariant(INV_BASELINES_CLEARED)
 
 
 def _get_param_path(target: str) -> tuple[str, str] | None:
@@ -74,6 +134,12 @@ def apply_factor(cmd: FactorCommand, engine: Any) -> None:
     C7 special protection: `heart.blood_volume` cannot go negative on
     `add` or `set` operations.
 
+    P0.2 idempotency: for the first multiply / add on a target each
+    step the baseline value is used as the base, preventing exponential
+    compounding across steps.  Subsequent writes chain from the current
+    value so that intra-step layering (tox → lifecycle → disease →
+    coupling) still works correctly.
+
     Args:
         cmd: FactorCommand instruction
         engine: VirtualCreature (or any object with the modules listed
@@ -95,12 +161,21 @@ def apply_factor(cmd: FactorCommand, engine: Any) -> None:
         logger.warning("apply_factor: attr '%s' not found on %s", attr_name, module_name)
         return
 
-    if cmd.op == "multiply":
-        new_value = current * cmd.value
-    elif cmd.op == "add":
-        new_value = current + cmd.value
+    # P0.2: first multiply / add on a target uses the step-baseline
+    if cmd.op in ("multiply", "add"):
+        baseline = _step_baselines.pop(cmd.target, None)
+        if baseline is not None:
+            base = baseline
+        else:
+            base = current
+
+        if cmd.op == "multiply":
+            new_value = base * cmd.value
+        else:
+            new_value = base + cmd.value
     elif cmd.op == "set":
         new_value = cmd.value
+        _step_baselines.pop(cmd.target, None)  # set overrides the baseline
     else:
         logger.warning("apply_factor: unknown op '%s'", cmd.op)
         return

@@ -41,7 +41,7 @@ class TestSolverParity:
         hr = euler_vc.heart.heart_rate
         assert 40 <= hr <= 250, f"HR={hr} outside valid range"
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_heart_rate_positive(self, radau_vc):
         """Radau: heart rate stays in physiologically valid range."""
         self._step_n(radau_vc, 10)
@@ -54,7 +54,7 @@ class TestSolverParity:
         map_val = euler_vc.heart.mean_arterial_pressure
         assert 30 <= map_val <= 200, f"MAP={map_val} outside valid range"
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_MAP_positive(self, radau_vc):
         """Radau: MAP stays in physiologically valid range."""
         self._step_n(radau_vc, 10)
@@ -67,7 +67,7 @@ class TestSolverParity:
         assert isinstance(result, dict)
         assert "heart" in result
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_step_delegation(self, radau_vc):
         """step() returns a dict for Radau (may be empty {})."""
         result = radau_vc.step()

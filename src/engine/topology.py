@@ -40,18 +40,19 @@ from dataclasses import dataclass, field
 #
 # Format: (src_module, src_var) -> [(tgt_module, tgt_var), ...]
 #
-# **Known dead routes** (src_var never appears in the source module's
-# derivatives() outputs dict → silently skipped by `if val is not None` in
-# unified_rhs; documented, not removed — removal would change Radau behavior
-# that can't be verified on Python 3.14 + scipy 1.17 where Radau hangs):
-#   - ("liver", "glucose_output")       liver emits "glucose_output_g_min"
-#   - ("gut", "portal_flow")            gut emits "portal_blood_flow_mL_min"
-#   - ("gut", "fat_absorption_active")  gut emits "fat_absorption_g_min"
-#   - ("neuro", "heart_rate_bpm")       neuro.derivatives() has no such key
-#   - ("lung", "respiratory_rate")      only in compute(), not derivatives()
-#   - ("fluid", "V_vascular_mL"/"V_isf_mL")  fluid outputs have neither key
-# All `blood`-targeted routes are also dead: `blood` is not in UNIFIED_MODULES,
-# so its derivatives() is never called on the Radau path.
+# **R4 cleanup (2026-06-28)**: Removed 28 dead routes that were silently
+# skipped by `if val is not None` in unified_rhs. Three categories:
+#   1. `blood`-targeted routes (blood not in UNIFIED_MODULES → never consumed)
+#      — all `→ blood` routes dropped (lung, kidney, immune, coagulation,
+#        liver, lymphatic sources).
+#   2. `blood`-sourced routes (blood never in all_outputs) — all 6 blood→*
+#      routes dropped.
+#   3. Mismatched src_var names (liver emits glucose_output_g_min not
+#      glucose_output; gut emits portal_blood_flow_mL_min not portal_flow;
+#      gut emits fat_absorption_g_min not fat_absorption_active; neuro has
+#      no heart_rate_bpm in derivatives(); lung respiratory_rate only in
+#      compute(); fluid has no V_vascular_mL/V_isf_mL in derivatives()).
+# After R4 the table contains only live routes (20 entries, down from 48).
 #
 # Phase 5 plan: this table will be auto-derived from each module's
 # `INPUTS`/`OUTPUTS` class attributes via `discover_topology()`. Until then
@@ -66,30 +67,19 @@ CONNECTIONS: dict[tuple[str, str], list[tuple[str, str]]] = {
     ("heart", "CVP"):               [("kidney", "cvp_input")],
     ("heart", "blood_volume_ratio"): [("fluid", "blood_volume_ratio")],
 
-    # Lung → blood, neuro
-    ("lung", "arterial_PO2_mmHg"):  [("blood", "arterial_PO2"), ("neuro", "PO2")],
-    ("lung", "arterial_PCO2_mmHg"): [("blood", "arterial_PCO2"), ("neuro", "PCO2")],
-    ("lung", "arterial_saturation"): [("blood", "arterial_saturation")],
-    ("lung", "arterial_pH"):         [("blood", "arterial_pH")],
-    ("lung", "respiratory_rate"):   [("neuro", "lung_rr")],
+    # Lung → neuro (blood targets removed — blood not in UNIFIED_MODULES;
+    #   arterial_saturation/arterial_pH only had blood targets → dropped;
+    #   respiratory_rate only emitted in compute(), not derivatives() → dropped)
+    ("lung", "arterial_PO2_mmHg"):  [("neuro", "PO2")],
+    ("lung", "arterial_PCO2_mmHg"): [("neuro", "PCO2")],
 
-    # Blood → kidney, neuro, endocrine, immune
-    ("blood", "potassium_mEq_L"):    [("kidney", "blood_K"), ("endocrine", "K"), ("heart", "potassium_mEq_L")],
-    ("blood", "sodium_mEq_L"):      [("kidney", "blood_Na")],
-    ("blood", "glucose_mmol_L"):    [("kidney", "blood_glucose"), ("endocrine", "glucose")],
-    ("blood", "arterial_pH"):        [("kidney", "blood_pH"), ("heart", "arterial_pH")],
-    ("blood", "arterial_PO2_mmHg"): [("neuro", "PO2")],
-    ("blood", "arterial_PCO2_mmHg"): [("neuro", "PCO2")],
-
-    # Kidney → fluid, blood
+    # Kidney → fluid (blood target dropped)
     ("kidney", "ADH_level"):         [("fluid", "ADH")],
     ("kidney", "urine_output_mL_min"): [("fluid", "urine_output")],
     ("kidney", "angiotensin_II"):    [("fluid", "RAAS_activity")],
-    ("kidney", "blood_volume_loss_rate_mL_min"): [("blood", "urine_loss")],
-
-    # Fluid → heart, blood, lymphatic
-    ("fluid", "V_vascular_mL"):      [("heart", "preload_volume")],
-    ("fluid", "V_isf_mL"):           [("lymphatic", "isf_input")],
+    # R4: removed ("kidney", "blood_volume_loss_rate_mL_min") → blood target (dead)
+    # R4: removed ("fluid", "V_vascular_mL") / ("fluid", "V_isf_mL") — fluid.derivatives()
+    # never emits these keys (dead source routes)
 
     # Endocrine → immune, liver, heart, kidney
     ("endocrine", "cortisol_ug_dL"): [("immune", "endocrine_cortisol")],
@@ -99,38 +89,30 @@ CONNECTIONS: dict[tuple[str, str], list[tuple[str, str]]] = {
     ("endocrine", "PTH_pg_mL"):      [("kidney", "PTH")],
     ("endocrine", "calcium_mg_dL"): [("kidney", "calcium")],
 
-    # Neuro → kidney, endocrine, lymphatic
+    # Neuro → endocrine (heart_rate_bpm dead route removed — neuro.derivatives()
+    # never emits this key)
     ("neuro", "pain_level"):         [("endocrine", "pain_stress")],
-    ("neuro", "heart_rate_bpm"):     [("lymphatic", "hr_input")],
 
-    # Immune → neuro, liver, coagulation, lymphatic
+    # Immune → neuro, liver, coagulation, lymphatic (blood targets dropped)
     ("immune", "cytokine_level"):    [("neuro", "cytokine"), ("coagulation", "immune_cytokine"), ("lymphatic", "cytokine_input"), ("liver", "inflammation")],
     ("immune", "coagulation_state"): [("coagulation", "immune_coagulation_state")],
-    ("immune", "wbc_count"):         [("blood", "WBC")],
-    ("immune", "capillary_leak_factor"): [("blood", "capillary_leak")],
+    # R4: removed ("immune", "wbc_count") / ("immune", "capillary_leak_factor")
+    # — only blood targets (dead)
 
-    # Coagulation → blood, immune
-    ("coagulation", "PT_sec"):        [("blood", "PT_sec")],
-    ("coagulation", "aPTT_sec"):     [("blood", "aPTT_sec")],
-    ("coagulation", "fibrinogen_mg_dL"): [("blood", "fibrinogen_mg_dL")],
-    ("coagulation", "coagulation_state"): [("blood", "coagulation_state")],
+    # R4: removed entire Coagulation → blood block (4 routes: PT_sec, aPTT_sec,
+    # fibrinogen_mg_dL, coagulation_state) — all targets were blood (dead)
 
-    # Liver → blood
-    ("liver", "metabolic_activity"):  [("coagulation", "liver_health_factor")],
-    ("liver", "glucose_output"):      [("blood", "liver_glucose")],
-    ("liver", "ammonia_umol_L"):      [("blood", "ammonia_umol_L")],
-    ("liver", "albumin_g_dL"):       [("blood", "albumin_g_dL")],
-    ("liver", "bilirubin_mg_dL"):    [("blood", "bilirubin_mg_dL")],
+    # Liver → coagulation (blood targets dropped; glucose_output/ammonia/
+    # albumin/bilirubin routes removed — liver emits glucose_output_g_min, and
+    # the others targeted blood which is not in UNIFIED_MODULES)
+    ("liver", "metabolic_activity"): [("coagulation", "liver_health_factor")],
 
-    # Gut → liver
+    # Gut → liver (portal_flow / fat_absorption_active dead routes removed —
+    # gut emits portal_blood_flow_mL_min and fat_absorption_g_min, not these keys)
     ("gut", "amino_absorption_g_min"): [("liver", "amino_absorption_g_min")],
-    ("gut", "portal_flow"):           [("liver", "portal_flow")],
-    ("gut", "fat_absorption_active"):  [("lymphatic", "gut_fat_absorption")],
 
-    # Lymphatic → blood
-    ("lymphatic", "splenic_reserve_mL"): [("blood", "splenic_reserve_mL")],
-    ("lymphatic", "lymph_flow_rate"): [("blood", "lymph_flow_mL_min")],
-    ("lymphatic", "interstitial_fluid_mL"): [("blood", "interstitial_fluid_mL")],
+    # R4: removed entire Lymphatic → blood block (3 routes: splenic_reserve_mL,
+    # lymph_flow_rate, interstitial_fluid_mL) — all targets were blood (dead)
 
     # Disease outputs (from disease.derivatives) → target modules
     # disease.compute_derivatives returns FactorCommand-style outputs
@@ -151,6 +133,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "heart.contractility_factor":    ("heart", "contractility_factor"),
     "heart.preload_factor":          ("heart", "preload_factor"),
     "heart.SVR":                     ("heart", "SVR"),
+    "heart.cortisol_factor":         ("heart", "cortisol_factor"),
     "heart.MAP":                     ("heart", "mean_arterial_pressure"),
     "heart.CVP":                     ("heart", "central_venous_pressure"),
     "heart.blood_volume":            ("heart", "circulating_volume_ml"),
@@ -198,12 +181,16 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.PT_sec":                ("blood", "PT_sec"),
     "blood.aPTT_sec":              ("blood", "aPTT_sec"),
     "blood.fibrinogen_mg_dL":      ("blood", "fibrinogen_mg_dL"),
+    "blood.INR":                   ("blood", "INR"),
+    "blood.coagulation_factor_VII": ("blood", "coagulation_factor_VII"),
     # P0 0d: factor-paths for fields previously written direct in _step_radau
     "blood.saturation":            ("blood", "arterial_saturation"),
     "blood.CRP":                   ("blood", "CRP_mg_L"),
+    "blood.drug_concentration_mg_kg": ("blood", "drug_concentration_mg_kg"),
     # Blood — lymphatic aliases
     "blood.splenic_reserve_mL":    ("blood", "splenic_reserve_mL"),
     "blood.interstitial_fluid_mL": ("blood", "interstitial_fluid_mL"),
+    "blood.lymph_flow_mL_min":     ("blood", "lymph_flow_mL_min"),
     # ── Gut ────────────────────────────────────────────────────────────────
     "gut.motility":                ("gut", "gut_motility"),
     "gut.gut_motility":            ("gut", "gut_motility"),

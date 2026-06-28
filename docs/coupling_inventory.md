@@ -14,32 +14,36 @@ the same thing** — they have different semantics, triggers, and coverage:
 |---|---|---|
 | **Path** | Radau only | Euler only |
 | **Role** | Intra-step data flow (ODE integration loop) | Post-step rule engine |
-| **Trigger** | Every RHS eval (many × per step via Newton) | Once per step (actually 2× — see below) |
+| **Trigger** | Every RHS eval (many × per step via Newton) | 2× per step (R4: explicit 2-substep relaxation — see below) |
 | **What it routes** | module.derivatives() outputs → `_cached_inputs` | published signals → `fn_expr` rules → FactorCommands |
 | **Strategy** | Gauss-Seidel semi-implicit (Newton converges it) | Explicit rule evaluation + first-order lag |
-| **Source of truth** | `src/engine/topology.py` CONNECTIONS (hand-maintained) | `data/coupling_rules.json` (16 rules, 5 enabled) |
-| **Module coverage** | 12 modules (heart/lung/kidney/fluid/gut/liver/endocrine/neuro/immune/coagulation/lymphatic + disease) | 6 modules publish signals (heart/lung/kidney/blood/fluid/liver) |
+| **Source of truth** | `src/engine/topology.py` CONNECTIONS (hand-maintained, 20 live routes after R4) | `data/coupling_rules.json` (16 rules, 5 enabled) |
+| **Module coverage** | 11 modules (heart/lung/kidney/fluid/gut/liver/endocrine/neuro/immune/coagulation/lymphatic + disease) | 6 modules publish signals (heart/lung/kidney/blood/fluid/liver) |
 
-**They cannot be merged in one step** — merging would require either (a) folding
-the RAAS-style rules into the implicit integration (changing Radau's Jacobian
-structure) or (b) pulling the CONNECTIONS data flow out of the integration loop
-(breaking the semi-implicit convergence). Roadmap D4: *"先用 twin-run 验证
-当前行为，再动耦合"* — twin-run (Step 4) is now the safety net.
+**They cannot be merged** — R4 evaluation (Stage 5) concluded the two mechanisms
+operate at **different abstraction levels** and are NOT redundant:
+- CONNECTIONS = passive wiring (passes values between `derivatives()` calls)
+- CouplingEngine = active state mutation (applies `FactorCommand` multiply/set to instance attributes post-step)
+
+RAAS rules (kidney.renin → heart.SVR multiply) CANNOT fold into CONNECTIONS
+because `heart.SVR` is a state variable, not an input to `heart.derivatives()`.
+The coupling needs a post-step factor application, which is CouplingEngine's job.
+See "R4 Stage 5 Evaluation" section below for the full analysis.
 
 ---
 
 ## Mechanism 1: CONNECTIONS (Radau path, intra-step)
 
 **Code:** `src/engine/state_vector.py::unified_rhs` (Step C, ~L396-402)
-**Table:** `src/engine/topology.py::CONNECTIONS` (34 entries)
+**Table:** `src/engine/topology.py::CONNECTIONS` (20 live entries after R4 cleanup)
 
 ### How it works
 1. Each RHS eval calls every module's `derivatives(**inputs_from_cache)`.
 2. Each module emits an `outputs` dict → collected into `all_outputs`.
 3. CONNECTIONS routes `all_outputs[src][src_var] → _cached_inputs[tgt][tgt_var]`.
 4. Next RHS eval (Newton sub-iteration or next step) reads those cached inputs.
-5. The `if val is not None` guard silently skips entries whose source key is
-   absent (the dead routes below).
+5. The `if val is not None` guard is a defensive fallback (R4: no dead routes
+   remain — all src_var names match their source module's derivatives() outputs).
 
 ### Gauss-Seidel ordering (intra-call direct hand-offs)
 Modules are evaluated in fixed order: heart → lung → kidney → gut → liver →
@@ -67,7 +71,9 @@ the standard semi-implicit / Gauss-Seidel-on-the-coupling pattern.
 2. `coupling_engine.resolve(ctx, dt)` flattens all signals into `_signal_map`,
    iterates enabled rules in priority order, evaluates each rule's `fn_expr`
    (Python expression via `eval`), applies optional first-order lag, emits
-   `_CouplingFactorCommand`s.
+   `FactorCommand`s (R4 Stage 2: unified with `common_types.FactorCommand` —
+   the `_CouplingFactorCommand` type drift is resolved; `source` field added
+   to `FactorCommand` to carry the `coupling:<rule_name>` provenance).
 3. Commands applied via `engine.apply_factor(cmd)`.
 
 ### The 5 enabled rules (the ones that actually fire)
@@ -84,18 +90,20 @@ The other 11 rules (blood_ph loop, liver_coag loop, cvp_renal) are
 
 ## Coverage Drift (the core problem)
 
-The two mechanisms cover **different** physiological relationships. Key gaps:
+The two mechanisms cover **different** physiological relationships. R4 Stage 5
+evaluation concluded this drift is **inherent** (different abstraction levels —
+see "R4 Stage 5 Evaluation" below), NOT a defect to fix.
 
-| Relationship | CONNECTIONS | CouplingEngine |
+| Relationship | CONNECTIONS (C) | CouplingEngine (B) |
 |---|---|---|
-| heart.cardiac_output → kidney/lung/gut (perfusion) | ✅ `topology.py:42` | ❌ no rule |
-| heart.MAP → kidney/fluid/neuro (map_input) | ✅ `topology.py:43` | ⚠️ partial (MAP→GFR only) |
+| heart.cardiac_output → kidney/lung/gut (perfusion) | ✅ input passing | ❌ no rule |
+| heart.MAP → kidney/fluid/neuro (map_input) | ✅ input passing | ⚠️ partial (MAP→GFR only) |
 | kidney.renin/angiotensin → heart.SVR/contractility (RAAS) | ❌ | ✅ enabled rules |
 | kidney.GFR → blood.BUN | ❌ | ✅ enabled rule |
 | blood.PCO2 → lung.respiratory_rate (chemoreflex) | ❌ | ✅ enabled rule |
-| kidney.ADH/urine → fluid | ✅ `topology.py:63-64` | ❌ no rule |
-| immune.cytokine → neuro/liver/coag/lymph | ✅ `topology.py:85` | ❌ (immune publishes no signal) |
-| liver.* → blood.* (albumin, PT, fibrinogen, ALT) | ✅ `topology.py:99-101` | ⚠️ 4 rules exist but all disabled |
+| kidney.ADH/urine → fluid | ✅ input passing | ❌ no rule |
+| immune.cytokine → neuro/liver/coag/lymph | ✅ input passing | ❌ (immune publishes no signal) |
+| liver.metabolic_activity → coagulation | ✅ input passing | ⚠️ 4 liver→blood rules exist but all disabled |
 | endocrine/neuro/gut/lymphatic/coagulation as signal sources | ✅ in CONNECTIONS | ❌ these organs publish NO signals |
 
 **Concrete divergence examples:**
@@ -108,60 +116,80 @@ The two mechanisms cover **different** physiological relationships. Key gaps:
   `kidney.compute(dt, MAP, CVP, CO)` direct arg passing in `_step_euler`, not
   through the rule engine — so it's covered, just by a third mechanism).
 
----
-
-## CONNECTIONS Dead Routes
-
-These entries have a `src_var` that the source module's `derivatives()` **never
-emits**, so `all_outputs[src_mod].get(src_var)` returns `None` and the route is
-silently skipped every call. They are **behaviorally inert today** (no effect
-because they never fire), but they are misleading documentation of intent.
-
-| src_var in CONNECTIONS | actual emit key | module:line |
-|---|---|---|
-| `("liver", "glucose_output")` | `glucose_output_g_min` | `liver.py:299` |
-| `("gut", "portal_flow")` | `portal_blood_flow_mL_min` | `gut.py:151` |
-| `("gut", "fat_absorption_active")` | `fat_absorption_g_min` | `gut.py:150` |
-| `("neuro", "heart_rate_bpm")` | (not in derivatives outputs) | `neuro.py:143-150` |
-| `("lung", "respiratory_rate")` | (only in compute(), not derivatives()) | `lung.py:197-210` |
-| `("fluid", "V_vascular_mL")` | (not in outputs) | `fluid.py:228-235` |
-| `("fluid", "V_isf_mL")` | (not in outputs) | `fluid.py:228-235` |
-
-Additionally, **all routes targeting `blood`** are dead because `blood` is not
-in `UNIFIED_MODULES` — its `derivatives()` is never called on the Radau path,
-so `blood`-keyed cache entries are written but never consumed:
-- `("lung", "arterial_PO2_mmHg") → [("blood", "arterial_PO2"), ...]`
-- `("blood", "potassium_mEq_L") → [..., ("heart", "potassium_mEq_L")]` (also
-  note `blood` is the *source* here, so this never fires at all)
-- `("coagulation", "PT_sec") → [("blood", "PT_sec")]` etc.
-
-**Not removed in Step 5** because removal would change Radau-path behavior, and
-real `solve_ivp(Radau)` cannot be verified locally (hangs >5min/step on
-Python 3.14 + scipy 1.17 — environment issue, baseline-confirmed). Left as
-recorded debt for the future "true unification" step.
+**Note:** The pre-R4 table listed `liver.* → blood.*` routes as ✅ in CONNECTIONS.
+R4 Stage 3 removed those as dead routes (blood not in UNIFIED_MODULES). The
+`liver.metabolic_activity → coagulation.liver_health_factor` route is the only
+live liver-sourced coupling in CONNECTIONS.
 
 ---
 
-## Behavioral Quirk: Euler Double-Resolve (Step 4.95)
+## CONNECTIONS Dead Routes — ✅ REMOVED in R4 Stage 3 (2026-06-28)
 
-`src/simulation.py::_step_euler` calls `coupling_engine.resolve()` **twice**:
+R4 Stage 3 removed all 28 dead routes from `CONNECTIONS` (48 → 20 live entries).
+The table below documents the historical dead routes for the record; they no
+longer exist in `topology.py`.
 
-1. **Step 4.95** (`simulation.py:631`): runs BEFORE `run_post_dispatch`, so it
-   resolves against the **previous step's** published signals (stale by one
-   step).
-2. **Step 8** (inside `run_post_dispatch → run_coupling`, `simulation.py:688`):
-   runs AFTER publish, resolves against **current step's** fresh signals.
+**Three categories of dead routes removed:**
 
-**Initial assumption (Step 5 plan):** the first resolve was a stale-signal bug
-to remove. **Empirically disproven by twin-run harness:** removing Step 4.95
-flips `blood_loss_severe` from PASS to FAIL (GFR max-rel-error 0.066 → 0.142).
-The two resolves together form an **intentional 2-substep Gauss-Seidel-style
-relaxation** that the Euler numerics depend on.
+1. **`blood`-targeted routes** (blood not in `UNIFIED_MODULES` → cache entries
+   written but never consumed):
+   - `lung.arterial_PO2/PCO2/saturation/pH → blood.*`
+   - `kidney.blood_volume_loss_rate_mL_min → blood.urine_loss`
+   - `immune.wbc_count / capillary_leak_factor → blood.*`
+   - `coagulation.PT/aPTT/fibrinogen/coagulation_state → blood.*`
+   - `liver.ammonia/albumin/bilirubin → blood.*`
+   - `lymphatic.splenic_reserve/lymph_flow/interstitial_fluid → blood.*`
 
-**Resolution:** Step 4.95 is kept; the misleading comment was corrected
-(`simulation.py:629`) to document the 2-substep relaxation semantics and the
-twin-run evidence. A future "true unification" should formalize this as a
-single explicit substep loop rather than two ad-hoc resolve calls.
+2. **`blood`-sourced routes** (blood never produces `derivatives()` outputs on
+   the Radau path → `all_outputs["blood"]` is always empty):
+   - `blood.potassium/sodium/glucose/pH/PO2/PCO2 → kidney/heart/endocrine/neuro`
+
+3. **Mismatched `src_var` names** (source module emits a differently-named key):
+   | removed src_var | actual emit key |
+   |---|---|
+   | `("liver", "glucose_output")` | `glucose_output_g_min` |
+   | `("gut", "portal_flow")` | `portal_blood_flow_mL_min` |
+   | `("gut", "fat_absorption_active")` | `fat_absorption_g_min` |
+   | `("neuro", "heart_rate_bpm")` | (not in derivatives outputs) |
+   | `("lung", "respiratory_rate")` | (only in compute(), not derivatives()) |
+   | `("fluid", "V_vascular_mL")` | (not in outputs) |
+   | `("fluid", "V_isf_mL")` | (not in outputs) |
+
+**Verification:** 28 twin-run/Radau tests + 986 core channel tests pass after
+removal. The `if val is not None` guard in `unified_rhs` is now a pure
+defensive fallback (no longer silently skipping dead routes).
+
+---
+
+## Euler 2-Substep Coupling Relaxation — ✅ EXPLICIT in R4 Stage 4 (2026-06-28)
+
+`src/simulation.py::_step_euler` calls `coupling_engine.resolve()` **twice**,
+forming a 2-substep Gauss-Seidel relaxation. R4 Stage 4 made this structure
+explicit via phase markers and comments:
+
+1. **Substep 1 (Step 4.95, `PHASE_COUPLING_RESOLVE_1`)** — runs BEFORE
+   `run_post_dispatch`, so it resolves against the **previous step's** published
+   signals (lagged by one step). Inline in `_step_euler`.
+2. **Substep 2 (Step 8, `PHASE_COUPLING_RESOLVE_2`)** — runs AFTER publishing
+   fresh signals, resolves against **current step's** signals. In `run_coupling`
+   (called via `run_post_dispatch`).
+
+**Why both are needed:** twin-run harness proved removing substep 1 flips
+`blood_loss_severe` from PASS to FAIL (GFR max-rel-error 0.066 → 0.142). The
+two resolves together form an intentional 2-substep Gauss-Seidel-style
+relaxation that the Euler numerics depend on.
+
+**R4 changes:**
+- Added `PHASE_COUPLING_RESOLVE_2` phase constant (`step_contract.py`)
+- `run_coupling` now marks `PHASE_COUPLING_RESOLVE_2` after resolve+apply,
+  before `PHASE_COUPLING_PUBLISH` (which now marks full completion)
+- Updated `DIVERGENCE_COUPLING_RESOLVE_COUNT` comment to reference the
+  explicit substep structure
+- Updated Step 4.95 comment block to label it "substep 1 (lagged)"
+
+**Radau path:** does NOT use this 2-substep structure — it relies on intra-step
+Newton iteration on `_cached_inputs` via `unified_rhs` + `CONNECTIONS` table
+for its coupling convergence. This is a documented intentional divergence.
 
 ---
 
@@ -173,42 +201,61 @@ single explicit substep loop rather than two ad-hoc resolve calls.
    adaptive step size limits sub-iteration amplitude. Flagged in
    `docs/archive/audit_report_2026-06-04.md:415-425`.
 
-2. **Euler signal-publish coverage gap:** only 6 of 12 modules publish signals.
+2. **Euler signal-publish coverage gap:** only 6 of 11 modules publish signals.
    CouplingEngine rules therefore cannot express any coupling whose source is
    endocrine/neuro/immune/coagulation/gut/lymphatic. This is why most
    relationships live in CONNECTIONS instead.
 
-3. **`_CouplingFactorCommand` vs `FactorCommand` type drift:**
-   `coupling.py:242` constructs `_CouplingFactorCommand` (a frozen re-definition
-   at L283) while type annotations say `FactorCommand`. Structurally identical,
-   distinct types. The `_source` field exists only on the coupling variant.
-   Cosmetic, not behavioral.
+3. ~~**`_CouplingFactorCommand` vs `FactorCommand` type drift**~~ — ✅ RESOLVED
+   in R4 Stage 2. `coupling.py` now constructs `FactorCommand` directly (with
+   `source="coupling:<rule_name>"`); the `_CouplingFactorCommand` re-definition
+   is deleted.
 
 ---
 
-## Future "True Unification" Directions (out of scope for Step 5)
+## R4 Stage 5 Evaluation: Do NOT Collapse RAAS Rules (2026-06-28)
 
-Three plausible directions, listed for the record (NOT implemented here):
+**Question:** Should the RAAS-style CouplingEngine rules (kidney.renin →
+heart.SVR multiply, kidney.angiotensin_II → heart.contractility multiply) be
+folded into CONNECTIONS to eliminate the B/C coverage drift?
 
-1. **CONNECTIONS → derived from module INPUTS/OUTPUTS declarations.** This is
-   the original Phase 5 plan (`topology.py::discover_topology` placeholder).
-   Each module declares `INPUTS`/`OUTPUTS` class attrs; CONNECTIONS is
-   auto-derived. Eliminates the dead-route drift mechanically. Does NOT merge
-   the two mechanisms — just makes CONNECTIONS self-consistent.
+**Answer: NO.** The two mechanisms operate at different abstraction levels and
+are NOT redundant:
 
-2. **Fold RAAS-style rules into the implicit integration.** Express
-   kidney→heart feedback as additional ODE state or as part of the derivatives
-   coupling, so Radau sees it. Large change to Radau's effective system;
-   requires a runnable Radau environment to validate.
+| Aspect | CONNECTIONS (Mechanism C) | CouplingEngine (Mechanism B) |
+|---|---|---|
+| **Operation** | Passive value passing | Active state mutation |
+| **What it does** | Routes `derivatives()` outputs → `_cached_inputs[tgt][tgt_var]` | Evaluates `fn_expr`, applies `FactorCommand(multiply/set)` to instance attrs |
+| **When** | Intra-step (every RHS eval, many × per step) | Post-step (2× per step via substep relaxation) |
+| **Target** | A module's input parameter (consumed by that module's `derivatives()`) | A module's STATE VARIABLE or config attr (e.g., `heart.SVR`) |
 
-3. **Unify on a single post-step rule engine for both paths.** Pull
-   CONNECTIONS data flow out of the RHS, run coupling as an explicit post-step
-   pass on both Euler and Radau. Breaks the semi-implicit convergence story;
-   would need careful tolerance re-validation.
+**Why RAAS rules can't fold into CONNECTIONS:**
+- `heart.SVR` is a STATE VARIABLE (in `STATE_VARS`), not an input to
+  `heart.derivatives()`. The derivatives function reads `svr_factor` (from
+  tox/pharma), not `renin_activity`.
+- The RAAS coupling MULTIPLIES `heart.SVR` post-step (factor application),
+  which changes the state for the NEXT step's derivatives. This is B's job.
+- CONNECTIONS can only pass values to a module's `*_input` cache slots, which
+  are read by that module's `derivatives()` signature. It cannot mutate state
+  variables — that would violate the derivatives() purity contract.
 
-Any of these needs (a) a runnable Radau environment and (b) the twin-run
-harness as the regression gate. Step 4 (harness) + this inventory are the
-prerequisites.
+**Why the "drift" is not a bug:**
+- C routes `kidney.angiotensin_II → fluid.RAAS_activity` (input passing for
+  fluid's derivatives) — this is a DIFFERENT use of AngII than B's
+  `kidney.renin_activity → heart.SVR` (factor application).
+- B and C are COMPLEMENTARY: C wires modules' derivative inputs; B applies
+  post-step factors that modify state for the next step. Both are needed.
+
+**Recommendation:** Keep the two mechanisms separate. The R4 cleanup (dead
+routes removed, type drift resolved, substep structure explicit) has already
+addressed the actionable debt. Further "unification" would require either:
+- Making C apply factors (breaks derivatives() purity)
+- Making B pass inputs (breaks post-step factor semantics)
+- A full architectural redesign (out of scope for R4)
+
+The remaining "drift" (RAAS in B not in C; CO perfusion in C not in B) is an
+inherent property of having two mechanisms at different abstraction levels,
+not a defect to fix.
 
 ---
 

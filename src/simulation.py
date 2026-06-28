@@ -3,15 +3,35 @@ Simulation Engine - 多系统耦合仿真引擎
 整合心脏、肺部、肾脏模块，实现器官间耦合
 """
 
-import json
 import logging
-from pathlib import Path
 
 import numpy as np
 
 from src.common_types import FactorCommand
 from src.engine import CONNECTIONS
-from src.engine.factor_pipeline import apply_factor as _apply_factor_impl
+from src.engine.factor_pipeline import apply_factor as _apply_factor_impl, snapshot_baselines, clear_baselines
+from src.engine.step_contract import (
+    StepGuard,
+    PHASE_PRE_DISPATCH,
+    PHASE_TOX,
+    PHASE_PHARMA,
+    PHASE_HEART_COMPUTE,
+    PHASE_DISEASE,
+    PHASE_LUNG_COMPUTE,
+    PHASE_KIDNEY_COMPUTE,
+    PHASE_GUT_COMPUTE,
+    PHASE_IMMUNE,
+    PHASE_COUPLING_RESOLVE_1,
+    PHASE_ORGAN_HEALTH_TRACK,
+    PHASE_ORGAN_HEALTH_APPLY,
+    PHASE_HISTORY,
+    PHASE_TIME_ADVANCE,
+    DIVERGENCE_IMMUNE_ORDER,
+    DIVERGENCE_DISEASE_ORDER,
+    DIVERGENCE_COUPLING_RESOLVE_COUNT,
+    DIVERGENCE_CHEMORECEPTOR_LAG,
+    DIVERGENCE_ORGAN_HEALTH_MECHANISM,
+)
 from src.engine.step_common import (
     run_pre_dispatch,
     run_post_dispatch,
@@ -20,6 +40,9 @@ from src.engine.step_common import (
     _apply_urine_blood_loss,
     _apply_fluid_and_ph,
     _sync_blood_volume,
+    build_engine_state,
+    run_organ_compute_chain,
+    refresh_state_dicts,
 )
 from src.engine.solvers import SolverRegistry
 from src.engine.solvers.radau import run_radau_step as _run_radau_step_fn
@@ -30,7 +53,6 @@ from src.engine.state_vector import (
     unpack_state as _unpack_state_fn,
     unified_rhs as _unified_rhs_fn,
 )
-from src.clinical_signs_engine import ClinicalSignsEngine as _ClinicalSignsEngine
 from blood import BloodCompartment
 from heart import HeartModule
 from lung import LungModule
@@ -92,7 +114,7 @@ class VirtualCreature:
         solver: str = "euler",
         lifecycle_mode: str = "bypass",
         record_history: bool = True,
-        legacy_clinical_signs_enabled: bool = True,
+        legacy_clinical_signs_enabled: bool = False,
     ):
         self.w = body_weight_kg
         self.species = species
@@ -134,16 +156,10 @@ class VirtualCreature:
         _urine = baseline_urine_output_ml_min(body_weight_kg)
 
         # 初始化血液隔室（最先创建，所有器官共享）
-        # Phase 4: BloodShim 包装，所有 self.blood.X 读写经 SignalBus 记录
-        # 9 个器官模块代码不变（self.blood.X 仍直接写）
-        from src.engine import BloodShim, SignalBus
-        self._signal_bus = SignalBus()
-        self._real_blood = BloodCompartment(
+        self.blood = BloodCompartment(
             total_volume_ml=_tbv,
             plasma_fraction=PLASMA_VOLUME_FRACTION
         )
-        self.blood = BloodShim(self._real_blood, self._signal_bus)
-        self._signal_bus._real_blood = self._real_blood
 
         # 初始化器官模块（传入体重缩放后的参数）
         self.heart = HeartModule(
@@ -171,7 +187,7 @@ class VirtualCreature:
             pco2_mmHg=self.blood.arterial_PCO2_mmHg,
         )
         self.gut = GutModule(weight_kg=body_weight_kg, blood=self.blood)
-        self.liver = LiverModule(weight_kg=body_weight_kg, blood=self.blood, signal_bus=self._signal_bus)
+        self.liver = LiverModule(weight_kg=body_weight_kg, blood=self.blood)
         self.endocrine = EndocrineModule(weight_kg=body_weight_kg, blood=self.blood)
         self.neuro = NeuroModule(weight_kg=body_weight_kg, blood=self.blood)
         self.immune = ImmuneModule(weight_kg=body_weight_kg, blood=self.blood, endocrine=self.endocrine)
@@ -184,21 +200,6 @@ class VirtualCreature:
         for mod_name in ("heart", "lung", "kidney", "blood", "fluid", "liver"):
             self._organ_contexts[mod_name] = OrganContext(mod_name)
         self.coupling_engine = CouplingEngine()
-
-        # ── Phase 5: I/O contract registration (no behavior change) ──────
-        # Modules declare INPUTS / OUTPUTS / READS_BLOOD / WRITES_BLOOD as class
-        # attributes. Here we register those contracts with the SignalBus so
-        # topology introspection is possible.
-        self._signal_bus.register_module("heart", inputs=self.heart.INPUTS, outputs=self.heart.OUTPUTS, reads_blood=self.heart.READS_BLOOD, writes_blood=self.heart.WRITES_BLOOD)
-        self._signal_bus.register_module("lung", inputs=self.lung.INPUTS, outputs=self.lung.OUTPUTS, reads_blood=self.lung.READS_BLOOD, writes_blood=self.lung.WRITES_BLOOD)
-        self._signal_bus.register_module("kidney", inputs=self.kidney.INPUTS, outputs=self.kidney.OUTPUTS, reads_blood=self.kidney.READS_BLOOD, writes_blood=self.kidney.WRITES_BLOOD)
-        self._signal_bus.register_module("gut", inputs=self.gut.INPUTS, outputs=self.gut.OUTPUTS, reads_blood=self.gut.READS_BLOOD, writes_blood=self.gut.WRITES_BLOOD)
-        self._signal_bus.register_module("liver", inputs=self.liver.INPUTS, outputs=self.liver.OUTPUTS, reads_blood=self.liver.READS_BLOOD, writes_blood=self.liver.WRITES_BLOOD)
-        self._signal_bus.register_module("endocrine", inputs=self.endocrine.INPUTS, outputs=self.endocrine.OUTPUTS, reads_blood=self.endocrine.READS_BLOOD, writes_blood=self.endocrine.WRITES_BLOOD)
-        self._signal_bus.register_module("neuro", inputs=self.neuro.INPUTS, outputs=self.neuro.OUTPUTS, reads_blood=self.neuro.READS_BLOOD, writes_blood=self.neuro.WRITES_BLOOD)
-        self._signal_bus.register_module("immune", inputs=self.immune.INPUTS, outputs=self.immune.OUTPUTS, reads_blood=self.immune.READS_BLOOD, writes_blood=self.immune.WRITES_BLOOD)
-        self._signal_bus.register_module("coagulation", inputs=self.coagulation.INPUTS, outputs=self.coagulation.OUTPUTS, reads_blood=self.coagulation.READS_BLOOD, writes_blood=self.coagulation.WRITES_BLOOD)
-        self._signal_bus.register_module("lymphatic", inputs=self.lymphatic.INPUTS, outputs=self.lymphatic.OUTPUTS, reads_blood=self.lymphatic.READS_BLOOD, writes_blood=self.lymphatic.WRITES_BLOOD)
 
         # ── 统一 ODE 求解器缓存（半隐式耦合）────────────────────────────
         # _cached_inputs[module_name][input_name] = value
@@ -368,41 +369,69 @@ class VirtualCreature:
         if self._legacy_clinical_signs_enabled:
             self._ensure_legacy_clinical_signs_engine()
 
+    def detach_disease(self, disease_module) -> bool:
+        """R5 Stage 2: 从引擎移除疾病模块（仅在 RESOLVED/DEAD 状态可移除）。
+
+        之前没有 detach 机制 — 治愈的疾病对象永远留在 self.diseases 列表中，
+        导致列表单调增长。现在允许在疾病进入终态（RESOLVED/DEAD）后移除。
+
+        Args:
+            disease_module: 要移除的 DiseaseModule 实例
+
+        Returns:
+            True 若移除成功，False 若疾病未在列表中或仍处于 ACTIVE 状态
+        """
+        from src.diseases import DiseaseState
+        if disease_module not in self.diseases:
+            return False
+        if disease_module.state == DiseaseState.ACTIVE:
+            return False  # 必须先 deactivate() 或 mark_dead()
+        self.diseases.remove(disease_module)
+        logger.info("Disease detached from engine: %s", disease_module.name)
+        return True
+
+    def restore_diseases(self, disease_state_full: list[dict]) -> None:
+        """R5 Stage 4: 从持久化快照恢复疾病状态。
+
+        重新创建疾病实例并恢复其完整状态（severity、state、_state_vars、activated_at_s）。
+        之前没有恢复机制 — 跨 session 疾病进度丢失。
+
+        Args:
+            disease_state_full: to_persistence_snapshot()["disease_state_full"] 列表，
+                每项是 disease.full_state() 的输出
+        """
+        from src.diseases import create_disease
+        self.diseases.clear()
+        for ds in disease_state_full:
+            name = ds.get("name")
+            severity = ds.get("severity", "moderate")
+            try:
+                d = create_disease(name, severity=severity)
+            except KeyError:
+                logger.warning("Cannot restore disease '%s' — not registered", name)
+                continue
+            d.restore_state(ds)
+            self.diseases.append(d)
+            if self._legacy_clinical_signs_enabled and d.active:
+                self._ensure_legacy_clinical_signs_engine()
+            logger.info("Disease restored: %s (state=%s)", name, d.state.value)
+
     def _ensure_legacy_clinical_signs_engine(self):
+        """R6: legacy seam deprecated. Interpretation objects must be created
+        by the outer composition layer via `build_external_interpretation_bundle`
+        (game/runtime_composition.py). This method is now a no-op stub kept
+        only to avoid breaking old callers that still set
+        `legacy_clinical_signs_enabled=True`; the engine no longer constructs
+        ClinicalSignsEngine internally.
         """
-        Compatibility seam for legacy engine-owned interpretation lifecycle.
-
-        New application paths should prefer outer-owned interpretation bundles.
-        This helper exists only to preserve older callers that still expect
-        `attach_disease()` + `simulate()` to populate `engine.clinical_signs_engine`.
-        """
-        if not self._legacy_clinical_signs_enabled:
-            return None
-
-        if hasattr(self, "clinical_signs_engine"):
-            return self.clinical_signs_engine
-
-        defs_path = Path(__file__).resolve().parents[1] / "data" / "symptom_definitions.json"
-        with open(defs_path, "r", encoding="utf-8") as f:
-            defs = json.load(f)
-        self.clinical_signs_engine = _ClinicalSignsEngine(self, defs, self.species)
-        return self.clinical_signs_engine
+        return None
 
     def _refresh_legacy_clinical_signs(self) -> None:
+        """R6: legacy seam deprecated. Refresh of interpretation state must
+        be driven by the outer GameRuntime (`runtime.refresher.refresh(engine)`).
+        This method is now a no-op stub kept only for backward compatibility.
         """
-        Compatibility seam for legacy engine-owned interpretation refresh.
-
-        New code should refresh interpretation from outer runtime composition
-        after physical time advancement. This method keeps old direct-engine
-        callers working until that migration is complete.
-        """
-        if not self._legacy_clinical_signs_enabled:
-            return
-
-        signs_engine = getattr(self, "clinical_signs_engine", None)
-        if signs_engine is None:
-            return
-        signs_engine.compute(self.current_time_s)
+        return
 
     def apply_factor(self, cmd: FactorCommand) -> None:
         """
@@ -538,18 +567,62 @@ class VirtualCreature:
         7. 血液代谢物
         7.5. 尿量导致的循环血量损失
         8. 记录历史
+
+        R3: StepGuard enforces ordering contracts at runtime.
+        Documented divergences from Radau path are recorded via
+        guard.divergence_ok() so they are explicit and auditable.
         """
         t = self.current_time_s
         dt = self.dt
 
+        # R3: create per-step guard. Enabled by default; tests can
+        # construct a disabled guard via StepGuard(enabled=False).
+        guard = StepGuard(label="euler")
+        # Document intentional divergences from Radau path (not violations).
+        guard.divergence_ok(
+            DIVERGENCE_IMMUNE_ORDER,
+            "Euler: immune.compute() runs BEFORE coupling (Step 4.9). "
+            "Radau: runs AFTER coupling (Step 7b). Euler needs immune's "
+            "factor_commands applied before coupling sees them."
+        )
+        guard.divergence_ok(
+            DIVERGENCE_DISEASE_ORDER,
+            "Euler: disease runs BEFORE organ compute (Step 2.5). "
+            "Radau: disease runs AFTER coupling (Step 7). Euler needs "
+            "disease factors in place before organ compute() reads them."
+        )
+        guard.divergence_ok(
+            DIVERGENCE_COUPLING_RESOLVE_COUNT,
+            "Euler: 2-substep Gauss-Seidel relaxation — substep 1 at Step 4.95 "
+            "(PHASE_COUPLING_RESOLVE_1, reads lagged signals) + substep 2 at "
+            "Step 8 (PHASE_COUPLING_RESOLVE_2, reads fresh signals). "
+            "Radau: intra-step Newton iteration on _cached_inputs (no explicit "
+            "substeps). Twin-run tests proved the 2-substep relaxation is "
+            "required for Euler stability."
+        )
+        guard.divergence_ok(
+            DIVERGENCE_CHEMORECEPTOR_LAG,
+            "Euler: chemoreceptor_drive read from previous step's "
+            "neuro.compute() (Gauss-Seidel 1-step lag, O(dt) error). "
+            "Radau: neuro integrated in solve_ivp, no lag."
+        )
+        guard.divergence_ok(
+            DIVERGENCE_ORGAN_HEALTH_MECHANISM,
+            "Euler: organ_health factor applied via direct setattr "
+            "(self.heart.MAP *= factor). Radau: via apply_factor "
+            "'multiply'. Euler bypasses baseline since factor is "
+            "applied once per step to current value."
+        )
+
         # Step 0-0.5: 事件处理 + 连续失血 + lifecycle（shared with Radau）
-        if run_pre_dispatch(self):
+        if run_pre_dispatch(self, guard=guard):
             return
 
         # Step 1: 毒理学（可卡因等药物效应）
         tox_state = self.toxicology.compute(dt)
         self.apply_factor(FactorCommand("heart.contractility_factor", "set", tox_state["contractility_factor"]))
         svr_factor = tox_state["svr_factor"]
+        guard.mark(PHASE_TOX)
 
         # Step 1.1: 在毒理学之后重新应用生命周期因子
         # 毒理学会覆盖 contractility_factor，需要将生命周期因子乘回去
@@ -572,6 +645,7 @@ class VirtualCreature:
             if svr_after_pharma != svr_before_pharma:
                 # pharma 修改了 self.SVR，将变化比例应用到 svr_factor
                 svr_factor *= (svr_after_pharma / svr_before_pharma)
+            guard.mark(PHASE_PHARMA)
 
         # Step 2: 心脏循环（输入：血容量 → 输出：CO、MAP）
         # chemoreceptor_drive 来自上一时间步的 neuro 状态（Gauss-Seidel 一阶滞后，
@@ -581,25 +655,20 @@ class VirtualCreature:
                                          chemoreceptor_drive=neuro_chemo)
         CVP = heart_state["CVP_mmHg"]
         CO = heart_state["cardiac_output_ml_min"]
+        guard.mark(PHASE_HEART_COMPUTE)
 
         # Step 2.5: 疾病模块 — 在器官 compute() 之前执行一次
         # 这样 diffusion_coefficient / GFR multiplier 等本轮即可影响下游器官，
         # 同时避免同一 dt 内重复推进 disease state。
         # Q1 (2026-06-14)：支持多病叠加——所有 active 疾病按 attach 顺序计算
         # 各自的 FactorCommand，统一走 apply_factor 的 chained-rebase 合并。
+        # P0.2: snapshot baselines before diseases so multiply/add ops are
+        # idempotent across steps (relative to post-heart baseline).
+        snapshot_baselines(self, guard=guard)
         if self.diseases:
             active_diseases = [d for d in self.diseases if d.active]
             if active_diseases:
-                engine_state = {
-                    "heart": {
-                        "heart_rate_bpm": heart_state["heart_rate_bpm"],
-                        "MAP_mmHg": heart_state["MAP_mmHg"],
-                        "cardiac_output_ml_min": CO,
-                    },
-                    "lung": {"arterial_PO2": self.blood.arterial_PO2_mmHg},
-                    "kidney": {"GFR_ml_min": self.kidney.GFR},
-                    "immune": {"antibiotic_effect": self.immune.antibiotic_effect},
-                }
+                engine_state = build_engine_state(self)
                 for d in active_diseases:
                     d._current_time_s = self.current_time_s
                     for cmd in d.compute(dt, engine_state):
@@ -611,55 +680,56 @@ class VirtualCreature:
             self.apply_factor(FactorCommand("heart.heart_rate", "set", hr_clamped))
             map_clamped = max(30.0, min(200.0, self.heart.mean_arterial_pressure))
             self.apply_factor(FactorCommand("heart.MAP", "set", map_clamped))
+            guard.mark(PHASE_DISEASE)
 
         # Step 3: 肺部气体交换（输入：CO → 输出：血气）
         lung_state = self.lung.compute(dt, CO)
+        guard.mark(PHASE_LUNG_COMPUTE)
 
         # Step 4: 肾脏泌尿（输入：MAP、CO → 输出：GFR、尿量）
         kidney_state = self.kidney.compute(dt, heart_state["MAP_mmHg"], CVP, CO)
+        guard.mark(PHASE_KIDNEY_COMPUTE)
 
         # Step 4.5: 肠道吸收
         gut_state = self.gut.compute(dt, CO)
+        guard.mark(PHASE_GUT_COMPUTE)
 
-        # Step 4.6: 肝脏代谢
-        liver_state = self.liver.compute(dt, gut_state, CO)
+        # Step 4.6-4.8: organ compute chain (liver→endocrine→coagulation→lymphatic→neuro)
+        # P1.2: unified with Radau path via run_organ_compute_chain
+        organ_states = run_organ_compute_chain(
+            self, dt, gut_state, heart_state, lung_state, guard=guard
+        )
+        liver_state = organ_states["liver"]
+        endocrine_state = organ_states["endocrine"]
+        neuro_state = organ_states["neuro"]
 
-        # Step 4.7: 内分泌轴
-        endocrine_state = self.endocrine.compute(dt)
-
-        # Step 4.65: 凝血系统
-        coagulation_state = self.coagulation.compute(dt, liver_state, {})
-        for cmd in coagulation_state.get("factor_commands", []):
-            self.apply_factor(cmd)
-
-        # Step 4.75: 淋巴/脾脏系统
-        lymphatic_state = self.lymphatic.compute(dt, gut_state, {})
-        for cmd in lymphatic_state.get("factor_commands", []):
-            self.apply_factor(cmd)
-
-        # Step 4.8: 神经系统
-        neuro_state = self.neuro.compute(dt, heart_state, lung_state)
-        for cmd in neuro_state.get("factor_commands", []):
-            self.apply_factor(cmd)
-
-        # Step 4.9: 免疫/炎症系统
+        # Step 4.9: 免疫/炎症系统（Euler 特有：在 coupling 之前执行）
         immune_state = self.immune.compute(dt, endocrine_state)
         for cmd in immune_state.get("factor_commands", []):
             self.apply_factor(cmd)
+        guard.mark(PHASE_IMMUNE)
 
-        # ── Step 4.95: 多器官耦合（第一次 resolve，读上一拍的信号）─────────────
-        # NOTE(Step 5, solver-refactor-roadmap-v3): this resolve() runs BEFORE
-        # run_post_dispatch publishes this step's signals, so it reads the
-        # PREVIOUS step's published signals. This is NOT a bug to remove
-        # casually — twin-run harness (tests/test_twin_run.py) empirically
-        # proved that together with the second resolve in run_post_dispatch
-        # (Step 8, fresh signals), this forms an intentional 2-substep
-        # Gauss-Seidel-style relaxation that the Euler numerics depend on
-        # (removing it flips blood_loss_severe from PASS to FAIL, GFR error
-        # 0.066 → 0.142). See docs/coupling_inventory.md "double-resolve".
+        # ── Step 4.95: coupling substep 1 (lagged resolve) ────────────────────
+        # R4: This is the FIRST substep of the Euler path's 2-substep Gauss-Seidel
+        # relaxation. It reads the PREVIOUS step's published signals (lagged by
+        # one step) from `_organ_contexts` and resolves coupling rules against
+        # them. The SECOND substep runs in `run_coupling` (Step 8, via
+        # `run_post_dispatch`) and publishes FRESH signals before resolving.
+        #
+        # This is NOT a bug to remove casually — twin-run harness
+        # (tests/test_twin_run.py) empirically proved that the 2-substep
+        # relaxation is required for Euler stability (removing this substep
+        # flips blood_loss_severe from PASS to FAIL, GFR error 0.066 → 0.142).
+        # See docs/coupling_inventory.md "double-resolve" and the
+        # DIVERGENCE_COUPLING_RESOLVE_COUNT contract marker below.
+        #
+        # P0.2: re-snapshot baselines after all organ compute() calls so
+        # coupling multiply/add ops use post-organ values as baseline.
+        snapshot_baselines(self, guard=guard)
         coupling_cmds = self.coupling_engine.resolve(self._organ_contexts, dt)
         for cmd in coupling_cmds:
             self.apply_factor(cmd)
+        guard.mark(PHASE_COUPLING_RESOLVE_1)
 
         # Step 5.1: 器官衰竭追踪
         # 保存 pre-degradation 值用于 stress 判断，避免 feedback 振荡
@@ -676,36 +746,25 @@ class VirtualCreature:
             heart_state_pre=heart_state_pre,
             lung_state_pre=lung_state_pre,
         )
+        guard.mark(PHASE_ORGAN_HEALTH_TRACK)
 
         # 健康因子永久降低器官输出（不可逆）
         # NOTE(C6): 一次性应用（不是乘法链）。organ_health.factor 由 track() 根据
         # 当前 stress 计算，每 step 独立。不会产生 base×0.95×0.90 的累积效应。
+        # R1: 只修改实例属性 — dict 由 refresh_state_dicts 统一刷新
         if self.organ_health.heart_factor < 1.0:
-            heart_state["cardiac_output_ml_min"] *= self.organ_health.heart_factor
-            heart_state["MAP_mmHg"] *= self.organ_health.heart_factor
             self.heart.mean_arterial_pressure *= self.organ_health.heart_factor
             self.heart.cardiac_output *= self.organ_health.heart_factor
         if self.organ_health.lung_factor < 1.0:
-            lung_state["arterial_PO2"] *= self.organ_health.lung_factor
             self.lung.diffusion_coefficient *= self.organ_health.lung_factor
         if self.organ_health.kidney_factor < 1.0:
-            kidney_state["GFR_ml_min"] *= self.organ_health.kidney_factor
             self.kidney.GFR *= self.organ_health.kidney_factor
+        guard.mark(PHASE_ORGAN_HEALTH_APPLY)
 
-        # Step 5.5: 重新读取疾病写入后的器官状态（不再次推进 disease）
-        # Q1 (2026-06-14)：多病叠加 — 只要任一 active 疾病就执行重读
-        if any(d.active for d in self.diseases):
-            heart_state["heart_rate_bpm"] = self.heart.heart_rate
-            heart_state["MAP_mmHg"] = self.heart.mean_arterial_pressure
-            heart_state["CVP_mmHg"] = self.heart.central_venous_pressure
-            heart_state["cardiac_output_ml_min"] = self.heart.cardiac_output
-            lung_state["arterial_PO2"] = self.blood.arterial_PO2_mmHg
-            kidney_state["GFR_ml_min"] = self.kidney.GFR
-            kidney_state["urine_output_ml_min"] = self.kidney.urine_output
-
-        # 从修改后的 dict 读取最终值（而非旧快照）
-        final_MAP = heart_state["MAP_mmHg"]
-        final_CO  = heart_state["cardiac_output_ml_min"]
+        # R1: 无条件从实例属性刷新 state dicts（替代 Step 5.5 条件同步）
+        # 实例属性是单一权威源 — dict 是快照，在 disease/organ_health/coupling
+        # 修改实例属性后必须刷新以保持一致。
+        refresh_state_dicts(self, heart_state, lung_state, kidney_state, guard=guard)
 
         # Step 6: 更新静脉血气（组织代谢）
         self._update_venous_gas()
@@ -715,7 +774,7 @@ class VirtualCreature:
 
         # Steps 7.5-8.5: shared post-dispatch (blood loss + fluid + coupling + legacy refresh)
         # signal_time = t (before +=dt) — Euler publishes at pre-step time
-        fluid_state = run_post_dispatch(self, dt, signal_time=t)
+        fluid_state = run_post_dispatch(self, dt, signal_time=t, guard=guard)
 
         # Post-coupling safety clamp: RAAS coupling rule multiplies heart.SVR
         # every step (factor = 1 + 0.2 * renin). Over many steps this compounds
@@ -736,9 +795,15 @@ class VirtualCreature:
                 neuro_state=neuro_state, immune_state=immune_state,
                 fluid_state=fluid_state, svr_factor=svr_factor,
             )
+        guard.mark(PHASE_HISTORY)
 
         # 更新时间
         self.current_time_s += dt
+        guard.mark(PHASE_TIME_ADVANCE)
+
+        # P0.2: clear per-step baselines to prevent stale state leaking
+        # into tests that don't call step().
+        clear_baselines(guard=guard)
 
         return {
             "heart": heart_state,
@@ -1277,14 +1342,16 @@ class VirtualCreature:
             # ── Disease state (readable summary) ────────────────────────
             # Q1 (2026-06-14): 多病叠加 — list 形式，每个 disease 一个 summary
             "disease_state": [d.summary() for d in self.diseases if d.active] or None,
+            # R5 Stage 4: 完整精度疾病状态（供恢复用，包含所有疾病不止 active 的）
+            "disease_state_full": [d.full_state() for d in self.diseases] or None,
         }
 
     def to_minimal_snapshot(self) -> dict:
-        """
-        Legacy compatibility alias for persistence/session snapshots.
+        """R6 Layer B: deprecated legacy alias for `to_persistence_snapshot()`.
 
-        New code should prefer `to_persistence_snapshot()` so the method name
-        reflects its actual outer-layer responsibility.
+        Prefer the outer-layer adapter `game.persistence_adapter.build_persistence_snapshot`
+        — session persistence is an application concern, not a kernel concern.
+        This alias is kept only to avoid breaking old callers and tests.
         """
         return self.to_persistence_snapshot()
 

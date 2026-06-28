@@ -183,7 +183,7 @@ class TestCouplingIntegration:
 
         ctx = c._organ_contexts
         cmds = c.coupling_engine.resolve(ctx, c.dt)
-        aldosterone_cmds = [c for c in cmds if "aldosterone" in c._source.lower()]
+        aldosterone_cmds = [c for c in cmds if "aldosterone" in c.source.lower()]
         assert len(aldosterone_cmds) == 0
 
     def test_liver_metabolic_activity_affects_albumin(self):
@@ -264,6 +264,6 @@ class TestCouplingConditions:
 
         ctx = c._organ_contexts
         cmds = c.coupling_engine.resolve(ctx, c.dt)
-        svr_cmds = [c for c in cmds if "SVR" in c.target and "RAAS" in c._source]
+        svr_cmds = [c for c in cmds if "SVR" in c.target and "RAAS" in c.source]
         # No RAAS SVR commands when renin is 0
         assert len(svr_cmds) == 0

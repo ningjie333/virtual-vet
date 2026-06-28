@@ -83,11 +83,14 @@ def build_state_map(engine: "VirtualCreature") -> dict[tuple[str, str], int]:
             state_map[(mname, ode_name)] = idx
             idx += 1
 
-    # 疾病状态变量
-    if engine.disease is not None and hasattr(engine.disease, '_state_vars'):
-        for vname in engine.disease._state_vars:
-            state_map[("disease", vname)] = idx
-            idx += 1
+    # 疾病状态变量 — R5 Stage 1: 遍历所有 active 疾病（用 disease.{name} 命名空间
+    # 隔离，避免多病 state_var 名字冲突；与 IVP 路径 _get_ivp_disease_modules 一致）
+    for d in engine.diseases:
+        if d.active and hasattr(d, '_state_vars'):
+            mname = f"disease.{d.name}"
+            for vname in d._state_vars:
+                state_map[(mname, vname)] = idx
+                idx += 1
 
     return state_map
 
@@ -108,11 +111,13 @@ def pack_state(engine: "VirtualCreature") -> np.ndarray:
         for ode_name, attr_name in module.STATE_VARS:
             y0[state_map[(mname, ode_name)]] = getattr(module, attr_name)
 
-    # 疾病状态
-    if engine.disease is not None and hasattr(engine.disease, '_state_vars'):
-        for vname in engine.disease._state_vars:
-            idx = state_map[("disease", vname)]
-            y0[idx] = engine.disease._state_vars[vname]
+    # 疾病状态 — R5 Stage 1: 遍历所有 active 疾病
+    for d in engine.diseases:
+        if d.active and hasattr(d, '_state_vars'):
+            mname = f"disease.{d.name}"
+            for vname in d._state_vars:
+                idx = state_map[(mname, vname)]
+                y0[idx] = d._state_vars[vname]
 
     return y0
 
@@ -138,11 +143,13 @@ def unpack_state(engine: "VirtualCreature", y: np.ndarray) -> None:
         if hook is not None:
             hook()
 
-    # 疾病状态
-    if engine.disease is not None and hasattr(engine.disease, '_state_vars'):
-        for vname in engine.disease._state_vars:
-            idx = state_map[("disease", vname)]
-            engine.disease._state_vars[vname] = y[idx]
+    # 疾病状态 — R5 Stage 1: 遍历所有 active 疾病
+    for d in engine.diseases:
+        if d.active and hasattr(d, '_state_vars'):
+            mname = f"disease.{d.name}"
+            for vname in d._state_vars:
+                idx = state_map[(mname, vname)]
+                d._state_vars[vname] = y[idx]
 
 
 def unified_rhs(engine: "VirtualCreature", t: float, y: np.ndarray) -> np.ndarray:
@@ -174,8 +181,8 @@ def unified_rhs(engine: "VirtualCreature", t: float, y: np.ndarray) -> np.ndarra
        - gut 的 outputs 直接作为 liver 的 gut_state 入参（intra-call 直传）
        - 其余跨模块依赖通过 CONNECTIONS 在本调用末尾路由到 _cached_inputs
     5. 按 CONNECTIONS 表路由 all_outputs → _cached_inputs（供下次 rhs 用）
-       注：src_var 命名不匹配的条目被 `if val is not None` 静默跳过
-       （见 docs/coupling_inventory.md 的 dead routes 清单）
+       注：R4 清理后 CONNECTIONS 只含活跃路由（src_var 命名均与 derivatives()
+       outputs 匹配）；`if val is not None` 仅作为防御性回退，不再静默跳过死路由
     6. 打包 module_dydt → numpy 向量返回（用 derivatives 的 dydt，非 outputs）
 
     ── 已知限制 ─────────────────────────────────────────────────────────
@@ -325,11 +332,14 @@ def unified_rhs(engine: "VirtualCreature", t: float, y: np.ndarray) -> np.ndarra
     module_dydt["fluid"] = dydt
     all_outputs["fluid"] = outputs
 
-    # 疾病
-    if engine.disease is not None and hasattr(engine.disease, 'compute_derivatives'):
-        engine_state = engine._get_engine_state()
-        disease_dydt = engine.disease.compute_derivatives(engine_state)
-        all_outputs["disease"] = disease_dydt
+    # 疾病 — R5 Stage 1: 遍历所有 active 疾病（用 disease.{name} 命名空间）
+    engine_state = engine._get_engine_state()
+    for d in engine.diseases:
+        if d.active and hasattr(d, 'compute_derivatives'):
+            mname = f"disease.{d.name}"
+            disease_dydt = d.compute_derivatives(engine_state)
+            module_dydt[mname] = disease_dydt
+            all_outputs[mname] = disease_dydt
 
     # 4. 按 CONNECTIONS 表路由 outputs → cached inputs（供下次 rhs 调用用）
     for (src_mod, src_var), targets in CONNECTIONS.items():
@@ -348,9 +358,7 @@ def unified_rhs(engine: "VirtualCreature", t: float, y: np.ndarray) -> np.ndarra
     dydt_vec = np.zeros(n)
 
     for (mname, vname), idx in state_map.items():
-        if mname == "disease":
-            dydt_vec[idx] = module_dydt.get("disease", {}).get(vname, 0.0)
-        else:
-            dydt_vec[idx] = module_dydt.get(mname, {}).get(vname, 0.0)
+        # R5 Stage 1: 疾病用 disease.{name} 命名空间，直接查 module_dydt
+        dydt_vec[idx] = module_dydt.get(mname, {}).get(vname, 0.0)
 
     return dydt_vec

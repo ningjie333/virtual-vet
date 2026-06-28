@@ -25,10 +25,12 @@ class FactorCommand:
         target: 参数路径，格式 "module.attr"（如 "heart.heart_rate"）
         op: 操作类型 — "multiply"（乘因子）/ "add"（加偏移）/ "set"（设绝对值）
         value: 操作数值
+        source: 可选来源标签（如 "coupling:RAAS_heart_SVR"），用于审计/测试
     """
     target: str
     op: Literal["multiply", "add", "set"]
     value: float
+    source: str = ""
 
 
 # ── 参数路径映射表 ───────────────────────────────────────────────────────────
@@ -44,6 +46,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "heart.contractility_factor":    ("heart", "contractility_factor"),
     "heart.preload_factor":         ("heart", "preload_factor"),
     "heart.SVR":                     ("heart", "SVR"),
+    "heart.cortisol_factor":         ("heart", "cortisol_factor"),
     "heart.MAP":                     ("heart", "mean_arterial_pressure"),
     "heart.CVP":                     ("heart", "central_venous_pressure"),
     "heart.blood_volume":            ("heart", "circulating_volume_ml"),
@@ -90,9 +93,13 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.PT_sec":                ("blood", "PT_sec"),
     "blood.aPTT_sec":              ("blood", "aPTT_sec"),
     "blood.fibrinogen_mg_dL":      ("blood", "fibrinogen_mg_dL"),
+    "blood.INR":                   ("blood", "INR"),
+    "blood.coagulation_factor_VII": ("blood", "coagulation_factor_VII"),
+    "blood.drug_concentration_mg_kg": ("blood", "drug_concentration_mg_kg"),
     # Blood — lymphatic aliases
     "blood.splenic_reserve_mL":    ("blood", "splenic_reserve_mL"),
     "blood.interstitial_fluid_mL": ("blood", "interstitial_fluid_mL"),
+    "blood.lymph_flow_mL_min":     ("blood", "lymph_flow_mL_min"),
     # ── Gut ────────────────────────────────────────────────────────────────
     "gut.motility":                ("gut", "gut_motility"),
     "gut.gut_motility":            ("gut", "gut_motility"),

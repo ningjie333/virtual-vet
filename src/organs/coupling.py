@@ -9,11 +9,16 @@ CouplingEngine     : resolves coupling_rules.json → FactorCommands
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
+from src.common_types import FactorCommand
+
 import jsonschema
+
+from src.engine.numerics import first_order_lag
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +193,7 @@ class CouplingEngine:
         self,
         organ_contexts: dict[ORGANS, OrganContext],
         dt: float,
-    ) -> list["_CouplingFactorCommand"]:
+    ) -> list["FactorCommand"]:
         """
         Compute all FactorCommands from current signal values.
 
@@ -230,20 +235,21 @@ class CouplingEngine:
                 continue
 
             # Apply first-order lag if time_constant > 0
+            # 使用精确指数解 1-exp(-dt/τ) 替代 Euler 离散化 dt/τ，
+            # 消除 dt 敏感性。
             if rule.time_constant > 0:
                 lag_key = f"{rule.name}:{rule.source_signal}"
                 prev = self._lag_state.get(lag_key, result_val)
-                # Discrete first-order lag: y_new = y_old + (target - y_old) * dt / tau
-                new_lag = prev + (result_val - prev) * dt / rule.time_constant
+                new_lag = first_order_lag(prev, result_val, dt, rule.time_constant)
                 self._lag_state[lag_key] = new_lag
                 result_val = new_lag
 
             # Build FactorCommand
-            cmd = _CouplingFactorCommand(
+            cmd = FactorCommand(
                 target=rule.target_param,
                 op=rule.op,
                 value=result_val,
-                _source=f"coupling:{rule.name}",
+                source=f"coupling:{rule.name}",
             )
             commands.append(cmd)
 
@@ -272,18 +278,3 @@ class CouplingEngine:
     @property
     def rules(self) -> list[_CouplingRule]:
         return list(self._rules)
-
-
-# FactorCommand is imported lazily (simulation.py imports this module)
-from dataclasses import dataclass as _dc
-from typing import Literal as _Lit
-
-
-@_dc(frozen=True)
-class _CouplingFactorCommand:
-    """Internal FactorCommand used by CouplingEngine — mirrors simulation.FactorCommand."""
-
-    target: str
-    op: _Lit["multiply", "add", "set"]
-    value: float
-    _source: str = "coupling"
