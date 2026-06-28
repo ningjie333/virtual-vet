@@ -148,6 +148,100 @@ export interface AdministerDrugResponse {
   time_cost_min?: number;
 }
 
+// ── R6 Layer C: 提取的具名响应类型 ─────────────────────────────────────────
+// 之前 examine/diagnose/wait/getGameState/newGame 5 个端点的响应类型在 api.ts
+// 内联声明，导致 (a) 字段重复 (b) 与 AdministerDrugResponse 漂移 (c) 调用方
+// 无法引用具名类型。下面 5 个 interface 直接对应后端 gui_app.py 各 handler 的
+// jsonify({...}) 返回结构，与 AdministerDrugResponse 保持字段语义一致。
+
+export interface ExamineResponse {
+  success: boolean;
+  phase: string;
+  medical_phase: string;
+  time_elapsed_min: number;
+  time_budget_min: number;
+  time_remaining_min: number;
+  time_cost_min: number;
+  action_started_at_s: number | null;
+  state_time_s: number | null;
+  death_timer: number | null;
+  report: Report;
+  vitals: Vitals;
+  game_log: string[];
+  new_reports?: Report[];
+  pending_reports?: number;
+  game_over?: GameOverData;
+  game_time?: string;
+  is_night?: boolean;
+  error?: string;
+}
+
+export interface DiagnoseResponse {
+  success: boolean;
+  phase: string;
+  medical_phase: string;
+  time_elapsed_min: number;
+  time_budget_min: number;
+  time_remaining_min: number;
+  time_cost_min: number;
+  death_timer: number | null;
+  treatment_result: TreatmentResult;
+  vitals: Vitals;
+  game_log: string[];
+  new_reports?: Report[];
+  pending_reports?: number;
+  game_over?: GameOverData;
+  game_time?: string;
+  is_night?: boolean;
+  error?: string;
+}
+
+export interface WaitResponse {
+  success: boolean;
+  phase: string;
+  medical_phase: string;
+  time_elapsed_min: number;
+  time_budget_min: number;
+  time_remaining_min: number;
+  time_cost_min: number;
+  death_timer: number | null;
+  vitals: Vitals;
+  game_log: string[];
+  new_reports?: Report[];
+  pending_reports?: number;
+  game_over?: GameOverData;
+  game_time?: string;
+  is_night?: boolean;
+  error?: string;
+}
+
+export interface GameStateResponse {
+  phase: string;
+  medical_phase: string;
+  time_elapsed_min: number;
+  time_budget_min: number;
+  time_remaining_min: number;
+  death_timer: number | null;
+  vitals: Vitals;
+  reports_count: number;
+  pending_reports: number;
+  game_log: string[];
+  active_signs: ActiveSign[];
+  game_time?: string;
+  is_night?: boolean;
+}
+
+export interface NewGameResponse {
+  session_id: string;
+  case: Case;
+  game_state: GameState;
+  vitals: Vitals;
+  game_time: string;
+  is_night: boolean;
+  time_budget_min: number;
+  pending_reports: number;
+}
+
 export interface ApiResponse<T = unknown> {
   success?: boolean;
   error?: string;

@@ -117,10 +117,17 @@ def _persist_action(state: GameState, session_id: str, action_type: str,
 
 
 def _snapshot_json(vc: VirtualCreature) -> str:
-    """Serialize VirtualCreature to JSON for SQLite storage."""
+    """Serialize VirtualCreature to JSON for SQLite storage.
+
+    R6 Layer B: delegates to outer-layer adapter
+    `game.persistence_adapter.build_persistence_snapshot` instead of calling
+    `vc.to_persistence_snapshot()` directly, so session-persistence concerns
+    live outside the kernel.
+    """
     import json
     try:
-        return json.dumps(vc.to_persistence_snapshot(), ensure_ascii=False)
+        from game.persistence_adapter import build_persistence_snapshot
+        return json.dumps(build_persistence_snapshot(vc), ensure_ascii=False)
     except Exception as e:
         logger.warning("Snapshot serialization failed: %s — returning empty snapshot", e)
         return "{}"
@@ -155,16 +162,33 @@ _game_sessions: dict[str, GameState] = {}
 _session_runtimes: dict[str, object] = {}
 _session_locks: dict[str, threading.Lock] = {}  # session_id → lock
 _action_seq: dict[str, int] = {}  # session_id → next seq number
+# R6 Layer C (C3 修订): 模块级全局锁，保护 4 个 session 字典的原子初始化。
+# 之前 api_new_game 先创建锁再写入字典 — 并发请求在 _session_locks[sid] = new_lock
+# 之前查不到锁，会重复创建并各自持有不同的锁实例，互不阻塞，原子性失败。
+# 现在 _registry_lock 短临界区保证 "create lock + populate 4 dicts" 是原子的。
+_registry_lock = threading.Lock()
 _DEFAULT_SESSION_ID = "case_001"
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 5000
+# R6 Layer C (C7): 统一错误消息常量（check_workflow_closure.py 强制校验）
+_SESSION_NOT_FOUND_MSG = "游戏会话不存在，请先开始新游戏"
+_DISEASE_REF_NOT_FOUND_MSG = "未找到该疾病的引用数据"
 
 # ============================================================
 # 辅助函数
 # ============================================================
 
 
-def _session_lock_or_404(session_id: str, message: str):
+# R6 Layer C: 统一所有 session-not-found 错误消息（之前 7 个端点用 2 种文案）
+_SESSION_NOT_FOUND_MSG = "游戏会话不存在，请先开始新游戏"
+
+
+def _session_lock_or_404(session_id: str, message: str = _SESSION_NOT_FOUND_MSG):
+    """取 session 锁，不存在则返回 (None, 404 response)。
+
+    R6 Layer C: message 默认用统一常量 `_SESSION_NOT_FOUND_MSG`。
+    保留 message 参数仅为向后兼容现有调用点。
+    """
     lock = _session_locks.get(session_id)
     if not lock:
         return None, (jsonify({"error": message}), 404)
@@ -379,12 +403,21 @@ def api_new_game():
     )
 
     # 用 case_id 作为 session id（单用户原型）
+    # R6 Layer C (C3 修订): 用模块级 _registry_lock 保护字典写入的原子性。
+    # 之前先创建锁再写字典 — 并发请求在锁写入前查不到，会创建新锁实例导致互不阻塞。
+    # 现在短临界区保证 create_lock + populate 4 dicts 是原子的；session 自身的锁
+    # 仍在请求处理时获取（_session_lock_or_404），与 _registry_lock 不嵌套，无死锁风险。
     session_id = case_id
-    _session_locks[session_id] = threading.Lock()
-    _game_sessions[session_id] = state
-    _session_runtimes[session_id] = build_external_interpretation_bundle(
-        vc,
-    ).runtime
+    with _registry_lock:
+        new_lock = threading.Lock()
+        _session_locks[session_id] = new_lock
+        _game_sessions[session_id] = state
+        _session_runtimes[session_id] = build_external_interpretation_bundle(
+            vc,
+        ).runtime
+        # _action_seq 也在此处原子初始化（之前由 _persist_action 懒初始化，
+        # 导致 GET 并发可能读到缺失 key）
+        _action_seq.setdefault(session_id, 1)
 
     # Persist to SQLite
     db_create_session(
@@ -407,6 +440,7 @@ def api_new_game():
                 "phase": state.phase,
                 "time_elapsed_min": 0,
                 "time_budget_min": state.time_budget_min,
+                "time_remaining_min": state.time_remaining_min,
                 "medical_phase": _clinical_phase(vc, runtime=runtime),
                 "death_timer": state.death_timer,
             },
@@ -430,14 +464,15 @@ def api_examine():
     session_id = data.get("session_id", _DEFAULT_SESSION_ID)
     test_type = data.get("test_type", "physical")
 
-    lock = _session_locks.get(session_id)
-    if not lock:
-        return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
+    # R6 Layer C: 统一用 _session_lock_or_404 helper（之前直接读 _session_locks 字典）
+    lock, error = _session_lock_or_404(session_id, _SESSION_NOT_FOUND_MSG)
+    if error:
+        return error
 
     with lock:
         state = _game_sessions.get(session_id)
         if not state:
-            return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
+            return jsonify({"error": _SESSION_NOT_FOUND_MSG}), 404
         runtime = _runtime_for_session(session_id)
 
         if state.phase in ("won", "lost"):
@@ -501,14 +536,14 @@ def api_administer_drug():
     dose_mg_kg = data.get("dose_mg_kg", 0.0)
     volume_ml = data.get("volume_ml", 0.0)
 
-    lock, error = _session_lock_or_404(session_id, "游戏会话不存在，请先开始新游戏")
+    lock, error = _session_lock_or_404(session_id, _SESSION_NOT_FOUND_MSG)
     if error:
         return error
 
     with lock:
         state = _game_sessions.get(session_id)
         if not state:
-            return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
+            return jsonify({"error": _SESSION_NOT_FOUND_MSG}), 404
         runtime = _runtime_for_session(session_id)
 
         if state.phase in ("won", "lost"):
@@ -565,14 +600,14 @@ def api_diagnose():
     session_id = data.get("session_id", _DEFAULT_SESSION_ID)
     diagnosis = data.get("diagnosis", "")
 
-    lock, error = _session_lock_or_404(session_id, "游戏会话不存在，请先开始新游戏")
+    lock, error = _session_lock_or_404(session_id, _SESSION_NOT_FOUND_MSG)
     if error:
         return error
 
     with lock:
         state = _game_sessions.get(session_id)
         if not state:
-            return jsonify({"error": "游戏会话不存在，请先开始新游戏"}), 404
+            return jsonify({"error": _SESSION_NOT_FOUND_MSG}), 404
         runtime = _runtime_for_session(session_id)
 
         if state.phase in ("won", "lost"):
@@ -645,14 +680,14 @@ def api_wait():
     data = request.get_json() or {}
     session_id = data.get("session_id", _DEFAULT_SESSION_ID)
 
-    lock, error = _session_lock_or_404(session_id, "游戏会话不存在")
+    lock, error = _session_lock_or_404(session_id, _SESSION_NOT_FOUND_MSG)
     if error:
         return error
 
     with lock:
         state = _game_sessions.get(session_id)
         if not state:
-            return jsonify({"error": "游戏会话不存在"}), 404
+            return jsonify({"error": _SESSION_NOT_FOUND_MSG}), 404
         runtime = _runtime_for_session(session_id)
 
         result = process_action(state, "wait", {}, runtime=runtime)
@@ -691,14 +726,14 @@ def api_wait():
 def api_game_state():
     """获取当前游戏状态（用于刷新/轮询）"""
     session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
-    lock, error = _session_lock_or_404(session_id, "游戏会话不存在")
+    lock, error = _session_lock_or_404(session_id, _SESSION_NOT_FOUND_MSG)
     if error:
         return error
 
     with lock:
         state = _game_sessions.get(session_id)
         if not state:
-            return jsonify({"error": "游戏会话不存在"}), 404
+            return jsonify({"error": _SESSION_NOT_FOUND_MSG}), 404
         runtime = _runtime_for_session(session_id)
 
         summary = _clinical_summary(state.engine, state.time_elapsed_min, runtime=runtime)
@@ -726,14 +761,14 @@ def api_game_state():
 def api_hint():
     """根据已获取的报告给出诊断提示"""
     session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
-    lock, error = _session_lock_or_404(session_id, "游戏会话不存在")
+    lock, error = _session_lock_or_404(session_id, _SESSION_NOT_FOUND_MSG)
     if error:
         return error
 
     with lock:
         state = _game_sessions.get(session_id)
         if not state:
-            return jsonify({"error": "游戏会话不存在"}), 404
+            return jsonify({"error": _SESSION_NOT_FOUND_MSG}), 404
 
         if not state.reports:
             return jsonify({"hint": "请先开具检查，获取检查报告后再来查看提示。"})
@@ -787,14 +822,14 @@ def api_diagnosis():
     from game.diagnosis_engine import get_disease_references_with_clues
 
     session_id = request.args.get("session_id", _DEFAULT_SESSION_ID)
-    lock, error = _session_lock_or_404(session_id, "游戏会话不存在")
+    lock, error = _session_lock_or_404(session_id, _SESSION_NOT_FOUND_MSG)
     if error:
         return error
 
     with lock:
         state = _game_sessions.get(session_id)
         if not state:
-            return jsonify({"error": "游戏会话不存在"}), 404
+            return jsonify({"error": _SESSION_NOT_FOUND_MSG}), 404
 
         matches = match_diseases(state.reports)
         suggested = get_suggested_tests(matches)
@@ -838,7 +873,7 @@ def api_disease_references(disease_name):
 
     ref = get_disease_references(disease_name)
     if ref is None:
-        return jsonify({"error": "未找到该疾病的引用数据"}), 404
+        return jsonify({"error": _DISEASE_REF_NOT_FOUND_MSG}), 404
     return jsonify(ref)
 
 
@@ -854,10 +889,15 @@ def api_session_replay(session_id):
 
     Returns the session metadata, final engine snapshot, and the
     full action sequence in chronological order.
+
+    R6 Layer C: 不获取 in-memory session lock — 此端点只读 SQLite（已结案
+    会话的回放数据），不触碰 `_game_sessions` / `_session_runtimes` 等内存态。
+    完成的会话可能从未进入过 `_session_locks`（服务器重启后内存丢失但 DB
+    仍在），强行加锁会 404。SQLite 自身的行级隔离保证一致性。
     """
     session = db_get_session(_db_conn, session_id)
     if not session:
-        return jsonify({"error": "Session not found"}), 404
+        return jsonify({"error": _SESSION_NOT_FOUND_MSG}), 404
     actions = db_get_action_log(_db_conn, session_id)
     return jsonify({"session": session, "actions": actions})
 
@@ -885,12 +925,13 @@ def _get_vitals(vc: VirtualCreature, elapsed_min: float = 0.0, runtime=None) -> 
 
 
 def _get_active_signs(vc: VirtualCreature, runtime=None) -> list[dict]:
-    """从引擎提取当前活跃症状，按 organ_system 分组"""
+    """从引擎提取当前活跃症状，按 organ_system 分组。
+
+    R6: 之前直接读 `vc.clinical_signs_engine`（legacy 内嵌属性）。
+    现在通过 `runtime.interpreter.active_signs(vc)` 走外层组合层。
+    """
     runtime = runtime or default_runtime()
-    signs_engine = getattr(vc, "clinical_signs_engine", None)
-    if signs_engine is None:
-        return []
-    active = signs_engine.get_active_signs()
+    active = runtime.interpreter.active_signs(vc)
     return [
         {
             "sign_id": s.sign_id,

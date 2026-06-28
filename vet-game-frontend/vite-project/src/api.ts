@@ -1,14 +1,14 @@
 import type {
   Case,
-  Report,
-  Vitals,
-  GameState,
-  TreatmentResult,
-  GameOverData,
   DiagnosisResponse,
   DrugEntry,
   AdministerDrugResponse,
   DiseaseReference,
+  ExamineResponse,
+  DiagnoseResponse,
+  WaitResponse,
+  GameStateResponse,
+  NewGameResponse,
 } from "./types";
 
 function trimTrailingSlash(value: string): string {
@@ -34,81 +34,20 @@ export const api = {
 
   getTreatments: () => request<Record<string, { name: string; description: string; correct_for: string | null }>>("GET", "/treatments"),
 
-  newGame: (caseId: string): Promise<{ session_id: string; case: Case; game_state: GameState; vitals: Vitals; game_time: string; is_night: boolean; time_budget_min: number }> =>
+  newGame: (caseId: string): Promise<NewGameResponse> =>
     request("POST", "/new-game", { case_id: caseId }),
 
-  examine: (sessionId: string, testType: string): Promise<{
-    success: boolean;
-    phase: string;
-    medical_phase: string;
-    time_elapsed_min: number;
-    time_budget_min: number;
-    time_remaining_min: number;
-    time_cost_min: number;
-    death_timer: number | null;
-    report: Report;
-    vitals: Vitals;
-    game_log: string[];
-    new_reports?: Report[];
-    pending_reports?: number;
-    game_over?: GameOverData;
-    game_time?: string;
-    is_night?: boolean;
-    error?: string;
-  }> => request("POST", "/examine", { session_id: sessionId, test_type: testType }),
+  examine: (sessionId: string, testType: string): Promise<ExamineResponse> =>
+    request("POST", "/examine", { session_id: sessionId, test_type: testType }),
 
-  diagnose: (sessionId: string, diagnosis: string): Promise<{
-    success: boolean;
-    phase: string;
-    medical_phase: string;
-    time_elapsed_min: number;
-    time_budget_min: number;
-    time_remaining_min: number;
-    time_cost_min: number;
-    death_timer: number | null;
-    treatment_result: TreatmentResult;
-    vitals: Vitals;
-    game_log: string[];
-    new_reports?: Report[];
-    pending_reports?: number;
-    game_over?: GameOverData;
-    game_time?: string;
-    is_night?: boolean;
-    error?: string;
-  }> => request("POST", "/diagnose", { session_id: sessionId, diagnosis }),
+  diagnose: (sessionId: string, diagnosis: string): Promise<DiagnoseResponse> =>
+    request("POST", "/diagnose", { session_id: sessionId, diagnosis }),
 
-  wait: (sessionId: string): Promise<{
-    success: boolean;
-    phase: string;
-    medical_phase: string;
-    time_elapsed_min: number;
-    time_budget_min: number;
-    time_remaining_min: number;
-    time_cost_min: number;
-    death_timer: number | null;
-    vitals: Vitals;
-    game_log: string[];
-    new_reports?: Report[];
-    pending_reports?: number;
-    game_over?: GameOverData;
-    game_time?: string;
-    is_night?: boolean;
-    error?: string;
-  }> => request("POST", "/wait", { session_id: sessionId }),
+  wait: (sessionId: string): Promise<WaitResponse> =>
+    request("POST", "/wait", { session_id: sessionId }),
 
-  getGameState: (sessionId: string): Promise<{
-    phase: string;
-    medical_phase: string;
-    time_elapsed_min: number;
-    time_budget_min: number;
-    time_remaining_min: number;
-    death_timer: number | null;
-    vitals: Vitals;
-    reports_count: number;
-    game_log: string[];
-    game_time?: string;
-    is_night?: boolean;
-  }> => request("GET", `/game-state?session_id=${encodeURIComponent(sessionId)}`),
+  getGameState: (sessionId: string): Promise<GameStateResponse> =>
+    request("GET", `/game-state?session_id=${encodeURIComponent(sessionId)}`),
 
   getHint: (sessionId: string): Promise<{ hint: string }> =>
     request("GET", `/hint?session_id=${encodeURIComponent(sessionId)}`),
