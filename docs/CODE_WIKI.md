@@ -1667,8 +1667,10 @@ Radau 路径在 `unified_rhs` 中各模块的 `derivatives()` 只读 `_cached_in
 
 按 `docs/architecture.md` 描述，这些是已知边界不完美，非期望终态：
 
-1. **`attach_disease()` 初始化 `ClinicalSignsEngine`** — 内核生命周期耦合下游解释关注。期望：移到外层组合层。
+1. ~~**`attach_disease()` 初始化 `ClinicalSignsEngine`** — 内核生命周期耦合下游解释关注。期望：移到外层组合层。~~
+   **已修复 (R6 Layer A, 2026-06-28)**：删除内核对 `ClinicalSignsEngine` 的 import；`_ensure_legacy_clinical_signs_engine` / `_refresh_legacy_clinical_signs` 转为 no-op stub；`legacy_clinical_signs_enabled` 默认 False；解释层初始化完全移至 `build_external_interpretation_bundle`（game/runtime_composition.py）。
 2. **`to_persistence_snapshot()` 描述会话持久化语义** — 会话持久化是应用关注而非内核关注。期望：移到 adapter 或 persistence 层。
+   **部分缓解 (R6 Layer B, 2026-06-28)**：新增 `game/persistence_adapter.py::build_persistence_snapshot(engine)` thin wrapper；`gui_app.py::_snapshot_json` 委托 adapter 而非直调内核方法。完整迁移（将 snapshot shaping 移出 kernel）待测试访问模式重构后进行。
 3. **游戏层夜间修正直接改 cardiac baseline** — 若昼夜效应是生理学，应成为环境输入；若仅游戏节奏，不应伪装为内核生理。
 4. **历史文档仍描述被取代的时间模型** — 以 `README.md` 和 `docs/architecture.md` 为权威，旧叙事文档为历史记录。
 

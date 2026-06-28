@@ -310,19 +310,15 @@ These are known boundary imperfections, not the desired end state.
 
 ### Clinical sign engine initialization in kernel flow
 
-`attach_disease()` currently initializes `ClinicalSignsEngine`.
+**Status: Resolved (R6 Layer A, 2026-06-28).**
 
-Why it is gray:
-
-- it couples kernel lifecycle to a downstream interpretation concern
-
-Preferred direction:
-
-- move interpretation setup to an outer composition layer
+`attach_disease()` previously initialized `ClinicalSignsEngine` inline, coupling kernel lifecycle to a downstream interpretation concern. R6 Layer A removed the import and converted `_ensure_legacy_clinical_signs_engine` / `_refresh_legacy_clinical_signs` to no-op stubs. Interpretation setup now lives exclusively in the outer composition layer via `build_external_interpretation_bundle` (game/runtime_composition.py). `legacy_clinical_signs_enabled` defaults to `False`.
 
 ### Session-oriented snapshot logic on the engine object
 
-`to_persistence_snapshot()` currently describes session persistence and instructor review semantics.
+**Status: Partially mitigated (R6 Layer B, 2026-06-28).**
+
+`to_persistence_snapshot()` still lives on the kernel `VirtualCreature`, but an outer-layer adapter `game/persistence_adapter.py::build_persistence_snapshot(engine)` now wraps it. App code (`gui_app.py::_snapshot_json`) delegates to the adapter rather than calling the kernel method directly. This is a thin wrapper (not full migration) — full decoupling would require moving snapshot shaping out of the kernel, deferred pending test access patterns.
 
 Why it is gray:
 

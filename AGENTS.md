@@ -108,4 +108,4 @@ Keep this file concise; use linked docs for full rationale.
 - ❌ 临界区内调外部函数（可能抛异常留半写） → ✅ 临界区外预构造对象。
 - ❌ 声明"已完成"但未跑工具 → ✅ `--closure` 通过才算闭环。
 - ❌ 新增 API 无调用点（死代码） → ✅ PR 附 Grep 调用点证据。
-- ❌ 同一概念多个名字（`disease`/`disease_name`/`diagnosis`） → ✅ 查 `docs/naming-conventions.md`（待建）统一。
+- ❌ 同一概念多个名字（`disease`/`disease_name`/`diagnosis`） → ✅ 新增概念时先 Grep 现有命名再决定，优先复用已有名字；若需建立统一命名字典，在 `docs/` 下新建并在此引用。
