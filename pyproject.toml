@@ -22,10 +22,9 @@ testpaths = ["tests"]
 # lane per-test budget (see docs/test-runbook.md) but well below infinity,
 # so a single hung test no longer blocks the whole `core` channel. Heavy
 # tests that legitimately need >60s should pass --timeout=N explicitly.
-# Motivation: 2026-06-14 — scipy 1.17 + Python 3.14 Radau hang + an
-# ordering-related Euler hang in core-only were both uncaught by the
-# test-runbook budget. See radau.py:16-21 and the investigation in
-# docs/coupling_inventory.md / MEMORY (TBD).
+# Motivation: 2026-06-27 — scipy solve_ivp(method="Radau") hangs on the
+# full ~50-ODE system (LU decomposition of the Jacobian, scipy >= 1.15).
+# Replaced with LSODA in radau.py. See radau.py:1-21.
 timeout = 60
 markers = [
     "fast: fast daily development lane (formulae, invariants, lightweight contracts)",
@@ -47,5 +46,38 @@ markers = [
 dev-dependencies = [
     "pytest>=7.0",
     "pytest-timeout>=2.4.0",
+    "pytest-cov>=4.1.0",
     "ruff>=0.4.0",
 ]
+
+[tool.coverage.run]
+source = ["src", "game"]
+branch = true
+omit = [
+    "tests/*",
+    "tools/*",
+    "*/__pycache__/*",
+    "vet-game-frontend/*",
+    "experiments/*",
+    "paper_rewriting_output/*",
+    "src/db/*",
+    "src/textual_monitor.py",
+    "src/ascii_dashboard.py",
+    "main.py",
+    "gui_app.py",
+    "cli_daemon.py",
+    "cli_shim.py",
+    "vet_monitor.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+    "if TYPE_CHECKING:",
+]
+fail_under = 0

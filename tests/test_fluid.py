@@ -342,3 +342,180 @@ class TestElectrolyteExchange:
             + fc.icf_na_meq_l * fc.icf_volume_ml / 1000.0
         )
         assert final_total_na == pytest.approx(initial_total_na, abs=1.0)
+
+
+# ── P1: Branch coverage supplements ────────────────────────────────────────
+
+
+class TestDerivativesMAPCoupling:
+    """流体模块 derivatives() 的 MAP-coupling 分支 (line 193-200)."""
+
+    def test_derivatives_with_map_input(self):
+        """MAP 输入时，毛细血管静水压动态更新 (Landis-Pappenheimer)."""
+        fc = FluidCompartment(weight_kg=20.0)
+        initial_pc = fc.capillary_hydrostatic_mmHg
+
+        # MAP = 120 mmHg → 毛细血管静水压应升高
+        dydt, outputs = fc.derivatives(dt=0.1, map_input=120.0)
+
+        assert fc.capillary_hydrostatic_mmHg > initial_pc, (
+            f"High MAP should raise capillary pressure above {initial_pc}"
+        )
+        assert fc.capillary_hydrostatic_mmHg <= 50.0, "Capillary pressure should not exceed 50 mmHg clamp"
+
+    def test_derivatives_low_map(self):
+        """低 MAP (< 90) 时，毛细血管静水压降低."""
+        fc = FluidCompartment(weight_kg=20.0)
+        initial_pc = fc.capillary_hydrostatic_mmHg
+
+        dydt, outputs = fc.derivatives(dt=0.1, map_input=60.0)
+
+        assert fc.capillary_hydrostatic_mmHg < initial_pc, (
+            f"Low MAP should lower capillary pressure below {initial_pc}"
+        )
+        assert fc.capillary_hydrostatic_mmHg >= 10.0, "Capillary pressure should not go below 10 mmHg clamp"
+
+    def test_derivatives_map_at_baseline_no_change(self):
+        """MAP = 90 (基线) 时，毛细血管静水压不变."""
+        fc = FluidCompartment(weight_kg=20.0)
+        initial_pc = fc.capillary_hydrostatic_mmHg
+
+        dydt, outputs = fc.derivatives(dt=0.1, map_input=90.0)
+
+        assert fc.capillary_hydrostatic_mmHg == pytest.approx(initial_pc, abs=0.5)
+
+    def test_derivatives_returns_starling_rate(self):
+        """derivatives() 返回 starling 和 osmotic 变化率."""
+        fc = FluidCompartment(weight_kg=20.0)
+        dydt, outputs = fc.derivatives(dt=0.1, map_input=90.0)
+
+        assert "starling_flow_mL_min" in outputs
+        assert "osmotic_shift_mL_min" in outputs
+        assert "nfp_mmHg" in outputs
+        assert isinstance(outputs["starling_flow_mL_min"], float)
+
+
+class TestStarlingReverseFlow:
+    """Starling 交换的反向路径: ISF → 血管 (flow_ml < 0, lines 336-355)."""
+
+    def test_reverse_starling_by_low_capillary_pressure(self):
+        """降低毛细血管静水压使 NFP < 0 → ISF 重吸收回血管."""
+        fc = FluidCompartment(weight_kg=20.0)
+        fc.capillary_hydrostatic_mmHg = 10.0  # 极低毛细血管压
+
+        nfp = fc.compute_net_filtration_pressure()
+        assert nfp < 0, f"NFP should be negative with low capillary pressure, got {nfp:.2f}"
+
+        flow = fc._compute_starling_exchange(dt=60.0)
+        assert flow < 0, f"Starling flow should be negative (reabsorption), got {flow:.3f}"
+
+    def test_reverse_starling_electrolyte_transfer(self):
+        """反向 Starling 交换时，ISF 电解质进入血管."""
+        fc = FluidCompartment(weight_kg=20.0)
+        fc.capillary_hydrostatic_mmHg = 10.0
+
+        initial_vasc_na = fc.vascular_na_meq_l
+        initial_isf_na = fc.isf_na_meq_l
+
+        flow = fc._compute_starling_exchange(dt=60.0)
+        fc._exchange_electrolytes_starling(flow)
+
+        # ISF → 血管：血管钠浓度应改变（ISF 钠与血管钠接近，变化不大）
+        # 关键是体积变化：血管体积增加，ISF 体积减少
+        # 验证三室钠总量守恒（无外部输入）
+        total_na_before = (
+            fc.vascular_na_meq_l * fc.vascular_volume_ml / 1000.0
+            + fc.isf_na_meq_l * fc.isf_volume_ml / 1000.0
+            + fc.icf_na_meq_l * fc.icf_volume_ml / 1000.0
+        )
+        fc.vascular_volume_ml -= flow
+        fc.isf_volume_ml += flow
+        total_na_after = (
+            fc.vascular_na_meq_l * fc.vascular_volume_ml / 1000.0
+            + fc.isf_na_meq_l * fc.isf_volume_ml / 1000.0
+            + fc.icf_na_meq_l * fc.icf_volume_ml / 1000.0
+        )
+        assert total_na_after == pytest.approx(total_na_before, abs=1.0)
+
+
+class TestOsmoticReverseFlow:
+    """渗透压水转移的反向路径: ICF → ISF (shift_ml < 0, lines 422-435)."""
+
+    def test_reverse_osmotic_by_hypotonic_isf(self):
+        """降低 ISF 渗透压 → 水从 ICF 转移到 ISF (低渗)."""
+        fc = FluidCompartment(weight_kg=20.0)
+        fc.isf_na_meq_l = 120.0
+        fc._update_osmolality()  # 更新 osmolality 以反映新的 Na⁺ 浓度
+
+        initial_icf = fc.icf_volume_ml
+        initial_isf = fc.isf_volume_ml
+        initial_icf_k = fc.icf_k_meq_l
+
+        shift = fc._compute_osmotic_water_shift(dt=60.0)
+        assert shift < 0, f"Osmotic shift should be negative (ICF→ISF), got {shift:.3f}"
+
+        fc._exchange_electrolytes_osmotic(shift)
+        fc.isf_volume_ml -= shift
+        fc.icf_volume_ml += shift
+
+        assert fc.icf_volume_ml < initial_icf
+        assert fc.isf_volume_ml > initial_isf
+        assert fc.icf_k_meq_l > initial_icf_k
+
+    def test_reverse_osmotic_isf_dilution(self):
+        """ICF → ISF 转移时，ISF 电解质被稀释."""
+        fc = FluidCompartment(weight_kg=20.0)
+        fc.isf_na_meq_l = 120.0
+        fc._update_osmolality()
+
+        initial_isf_na = fc.isf_na_meq_l
+        shift = fc._compute_osmotic_water_shift(dt=60.0)
+        fc._exchange_electrolytes_osmotic(shift)
+
+        assert fc.isf_na_meq_l < initial_isf_na
+
+    def test_total_water_conserved_osmotic_reverse(self):
+        """渗透压水转移反向时，总液体量守恒."""
+        fc = FluidCompartment(weight_kg=20.0)
+        fc.isf_na_meq_l = 120.0
+        fc._update_osmolality()
+
+        initial_total = fc.total_body_water_ml
+        shift = fc._compute_osmotic_water_shift(dt=60.0)
+        fc._exchange_electrolytes_osmotic(shift)
+        fc.isf_volume_ml -= shift
+        fc.icf_volume_ml += shift
+        fc._update_osmolality()
+        fc.total_body_water_ml = (
+            fc.vascular_volume_ml + fc.isf_volume_ml + fc.icf_volume_ml
+        )
+
+        assert fc.total_body_water_ml == pytest.approx(initial_total, abs=1.0)
+
+
+class TestZeroFlowGuard:
+    """零流量 guard 分支 (abs(flow_ml) < 1e-9) 的正确性."""
+
+    def test_starling_zero_flow_no_change(self):
+        """零流量 Starling 交换时，电解质浓度不变."""
+        fc = FluidCompartment(weight_kg=20.0)
+        na_before = fc.vascular_na_meq_l
+        cl_before = fc.vascular_cl_meq_l
+        hco3_before = fc.vascular_hco3_meq_l
+
+        fc._exchange_electrolytes_starling(0.0)
+
+        assert fc.vascular_na_meq_l == na_before
+        assert fc.vascular_cl_meq_l == cl_before
+        assert fc.vascular_hco3_meq_l == hco3_before
+
+    def test_osmotic_zero_shift_no_change(self):
+        """零渗透压水转移时，电解质浓度不变."""
+        fc = FluidCompartment(weight_kg=20.0)
+        isf_na_before = fc.isf_na_meq_l
+        icf_k_before = fc.icf_k_meq_l
+
+        fc._exchange_electrolytes_osmotic(0.0)
+
+        assert fc.isf_na_meq_l == isf_na_before
+        assert fc.icf_k_meq_l == icf_k_before

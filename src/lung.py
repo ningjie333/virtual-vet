@@ -146,15 +146,15 @@ class LungModule:
             self.respiratory_rate, self.tidal_volume, alveolar_PCO2)
 
         # ── 4. 气体扩散（代数） ──────────────────────────────────────────────
+        # NOTE(C5): 纯函数化 — VO2/VCO2 不再直接写 self，改为本地变量 +
+        # self_ 输出端口（由 caller 在 Newton 迭代收敛后一次性写回）
         PO2_gradient = alveolar_PO2 - self.blood.arterial_PO2_mmHg
         VO2 = self.diffusion_coefficient * PO2_gradient * self.VQ_ratio
         VO2 = max(0.0, VO2)
-        self.O2_consumption = VO2
 
         PCO2_gradient = self.blood.venous_PCO2_mmHg - alveolar_PCO2
         VCO2 = self.diffusion_coefficient * 0.2 * PCO2_gradient * self.VQ_ratio
         VCO2 = max(0.0, VCO2)
-        self.CO2_production = VCO2
 
         # ── 5. 动脉血气（代数）─────────────────────────────────────────────
         # A-a 梯度上限提到 60 mmHg 以表达 ARDS 级低氧（McCaffree 1978）
@@ -177,8 +177,12 @@ class LungModule:
         # 文献：Henderson-Hasselbalp 方程，pKa=6.1, CO2 溶解系数 0.03
         # 本地文献：Batzel 2009 心血管调节系统识别
 
-        # ── 8. VdP 振荡器推进（获取目标 RR/TV） ──────────────────────────────
-        self._vdp.update(pco2=a_PCO2, po2=a_PO2, ph=a_pH)
+        # ── 8. VdP 振荡器（读取目标 RR/TV） ──────────────────────────────
+        # NOTE(C5): 纯函数化 — 不再调用 _vdp.update() 推进内部状态。
+        # VdP 状态由 compute() 中的 _respiratory_compensation() 管理
+        # （每步调用一次 update()），derivatives() 只读取当前 VdP 输出
+        # 计算 RR/TV 的目标值。Newton 子迭代期间 VdP 目标保持不变，
+        # 避免子迭代间状态污染。
         target_rr = self._vdp.respiratory_rate
         target_tv_factor = 1.0 + 0.7 * max(0.0, (self._vdp.amplitude - 0.8) / 1.2) if self._vdp.amplitude > 0.8 else 1.0
         target_tv = self.base_tidal_volume * target_tv_factor
@@ -214,6 +218,10 @@ class LungModule:
             "vdp_amplitude": self._vdp.amplitude,
             "vdp_phase": self._vdp.phase,
             "vdp_is_inspiration": self._vdp.is_inspiration,
+            # NOTE(C5): self_* 字段 — caller 在 Newton 迭代收敛后一次性写回
+            # O2_consumption / CO2_production 不在 STATE_VARS，需通过 self_ 写回
+            "self_O2_consumption": VO2,
+            "self_CO2_production": VCO2,
         }
 
         return dydt, outputs

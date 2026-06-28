@@ -36,7 +36,7 @@ class TestOrganHealthSignature:
                           if c.kwargs.get("lung_state_pre") is not None]
         assert len(calls_with_pre) >= 1, "Euler track() call missing lung_state_pre"
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_passes_heart_state_pre(self):
         """P0 0c: Radau path now passes heart_state_pre (was missing)."""
         vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=False)
@@ -47,7 +47,7 @@ class TestOrganHealthSignature:
         assert len(calls_with_pre) >= 1, \
             "P0 0c regression: Radau track() call missing heart_state_pre"
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_passes_lung_state_pre(self):
         """P0 0c: Radau path now passes lung_state_pre (was missing)."""
         vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=False)

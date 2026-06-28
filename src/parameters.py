@@ -187,6 +187,12 @@ SVR_BAROREFLEX_TAU_SEC = 10.0                     # SVR 压力反射一阶滞后
 # REF: textbook:hall | Hall 2016 | RAAS effector response ~minutes
 TAU_RAAS = 120.0                                # RAAS 肾素活性一阶滞后 τ (s)
 
+# ── GFR Starling 模型系数 ───────────────────────────────────────────────
+# P2.2: 原在 kidney.py 模块级定义，集中到此处管理
+GFR_PGC_MAP_RATIO = 0.6       # 肾小球毛细血管压 / MAP 比值
+GFR_PBS_CVP_OFFSET = 10.0     # 鲍曼囊压 = CVP + 10 mmHg
+GFR_KF = 3.0                  # 肾小球超滤系数 mL/min/mmHg
+
 # 顺应性 (mL/mmHg)
 # REF: textbook:guyton | Guyton 14e Ch20 | Arterial compliance ≈ 1.5 mL/mmHg
 ARTERIAL_COMPLIANCE = 1.5                         # 动脉顺应性

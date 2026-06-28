@@ -77,47 +77,44 @@ class LymphaticModule:
         """
         返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
 
+        R2: 纯函数 — 不修改 self.* 或 self.blood.*。
+        调用方（compute() 或 radau Step 5a）负责把 outputs 写入实例属性。
+
         Returns:
             (dydt, outputs):
               dydt: dict[str, float] — 状态变量导数
-              outputs: dict[str, float] — 供其他模块使用的输出端口
+              outputs: dict[str, float] — 供其他模块使用的输出端口 + blood 写入字段
         """
         dt_min = dt / 60.0
 
         # ── 脾脏储血动力学 ─────────────────────────────────────────────────
-        # 低灌注/休克 → 脾脏动员释放储血；恢复期缓慢充盈
         map_mmHg = map_input if map_input is not None else self.blood.MAP_mmHg
         hr = hr_input if hr_input is not None else self.blood.heart_rate_bpm
 
+        splenic_mobilizing = False
+        splenic_mobilization_rate = 0.0
+
         if map_mmHg < self._SPLENIC_MOBILIZATION_MAP_THRESHOLD:
             deficit = self._SPLENIC_MOBILIZATION_MAP_THRESHOLD - map_mmHg
-            mobilization_rate = deficit / 40.0 * 10.0  # 最大 ~10 mL/min
-            self._splenic_mobilizing = True
-            self._splenic_mobilization_rate = mobilization_rate
+            splenic_mobilization_rate = deficit / 40.0 * 10.0
+            splenic_mobilizing = True
         elif hr > 120:
             excess = hr - 120
-            mobilization_rate = excess / 60.0 * 5.0  # 最大 ~5 mL/min
-            self._splenic_mobilizing = True
-            self._splenic_mobilization_rate = mobilization_rate
-        else:
-            self._splenic_mobilizing = False
-            self._splenic_mobilization_rate = 0.0
+            splenic_mobilization_rate = excess / 60.0 * 5.0
+            splenic_mobilizing = True
 
         max_reserve = self.w * self._SPLENIC_RESERVE_MAX_ML_KG
 
-        if self._splenic_mobilizing and self.splenic_reserve_mL > 10.0:
-            # 动员储血 → 血浆容量补充
-            dSplenic = -self._splenic_mobilization_rate * dt_min
-        elif not self._splenic_mobilizing and self.splenic_reserve_mL < max_reserve * 0.9:
-            # 恢复期：脾脏缓慢充盈（恢复最多至基准的 90%）
-            refill_rate = 0.5  # mL/min
+        if splenic_mobilizing and self.splenic_reserve_mL > 10.0:
+            dSplenic = -splenic_mobilization_rate * dt_min
+        elif not splenic_mobilizing and self.splenic_reserve_mL < max_reserve * 0.9:
+            refill_rate = 0.5
             dSplenic = refill_rate * dt_min
         else:
             dSplenic = 0.0
 
         new_splenic = max(0.0, min(max_reserve, self.splenic_reserve_mL + dSplenic))
         dSplenic_final = (new_splenic - self.splenic_reserve_mL) / 1.0
-        self.splenic_reserve_mL = new_splenic
 
         # ── 淋巴回流速率（代数） ───────────────────────────────────────────
         cytokine = cytokine_input if cytokine_input is not None else self.blood.cytokine_level
@@ -130,8 +127,7 @@ class LymphaticModule:
         if gut_fat_absorption:
             lymph_flow += 2.0
 
-        self.lymph_flow_rate = max(0.5, min(20.0, lymph_flow))
-        self.blood.lymph_flow_mL_min = self.lymph_flow_rate
+        new_lymph_flow_rate = max(0.5, min(20.0, lymph_flow))
 
         # ── 间质液动力学 ───────────────────────────────────────────────────
         capillary_leak = 0.0
@@ -139,22 +135,15 @@ class LymphaticModule:
             leak_rate = (cytokine - 0.4) / 0.6 * 20.0
             capillary_leak = leak_rate * dt_min
 
-        lymph_drainage = self.lymph_flow_rate * dt_min
+        lymph_drainage = new_lymph_flow_rate * dt_min
         dISF = capillary_leak - lymph_drainage
 
         max_isf = self.w * 60.0
-        # Soft floor: compute dISF but clamp it so derivative doesn't explode at dt=1e-9
-        # At dt=1e-9, dISF/dt = (dISF/dt) would be enormous; instead compute per-second rate
-        raw_dISF = dISF  # mL change in this call (already in mL units)
+        raw_dISF = dISF
         if raw_dISF < 0 and self.interstitial_fluid_mL + raw_dISF < 1000.0:
-            # Would hit floor — clamp dISF to avoid discontinuity at dt=1e-9
-            raw_dISF = 1000.0 - self.interstitial_fluid_mL - 0.01  # allow tiny negative room
+            raw_dISF = 1000.0 - self.interstitial_fluid_mL - 0.01
         new_isf = max(1000.0, min(max_isf, self.interstitial_fluid_mL + raw_dISF))
-        dISF_final = (new_isf - self.interstitial_fluid_mL) / 60.0  # per-second rate (not /dt)
-        self.interstitial_fluid_mL = new_isf
-
-        self.blood.interstitial_fluid_mL = self.interstitial_fluid_mL
-        self.blood.splenic_reserve_mL = self.splenic_reserve_mL
+        dISF_final = (new_isf - self.interstitial_fluid_mL) / 60.0
 
         dydt = {
             "splenic_reserve_mL": dSplenic_final,
@@ -162,10 +151,14 @@ class LymphaticModule:
         }
 
         outputs = {
-            "splenic_reserve_mL": self.splenic_reserve_mL,
-            "lymph_flow_rate": self.lymph_flow_rate,
-            "interstitial_fluid_mL": self.interstitial_fluid_mL,
+            "splenic_reserve_mL": new_splenic,
+            "lymph_flow_rate": new_lymph_flow_rate,
+            "interstitial_fluid_mL": new_isf,
             "immune_cell_reserve": self.immune_cell_reserve,
+            # blood 写入字段（由 radau Step 5a 通过 apply_factor 写入）
+            "blood_lymph_flow_mL_min": new_lymph_flow_rate,
+            "blood_interstitial_fluid_mL": new_isf,
+            "blood_splenic_reserve_mL": new_splenic,
         }
 
         return dydt, outputs

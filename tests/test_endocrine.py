@@ -27,6 +27,29 @@ def make_endocrine():
     return EndocrineModule(weight_kg=20.0, blood=blood)
 
 
+def _apply_derivatives(module, dt, **kwargs):
+    """Call derivatives() and apply outputs to module (simulating Euler step).
+
+    derivatives() is a pure function: it returns (dydt, outputs) without
+    modifying self. outputs already contains the new (post-step, clamped)
+    values, so we SET matching attributes directly. blood_* outputs are
+    skipped (they are applied by the engine layer via apply_factor).
+    """
+    dydt, outputs = module.derivatives(dt=dt, **kwargs)
+    for k, v in outputs.items():
+        if k.startswith("blood_"):
+            continue
+        if k.startswith("self_"):
+            attr = k[5:]
+            if hasattr(module, attr):
+                setattr(module, attr, v)
+            elif hasattr(module, "_" + attr):
+                setattr(module, "_" + attr, v)
+        elif hasattr(module, k):
+            setattr(module, k, v)
+    return dydt, outputs
+
+
 # ---------------------------------------------------------------------------
 # TestThyroidAxis
 # ---------------------------------------------------------------------------
@@ -69,7 +92,7 @@ class TestPancreasAxis:
         e = make_endocrine()
         e.blood.glucose_mmol_L = 20.0
         for _ in range(300):
-            e.derivatives(dt=0.1)
+            _apply_derivatives(e, dt=0.1)
         assert e.insulin_uU_mL > 15.0, \
             f"High glucose should raise insulin, got {e.insulin_uU_mL}"
 
@@ -79,7 +102,7 @@ class TestPancreasAxis:
         baseline = e.glucagon_pg_mL
         e.blood.glucose_mmol_L = 3.0
         for _ in range(300):
-            e.derivatives(dt=0.1)
+            _apply_derivatives(e, dt=0.1)
         assert e.glucagon_pg_mL > baseline, \
             f"Low glucose should raise glucagon above {baseline}, got {e.glucagon_pg_mL}"
 
@@ -113,7 +136,7 @@ class TestAdrenalAxis:
         baseline = e.cortisol_ug_dL
         e.add_stress(0.5)
         for _ in range(300):
-            e.derivatives(dt=0.1)
+            _apply_derivatives(e, dt=0.1)
         assert e.cortisol_ug_dL > baseline, \
             f"Stress should raise cortisol above {baseline}, got {e.cortisol_ug_dL}"
 

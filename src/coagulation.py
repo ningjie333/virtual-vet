@@ -85,10 +85,17 @@ class CoagulationModule:
         """
         返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
 
+        纯函数：只读 self.* / self.blood.*，不修改任何状态。STATE_VARS
+        (factor_VII/V/II/IX/X/XI, fibrinogen, coagulation_state) 由 caller 从
+        y 向量解包设置；本方法仅返回其导数 dydt 与本次新值（局部变量）。
+        需写回 self 的非状态字段（factor_VIII）以 "self_" 前缀放入 outputs；
+        需写回 self.blood 的字段以 "blood_" 前缀放入 outputs（由 caller 一次性
+        应用，避免 Newton 子迭代污染）。
+
         Returns:
             (dydt, outputs):
               dydt: dict[str, float] — 状态变量导数
-              outputs: dict[str, float] — 供其他模块使用的输出端口
+              outputs: dict[str, float] — 供其他模块使用的输出端口 + 待写回字段
         """
         dt_min = dt / 60.0
 
@@ -115,7 +122,9 @@ class CoagulationModule:
             "factor_XI": 60.0,
         }
         factors = ["factor_VII", "factor_V", "factor_II", "factor_IX", "factor_X", "factor_XI", "factor_VIII"]
-        factor_derivatives = {}
+        # NOTE(C5): 纯函数化 — 不再 setattr(self, name, new_val)，改为局部 dict
+        new_factor_values: dict[str, float] = {}
+        factor_derivatives: dict[str, float] = {}
         for name in factors:
             current = getattr(self, name)
             baseline_synthesis = 0.0000001 * dt_min  # baseline_synthesis_per_min × dt_min
@@ -129,16 +138,27 @@ class CoagulationModule:
             decay = factor_decay * (current - 0.3) if current > 0.3 else 0.0
             new_val = current + synthesis - decay
             new_val = max(0.05, min(1.5, new_val))
-            setattr(self, name, new_val)
-            dFactor = (new_val - current) / 60.0  # convert per-min to per-sec (dt_min = dt/60)
-            factor_derivatives[name] = dFactor
+            new_factor_values[name] = new_val
+            # factor_VIII 不在 STATE_VARS 中，不进入 dydt（仅通过 self_ 输出端口写回）
+            if name != "factor_VIII":
+                dFactor = (new_val - current) / 60.0  # convert per-min to per-sec (dt_min = dt/60)
+                factor_derivatives[name] = dFactor
 
         # ── PT / aPTT（写入 blood） ─────────────────────────────────────────
-        effective_pt = self.factor_VII * self.factor_X * self.factor_V * self.factor_II
+        # 用 new_factor_values 代替 self.factor_*（避免读到旧值）
+        effective_pt = (
+            new_factor_values["factor_VII"]
+            * new_factor_values["factor_X"]
+            * new_factor_values["factor_V"]
+            * new_factor_values["factor_II"]
+        )
         effective_pt = max(0.1, effective_pt)
         pt_sec = max(10.0, min(60.0, 12.0 / effective_pt))
 
-        effective_aptt = self.factor_VIII * 2.0 + self.factor_IX * self.factor_XI
+        effective_aptt = (
+            new_factor_values["factor_VIII"] * 2.0
+            + new_factor_values["factor_IX"] * new_factor_values["factor_XI"]
+        )
         effective_aptt = max(0.1, effective_aptt)
         aptt_sec = max(20.0, min(120.0, 35.0 / effective_aptt))
 
@@ -163,30 +183,36 @@ class CoagulationModule:
         # NOTE(C5): 纯函数化 — 改为本地变量
         new_fibrinogen = max(50.0, min(800.0, self.fibrinogen + fibrin_net))
         dFibrinogen = fibrin_net / dt if dt > 0 else 0.0
-        new_fibrinogen_mg_dL = new_fibrinogen
 
         # ── 凝血状态 ─────────────────────────────────────────────────────
         target_coag_state = self._compute_coagulation_state()
         tau_coag = 900.0
         dCoag = (target_coag_state - self.coagulation_state) / tau_coag if tau_coag > 0 else 0.0
         new_coagulation_state = max(0.0, min(1.0, self.coagulation_state + dCoag * dt))
-        # NOTE(C5): 纯函数化 — self.coagulation_state 写入移到 caller 或 compute()
-        # 在 Radau 路径下，dydt 返回 dCoag，y-vector 积分会更新 self.coagulation_state
+        # NOTE(C5): 纯函数化 — self.coagulation_state 由 y 向量解包设置
 
+        # dydt 只包含 STATE_VARS 中声明的键
+        # (factor_VII, factor_V, factor_II, factor_IX, factor_X, factor_XI,
+        #  fibrinogen, coagulation_state) — factor_VIII 不在其中
         dydt = {**factor_derivatives, "fibrinogen": dFibrinogen, "coagulation_state": dCoag}
 
         outputs = {
-            "PT_sec": new_PT_sec,  # NOTE(C5): 本地变量
-            "aPTT_sec": new_aPTT_sec,  # NOTE(C5): 本地变量
-            "coagulation_state": new_coagulation_state,  # NOTE(C5): 本地变量
-            "fibrinogen_mg_dL": new_fibrinogen,  # NOTE(C5): 本地变量
-            "factor_VII": self.factor_VII,
-            "factor_V": self.factor_V,
-            "factor_II": self.factor_II,
-            "factor_IX": self.factor_IX,
-            "factor_X": self.factor_X,
-            "factor_XI": self.factor_XI,
-            # NOTE(C5): blood 字段 (Newton 迭代 caller 一次性写回)
+            "PT_sec": new_PT_sec,
+            "aPTT_sec": new_aPTT_sec,
+            "coagulation_state": new_coagulation_state,
+            "fibrinogen_mg_dL": new_fibrinogen,
+            # 输出端口（供其他模块读取新值，本地变量）
+            "factor_VII": new_factor_values["factor_VII"],
+            "factor_V": new_factor_values["factor_V"],
+            "factor_II": new_factor_values["factor_II"],
+            "factor_IX": new_factor_values["factor_IX"],
+            "factor_X": new_factor_values["factor_X"],
+            "factor_XI": new_factor_values["factor_XI"],
+            "factor_VIII": new_factor_values["factor_VIII"],
+            # self_* 字段：caller 在 Newton 迭代收敛后一次性写回
+            # factor_VIII 不在 STATE_VARS，需通过 self_ 写回（其余 6 个由 y 向量解包）
+            "self_factor_VIII": new_factor_values["factor_VIII"],
+            # blood_* 字段：caller 一次性写回
             "blood_PT_sec": new_PT_sec,
             "blood_aPTT_sec": new_aPTT_sec,
             "blood_fibrinogen_mg_dL": new_fibrinogen,

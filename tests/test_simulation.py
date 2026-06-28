@@ -193,3 +193,158 @@ class TestBloodCompartmentEdgeCases:
                 v.step()
             # Just verify no crash; simulation completes
             assert len(v.history["time_s"]) == 50
+
+
+# ── P1: Branch coverage supplements ────────────────────────────────────────
+
+
+class TestProcessEvents:
+    """_process_events() 覆盖: blood_loss, fluid_infusion, food_intake, cocaine."""
+
+    def test_blood_loss_event(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc._scheduled_events = [(0.01, "blood_loss", {"volume_ml": 200.0})]
+        initial_vol = vc.heart.circulating_volume_ml
+        vc._process_events(0.1)
+        assert vc.heart.circulating_volume_ml == pytest.approx(initial_vol - 200.0, rel=0.01)
+        assert len(vc.event_log) == 1
+        assert "失血" in vc.event_log[0]
+
+    def test_fluid_infusion_event(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc._scheduled_events = [(0.01, "fluid_infusion", {"volume_ml": 500.0})]
+        initial_vol = vc.heart.circulating_volume_ml
+        vc._process_events(0.1)
+        assert vc.heart.circulating_volume_ml == pytest.approx(initial_vol + 500.0, rel=0.01)
+        assert len(vc.event_log) == 1
+        assert "输液" in vc.event_log[0]
+
+    def test_food_intake_glucose_only(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        initial_glucose = vc.gut.lumen_glucose_g
+        vc._scheduled_events = [(0.01, "food_intake", {"glucose_grams": 50.0})]
+        vc._process_events(0.1)
+        assert vc.gut.lumen_glucose_g == pytest.approx(initial_glucose + 50.0, rel=0.01)
+        assert "进食" in vc.event_log[0]
+
+    def test_food_intake_amino_and_fat(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc._scheduled_events = [(0.01, "food_intake",
+                                 {"glucose_grams": 30.0, "amino_grams": 20.0, "fat_grams": 10.0})]
+        vc._process_events(0.1)
+        assert "氨基酸" in vc.event_log[0]
+        assert "脂肪" in vc.event_log[0]
+
+    def test_cocaine_event(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc._scheduled_events = [(0.01, "cocaine", {"dose_mg_kg": 3.0})]
+        vc._process_events(0.1)
+        assert vc.toxicology._t_since_injection_min is not None
+        assert "注射可卡因" in vc.event_log[0]
+
+    def test_future_event_not_processed(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc._scheduled_events = [(10.0, "blood_loss", {"volume_ml": 100.0})]
+        vc._process_events(0.1)
+        assert len(vc.event_log) == 0
+        assert len(vc._scheduled_events) == 1  # 未来事件保留
+
+    def test_multiple_events_processed_in_order(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc._scheduled_events = [
+            (0.01, "fluid_infusion", {"volume_ml": 200.0}),
+            (0.02, "blood_loss", {"volume_ml": 50.0}),
+        ]
+        vc._process_events(0.1)
+        assert len(vc.event_log) == 2
+        assert "输液" in vc.event_log[0]
+        assert "失血" in vc.event_log[1]
+
+
+class TestHandleDeath:
+    """_handle_death() 记录死亡原因."""
+
+    def test_death_sets_reason(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        # death_reason is only set after _handle_death is called
+        assert not hasattr(vc, "death_reason") or vc.death_reason is None
+        vc._handle_death("hypovolemic_shock")
+        assert vc.death_reason == "hypovolemic_shock"
+
+    def test_death_does_not_crash_on_subsequent_steps(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc._handle_death("cardiac_arrest")
+        # step() should check death_reason and return early
+        result = vc.step()
+        assert vc.death_reason == "cardiac_arrest"
+
+
+class TestPersistenceSnapshot:
+    """to_persistence_snapshot() 系列化完备性."""
+
+    def test_snapshot_contains_all_key_sections(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc.step()
+        snap = vc.to_persistence_snapshot()
+
+        assert "time_s" in snap
+        assert "HR_bpm" in snap
+        assert "MAP_mmHg" in snap
+        assert "CO_ml_min" in snap
+        assert "CVP_mmHg" in snap
+        assert "blood_volume_ml" in snap
+        assert "contractility_factor" in snap
+        assert "RR" in snap
+        assert "art_PO2" in snap
+        assert "art_PCO2" in snap
+        assert "saturation" in snap
+        assert "GFR" in snap
+        assert "urine_ml_min" in snap
+        assert "BUN" in snap
+        assert "pH" in snap
+        assert "glucose_mmol_L" in snap
+        assert "lactate_mmol_L" in snap
+        assert "core_temperature_C" in snap
+        assert "fluid_vascular_ml" in snap
+        assert "fluid_isf_ml" in snap
+        assert "fluid_icf_ml" in snap
+        assert "heart_health" in snap
+        assert "lung_health" in snap
+        assert "kidney_health" in snap
+        assert "lifecycle" in snap
+        assert "disease_state" in snap
+
+    def test_snapshot_vitals_are_finite(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc.step()
+        snap = vc.to_persistence_snapshot()
+
+        for key in ["HR_bpm", "MAP_mmHg", "pH", "core_temperature_C"]:
+            assert snap[key] is not None, f"{key} should not be None"
+            assert snap[key] > 0, f"{key} should be positive, got {snap[key]}"
+
+    def test_snapshot_time_advances(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        for _ in range(5):
+            vc.step()
+        snap = vc.to_persistence_snapshot()
+        assert snap["time_s"] == pytest.approx(0.5, abs=0.01)
+
+    def test_minimal_snapshot_alias(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc.step()
+        assert vc.to_minimal_snapshot() == vc.to_persistence_snapshot()
+
+
+class TestPrintSummary:
+    """print_summary() 不崩溃."""
+
+    def test_print_summary_no_crash(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc.step()
+        vc.print_summary()  # should not raise
+
+    def test_print_summary_after_death(self):
+        vc = VirtualCreature(20.0, record_history=False)
+        vc._handle_death("test")
+        vc.print_summary()  # should not raise

@@ -5,11 +5,12 @@ Kidney Module - 肾脏泌尿系统
 
 from parameters import *
 from src.organ_guard import organ_setattr, _blood_escape
+from src.engine.numerics import first_order_lag
 
 # ── GFR Starling 模型系数 ──
-_GFR_PGC_MAP_RATIO = 0.6       # 肾小球毛细血管压 / MAP 比值
-_GFR_PBS_CVP_OFFSET = 10.0     # 鲍曼囊压 = CVP + 10 mmHg
-_GFR_KF = 3.0                  # 肾小球超滤系数 mL/min/mmHg
+# P2.2: 已迁移到 parameters.py，此处保留引用以兼容当前代码
+# 新代码应直接使用 parameters.py 中的 GFR_PGC_MAP_RATIO / GFR_PBS_CVP_OFFSET / GFR_KF
+# kidney.py 通过 `from parameters import *` 自动可用
 
 
 class KidneyModule:
@@ -143,8 +144,8 @@ class KidneyModule:
         water_reabsorption = min(0.999, TUBULAR_WATER_REABSORPTION * (1.0 + 0.1 * aldosterone))
 
         # ── 3. GFR（代数） ───────────────────────────────────────────────────
-        PGC = map_input * _GFR_PGC_MAP_RATIO
-        PBS = cvp_input + _GFR_PBS_CVP_OFFSET
+        PGC = map_input * GFR_PGC_MAP_RATIO
+        PBS = cvp_input + GFR_PBS_CVP_OFFSET
         plasma_colloid = PLASMA_COLLOID_OSMOTIC_MMHG
         # Phase 2 #4: GFR Starling π_BS (Bowman space oncotic pressure)
         # REF: Hall 2016 生理学
@@ -152,7 +153,7 @@ class KidneyModule:
         # 占位项, 便于以后扩展 (低蛋白血症 / 滤过分数异常)
         bowman_space_colloid = 0.0
         filtration_pressure = PGC - PBS - plasma_colloid + bowman_space_colloid
-        Kf = _GFR_KF
+        Kf = GFR_KF
         GFR = max(0.0, Kf * filtration_pressure) * self._disease_gfr_multiplier
 
         # ── 4. 钠平衡（代数） ─────────────────────────────────────────────────
@@ -264,8 +265,9 @@ class KidneyModule:
         sigmoid_factor = 1.0 / (1.0 + math.exp(-15.0 * (combined_stress - 0.15)))
         target_renin = max(0.0, combined_stress * sigmoid_factor + 0.3 * Na_deficit)
         # 一阶滞后（稳态 = target，无静态偏差；只是响应变慢）
-        alpha = min(dt / TAU_RAAS, 1.0) if (TAU_RAAS > 0 and dt > 0) else 1.0
-        self.renin_activity = self.renin_activity + alpha * (target_renin - self.renin_activity)
+        # 使用精确指数解 1-exp(-dt/τ) 替代 Euler 离散化 dt/τ，
+        # 消除 dt 敏感性（与 heart._first_order_relax 一致）。
+        self.renin_activity = first_order_lag(self.renin_activity, target_renin, dt, TAU_RAAS)
 
         # 血管紧张素 II（简化：与肾素成正比）
         self.angiotensin_II = self.renin_activity * 2.0
@@ -292,12 +294,12 @@ class KidneyModule:
         πGC ≈ 血浆胶体渗透压（≈ 25 mmHg）
         πBS ≈ 0（鲍曼囊胶渗压可忽略）
         """
-        PGC = MAP * _GFR_PGC_MAP_RATIO       # 肾小球毛细血管压
-        PBS = CVP + _GFR_PBS_CVP_OFFSET      # 鲍曼囊压
+        PGC = MAP * GFR_PGC_MAP_RATIO       # 肾小球毛细血管压
+        PBS = CVP + GFR_PBS_CVP_OFFSET      # 鲍曼囊压
         plasma_colloid = PLASMA_COLLOID_OSMOTIC_MMHG  # 血浆胶体渗透压（引用 parameters.py）
 
         filtration_pressure = PGC - PBS - plasma_colloid
-        Kf = _GFR_KF                          # 肾小球超滤系数
+        Kf = GFR_KF                          # 肾小球超滤系数
 
         self.GFR = max(0.0, Kf * filtration_pressure)
         # 应用疾病导致的 GFR 乘子（持久化，每步生效）

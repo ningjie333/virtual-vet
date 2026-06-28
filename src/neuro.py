@@ -75,10 +75,16 @@ class NeuroModule:
         """
         返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
 
+        纯函数：只读 self.* / self.blood.*，不修改任何状态。STATE_VARS
+        (sympathetic_tone / parasympathetic_tone / consciousness / seizure /
+        pain_level) 由 caller 从 y 向量解包设置；本方法仅返回其导数 dydt 与
+        本次新值（局部变量）。需写回 self 的非状态字段（chemoreceptor_drive、
+        _seizure_timer）以 "self_" 前缀放入 outputs。
+
         Returns:
             (dydt, outputs):
               dydt: dict[str, float] — 状态变量导数
-              outputs: dict[str, float] — 供其他模块使用的输出端口
+              outputs: dict[str, float] — 供其他模块使用的输出端口 + 待写回字段
         """
         # 化学感受器驱动
         PO2 = self.blood.arterial_PO2_mmHg
@@ -101,21 +107,24 @@ class NeuroModule:
             acid_drive = 0.0
 
         chemoreceptor_drive = min(1.0, hypoxic_drive * 0.3 + hypercapnic_drive * 0.5 + acid_drive * 0.2)
-        self.chemoreceptor_drive = chemoreceptor_drive
+        # NOTE(C5): 纯函数化 — 不再写 self.chemoreceptor_drive（局部变量）
 
         # 疼痛趋向目标值（一阶 lag）
         dPain = (self._pain_target - self.pain_level) / 10.0 if self._pain_target != self.pain_level else 0.0
-        self.pain_level = max(0.0, min(10.0, self.pain_level + dPain * dt))
+        new_pain_level = max(0.0, min(10.0, self.pain_level + dPain * dt))
 
-        # 癫痫计时器消退
+        # 癫痫计时器消退（局部变量）
+        new_seizure_timer = self._seizure_timer
+        new_seizure = self.seizure
         if self._seizure_timer > 0:
-            self._seizure_timer = max(0.0, self._seizure_timer - dt)
-            if self._seizure_timer <= 0:
-                self.seizure = 0.0
+            new_seizure_timer = max(0.0, self._seizure_timer - dt)
+            if new_seizure_timer <= 0:
+                new_seizure = 0.0
 
         # 意识水平（MAP 驱动）
         # dConsciousness 是 per-second rate（τ=30s），无需除以 dt
         dConsciousness = 0.0
+        new_consciousness = self.consciousness
         if map_input is not None:
             if map_input < 40.0:
                 consciousness_target = 0.2
@@ -126,36 +135,49 @@ class NeuroModule:
             else:
                 consciousness_target = 1.0
             dConsciousness = (consciousness_target - self.consciousness) / 30.0
-            self.consciousness = max(0.0, min(1.0, self.consciousness + dConsciousness * dt))
+            new_consciousness = max(0.0, min(1.0, self.consciousness + dConsciousness * dt))
 
         # 交感/副交感张力（slow adaptation）
         # 疼痛 → 交感↑; 低灌注 → 交感↑; 癫痫 → 交感风暴
-        pain_sympathetic_effect = self.pain_level / 10.0 * 0.3
-        seizure_sympathetic_effect = self.seizure * 0.4
+        # 用 new_pain_level 和 new_seizure（避免读旧值）
+        pain_sympathetic_effect = new_pain_level / 10.0 * 0.3
+        seizure_sympathetic_effect = new_seizure * 0.4
         target_sympathetic = max(0.0, min(1.0, 0.3 + pain_sympathetic_effect + seizure_sympathetic_effect + chemoreceptor_drive * 0.2))
         target_parasympathetic = max(0.0, min(1.0, 0.7 - pain_sympathetic_effect * 0.5))
 
         dSympathetic = (target_sympathetic - self.sympathetic_tone) / 20.0
         dParasympathetic = (target_parasympathetic - self.parasympathetic_tone) / 30.0
-        self.sympathetic_tone = max(0.0, min(1.0, self.sympathetic_tone + dSympathetic * dt))
-        self.parasympathetic_tone = max(0.0, min(1.0, self.parasympathetic_tone + dParasympathetic * dt))
+        new_sympathetic_tone = max(0.0, min(1.0, self.sympathetic_tone + dSympathetic * dt))
+        new_parasympathetic_tone = max(0.0, min(1.0, self.parasympathetic_tone + dParasympathetic * dt))
 
+        # dydt 只包含 STATE_VARS 中声明的键
+        # (sympathetic_tone, parasympathetic_tone, consciousness, seizure, pain) —
+        # chemoreceptor 不在其中（已移除）
         dydt = {
             "sympathetic_tone": dSympathetic,
             "parasympathetic_tone": dParasympathetic,
             "consciousness": dConsciousness,
             "seizure": 0.0,
             "pain": dPain,
-            "chemoreceptor": 0.0,
         }
 
         outputs = {
+            # 输出端口（供其他模块读取新值，本地变量）
             "chemoreceptor_drive": chemoreceptor_drive,
-            "pain_level": self.pain_level,
-            "seizure": self.seizure,
-            "consciousness": self.consciousness,
-            "sympathetic_tone": self.sympathetic_tone,
-            "parasympathetic_tone": self.parasympathetic_tone,
+            "pain_level": new_pain_level,
+            "seizure": new_seizure,
+            "consciousness": new_consciousness,
+            "sympathetic_tone": new_sympathetic_tone,
+            "parasympathetic_tone": new_parasympathetic_tone,
+            # self_* 字段：caller 在 Newton 迭代收敛后一次性写回
+            # chemoreceptor_drive / _seizure_timer 不在 STATE_VARS，需通过 self_ 写回
+            "self_chemoreceptor_drive": chemoreceptor_drive,
+            "self_pain_level": new_pain_level,
+            "self_seizure": new_seizure,
+            "self_consciousness": new_consciousness,
+            "self_sympathetic_tone": new_sympathetic_tone,
+            "self_parasympathetic_tone": new_parasympathetic_tone,
+            "self_seizure_timer": new_seizure_timer,
         }
 
         return dydt, outputs

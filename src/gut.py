@@ -137,30 +137,34 @@ class GutModule:
             new_amino_acids_g_L = 0.0
             new_fatty_acids_mmol_L = 0.0
 
-        # ── 6. 存储吸收数据（供 liver 耦合） ─────────────────────────────────
-        self._portal_glucose_absorption_g_min = glucose_abs / dt if dt > 0 else 0.0
-        self._portal_amino_absorption_g_min = amino_abs / dt if dt > 0 else 0.0
-        self._portal_fat_absorption_g_min = fat_abs / dt if dt > 0 else 0.0
+        # ── 6. 吸收数据（供 liver 耦合，输出端口） ───────────────────────────
+        # NOTE(C5): 纯函数化 — 不再写 self._portal_*_absorption_g_min 缓存，
+        # 改为本地变量 + outputs 输出端口（由 caller 在 Newton 迭代收敛后
+        # 一次性写回，供 liver 读取）。lumen_glucose / lumen_amino / lumen_fat /
+        # SCFA 不在 STATE_VARS 中，不进入 dydt（由 compute() 管理）。
+        portal_glucose_absorption_g_min = glucose_abs / dt if dt > 0 else 0.0
+        portal_amino_absorption_g_min = amino_abs / dt if dt > 0 else 0.0
+        portal_fat_absorption_g_min = fat_abs / dt if dt > 0 else 0.0
 
         # 状态变量导数（慢变量，主要由外部因子驱动）
         # motility, barrier, microbiome 本身由疾病调制，这里设为其慢变导数为 0
+        # NOTE(C5): lumen_glucose / lumen_amino / lumen_fat / SCFA 不在
+        # STATE_VARS 中（STATE_VARS 仅 motility / barrier / microbiome），
+        # 已从 dydt 移除；其动力学由 compute() 中的 _compute_gastric_emptying()
+        # 与 _compute_microbiome() 管理。
         dydt = {
             "motility": 0.0,
             "barrier": 0.0,
             "microbiome": 0.0,
-            "lumen_glucose": dLumen_glucose,
-            "lumen_amino": dLumen_amino,
-            "lumen_fat": dLumen_fat,
-            "SCFA": dSCFA,
         }
 
         outputs = {
             "portal_blood_flow_mL_min": portal_flow,
             "amino_acids_g_L": new_amino_acids_g_L,  # NOTE(C5): 本地变量
             "fatty_acids_mmol_L": new_fatty_acids_mmol_L,  # NOTE(C5): 本地变量
-            "glucose_absorption_g_min": self._portal_glucose_absorption_g_min,
-            "amino_absorption_g_min": self._portal_amino_absorption_g_min,
-            "fat_absorption_g_min": self._portal_fat_absorption_g_min,
+            "glucose_absorption_g_min": portal_glucose_absorption_g_min,
+            "amino_absorption_g_min": portal_amino_absorption_g_min,
+            "fat_absorption_g_min": portal_fat_absorption_g_min,
             # NOTE(C5): blood 字段 (Newton 迭代 caller 一次性写回)
             "blood_amino_acids_g_L": new_amino_acids_g_L,
             "blood_fatty_acids_mmol_L": new_fatty_acids_mmol_L,

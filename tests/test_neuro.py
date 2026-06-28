@@ -31,6 +31,29 @@ def make_neuro():
     return NeuroModule(weight_kg=20.0, blood=blood)
 
 
+def _apply_derivatives(module, dt, **kwargs):
+    """Call derivatives() and apply outputs to module (simulating Euler step).
+
+    derivatives() is a pure function: it returns (dydt, outputs) without
+    modifying self. outputs already contains the new (post-step, clamped)
+    values, so we SET matching attributes directly. blood_* outputs are
+    skipped (they are applied by the engine layer via apply_factor).
+    """
+    dydt, outputs = module.derivatives(dt=dt, **kwargs)
+    for k, v in outputs.items():
+        if k.startswith("blood_"):
+            continue
+        if k.startswith("self_"):
+            attr = k[5:]
+            if hasattr(module, attr):
+                setattr(module, attr, v)
+            elif hasattr(module, "_" + attr):
+                setattr(module, "_" + attr, v)
+        elif hasattr(module, k):
+            setattr(module, k, v)
+    return dydt, outputs
+
+
 # ---------------------------------------------------------------------------
 # TestChemoreceptor
 # ---------------------------------------------------------------------------
@@ -49,7 +72,7 @@ class TestChemoreceptor:
         """High PaCO2 (55 mmHg) → chemoreceptor_drive rises above baseline 0."""
         n = make_neuro()
         n.blood.arterial_PCO2_mmHg = 55.0
-        dydt, out = n.derivatives(dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
+        dydt, out = _apply_derivatives(n, dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
         # hypercapnic_drive = (55-50)/50 * 0.5 = 0.05
         assert n.chemoreceptor_drive >= 0.05, \
             f"PCO2=55 should raise drive >=0.05, got {n.chemoreceptor_drive}"
@@ -58,7 +81,7 @@ class TestChemoreceptor:
         """Low PaO2 (50 mmHg) → chemoreceptor_drive rises."""
         n = make_neuro()
         n.blood.arterial_PO2_mmHg = 50.0
-        dydt, out = n.derivatives(dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
+        dydt, out = _apply_derivatives(n, dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
         # PO2 < 70: hypoxic_drive = (70-50)/70 ≈ 0.286 → weighted 0.3
         assert n.chemoreceptor_drive > 0.0, \
             f"PO2=50 should raise drive >0, got {n.chemoreceptor_drive}"
@@ -67,7 +90,7 @@ class TestChemoreceptor:
         """Low pH (7.1) → chemoreceptor_drive rises."""
         n = make_neuro()
         n.blood.arterial_pH = 7.1
-        dydt, out = n.derivatives(dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
+        dydt, out = _apply_derivatives(n, dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
         # acid_drive = (7.35-7.1)/0.35 ≈ 0.714 → weighted 0.2
         assert n.chemoreceptor_drive > 0.0, \
             f"pH=7.1 should raise drive, got {n.chemoreceptor_drive}"
@@ -78,7 +101,7 @@ class TestChemoreceptor:
         n.blood.arterial_PO2_mmHg = 30.0
         n.blood.arterial_PCO2_mmHg = 70.0
         n.blood.arterial_pH = 7.0
-        dydt, out = n.derivatives(dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
+        dydt, out = _apply_derivatives(n, dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
         # drive = 0.3*(40/70) + 0.5*(20/50) + 0.2*(0.35/0.35) ≈ 0.17+0.2+0.2 = 0.57
         assert n.chemoreceptor_drive > 0.3, \
             f"Combined drives should exceed 0.3, got {n.chemoreceptor_drive}"
@@ -102,7 +125,7 @@ class TestConsciousness:
         """Severe hypotension (MAP=40) → consciousness drops (via baroreflex)."""
         n = make_neuro()
         for _ in range(1000):  # converge with tau=30s
-            n.derivatives(dt=0.1, map_input=40.0, heart_hr=80.0, lung_rr=18.0)
+            _apply_derivatives(n, dt=0.1, map_input=40.0, heart_hr=80.0, lung_rr=18.0)
         assert n.consciousness < 1.0, \
             f"MAP=40 should reduce consciousness from 1.0, got {n.consciousness}"
 
@@ -112,7 +135,7 @@ class TestConsciousness:
         n.blood.arterial_PO2_mmHg = 40.0
         # NOTE: consciousness drops only when MAP < 40 simultaneously
         for _ in range(1000):
-            n.derivatives(dt=0.1, map_input=30.0, heart_hr=80.0, lung_rr=18.0)
+            _apply_derivatives(n, dt=0.1, map_input=30.0, heart_hr=80.0, lung_rr=18.0)
         assert n.consciousness < 1.0, \
             f"PO2=40+MAP=30 should reduce consciousness, got {n.consciousness}"
 
@@ -129,7 +152,7 @@ class TestPain:
         n = make_neuro()
         n.set_pain_target(5.0)
         for _ in range(200):  # 20 s → ~2τ → ~86% of way
-            n.derivatives(dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
+            _apply_derivatives(n, dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
         assert 3.5 <= n.pain_level <= 6.0, \
             f"pain_level={n.pain_level}, expected ~4.3 (86% of 5.0)"
 
@@ -139,7 +162,7 @@ class TestPain:
         baseline = n.sympathetic_tone
         n.set_pain_target(8.0)
         for _ in range(2000):  # 200s = 10 tau → ~99.95% convergence
-            n.derivatives(dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
+            _apply_derivatives(n, dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
         assert n.sympathetic_tone > baseline + 0.05, \
             f"Pain should raise sympathetic above {baseline}, got {n.sympathetic_tone}"
 
@@ -149,7 +172,7 @@ class TestPain:
         n.set_pain_target(0.0)
         n.pain_level = 5.0  # Start elevated
         for _ in range(500):  # 50s = 5τ → ~99% decay
-            n.derivatives(dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
+            _apply_derivatives(n, dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
         assert n.pain_level < 0.1, \
             f"Pain target=0 should decay near 0, got {n.pain_level}"
 
@@ -168,7 +191,7 @@ class TestSeizure:
         n.seizure = 1.0
         n._seizure_timer = 999.0  # far exceed test duration so seizure stays active
         for _ in range(2000):  # converge (tau=20s)
-            n.derivatives(dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
+            _apply_derivatives(n, dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
         # seizure=1.0 → seizure_sympathetic_effect = 0.4; target ≈ 0.7
         assert n.sympathetic_tone > baseline + 0.05, \
             f"Seizure should raise sympathetic above {baseline}, got {n.sympathetic_tone}"
@@ -179,7 +202,7 @@ class TestSeizure:
         n.seizure = 0.5
         n._seizure_timer = 0.5  # expires after 0.5 seconds
         for _ in range(50):  # 5 seconds > 0.5s timer
-            n.derivatives(dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
+            _apply_derivatives(n, dt=0.1, map_input=90.0, heart_hr=80.0, lung_rr=18.0)
         assert n.seizure == 0.0, f"Seizure should self-terminate after timer expires, got {n.seizure}"
 
 

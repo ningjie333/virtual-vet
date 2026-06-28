@@ -56,12 +56,10 @@ class LiverModule:
                          → 返回 liver_state
     """
 
-    def __init__(self, weight_kg: float, blood, signal_bus=None):
-        # Phase 6: signal bus 显式参数. None 时回退到 blood (BloodShim 兼容).
+    def __init__(self, weight_kg: float, blood):
         self.w = weight_kg
         with _blood_escape(LiverModule):
             self.blood = blood  # 保留供向后兼容 (summary 等仍可读)
-        self._bus = signal_bus if signal_bus is not None else blood
 
         # 代谢功能 (0-1)
         self.metabolic_activity = 1.0
@@ -92,37 +90,14 @@ class LiverModule:
         self.cumulative_urea_production_mmol = 0.0
         self.cumulative_albumin_production_g = 0.0
 
-    # ── Phase 6: 显式 blood I/O helper ─────────────────────────────────
+    # ── blood I/O helper ──────────────────────────────────────────────
     def _blood_read(self, name: str) -> Any:
-        """显式 blood 字段读：record to bus + return real blood value.
-
-        Works in two regimes:
-        - Phase 6 (signal_bus is SignalBus): record read + return real_blood.X
-        - Legacy / tests (signal_bus is BloodCompartment or None): direct access
-        """
-        bus = self._bus
-        if hasattr(bus, "read_blood") and hasattr(bus, "real_blood"):
-            # Phase 6: proper SignalBus
-            bus.read_blood(name)
-            return getattr(bus.real_blood, name)
-        # Legacy: direct access (backward compat for tests with plain BloodCompartment)
+        """Read a blood field by name."""
         return getattr(self.blood, name)
 
     def _blood_write(self, name: str, value: Any) -> None:
-        """显式 blood 字段写：record to bus + write to real blood.
-
-        Works in two regimes:
-        - Phase 6 (signal_bus is SignalBus): record write + write to real_blood
-        - Legacy / tests (signal_bus is BloodCompartment or None): direct write
-        """
-        bus = self._bus
-        if hasattr(bus, "publish_blood") and hasattr(bus, "real_blood"):
-            # Phase 6: proper SignalBus
-            bus.publish_blood(name, value)
-            setattr(bus.real_blood, name, value)
-        else:
-            # Legacy: direct write
-            setattr(self.blood, name, value)
+        """Write a blood field by name."""
+        setattr(self.blood, name, value)
 
     # ── derivatives() — 供 solve_ivp Radau 调用 ──────────────────────────────
     # 状态变量（进入统一 y 向量）: glycogen_fraction, bilirubin_accumulation
@@ -132,6 +107,9 @@ class LiverModule:
         """
         返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
 
+        R2: 纯函数 — 不修改 self.* 或 self.blood.*。
+        调用方（compute() 或 radau Step 5a）负责把 outputs 写入实例属性。
+
         Args:
             dt: 时间步长（秒）
             co_input: 心输出量 mL/min
@@ -140,7 +118,7 @@ class LiverModule:
         Returns:
             (dydt, outputs):
               dydt: dict[str, float] — 状态变量导数
-              outputs: dict[str, float] — 供其他模块使用的输出端口
+              outputs: dict[str, float] — 输出端口 + blood_*/self_* 写入字段
         """
         dt_min = dt / 60.0
         dt_hour = dt / 3600.0
@@ -149,10 +127,9 @@ class LiverModule:
         # ── 1. 肝血流量（代数） ─────────────────────────────────────────────
         hepatic_flow = 0.25 * co_input
 
-        # ── 2. 葡萄糖稳态（代数 + 状态更新） ───────────────────────────────
+        # ── 2. 葡萄糖稳态（代数） ───────────────────────────────────────────
         glucose = self._blood_read("glucose_mmol_L")
 
-        # 低血糖：糖原分解
         if glucose < 3.5:
             base_rate = 0.3 * self.glycogen_fraction
             rate = base_rate * self.metabolic_activity
@@ -167,7 +144,6 @@ class LiverModule:
             dGlycogen = 0.0
             glucose_output = 0.0
 
-        # 高血糖：糖原合成
         if glucose > 6.0:
             base_rate = 0.2 * self.metabolic_activity
             if glucose > 8.0:
@@ -177,50 +153,47 @@ class LiverModule:
             glycogen_synthesized_g = base_rate * dt_min * _MAX_GLYCOGEN_G
             dGlycogen += glycogen_synthesized_g / _MAX_GLYCOGEN_G
 
-        # 氨抑制
         ammonia_val = self._blood_read("ammonia_umol_L")
         if ammonia_val > 100:
             glucose_output *= max(0.3, 1.0 - (ammonia_val - 100) / 400)
 
-        # 糖异生（利用氨基酸）
         amino_g_min = gut_state.get("amino_absorption_g_min", 0.0)
         if glucose < 3.5 and self.metabolic_activity > 0.3:
             gluconeogenesis = amino_g_min * 0.6 * self.metabolic_activity
             glucose_output += gluconeogenesis
 
-        self.glycogen_fraction = max(0.0, min(1.0, self.glycogen_fraction + dGlycogen))
+        new_glycogen_fraction = max(0.0, min(1.0, self.glycogen_fraction + dGlycogen))
 
-        # ── 3. 氨解毒（代数更新到 blood.ammonia） ───────────────────────────
+        # ── 3. 氨解毒 ───────────────────────────────────────────────────────
         k = 1.0 * self.detox_capacity
         gut_ammonia_rate = amino_g_min * _AMINO_TO_AMMONIA_UMOL_PER_G
         total_production = self.endogenous_ammonia_rate + gut_ammonia_rate
 
+        new_ammonia = ammonia_val
+        new_bun = self._blood_read("bun_mg_dL")
         if k > 1e-6:
             new_ammonia = (
                 ammonia_val * math.exp(-k * dt_min)
                 + (total_production / k) * (1.0 - math.exp(-k * dt_min))
             )
             new_ammonia = max(0.0, new_ammonia)
-            self._blood_write("ammonia_umol_L", new_ammonia)
 
-        # 尿素产生
-        ammonia_consumed = max(0.0, ammonia_val - new_ammonia) if k > 1e-6 else 0.0
-        urea_mmol = ammonia_consumed / 2.0
-        if urea_mmol > 0:
-            self._blood_write("bun_mg_dL",
-                self._blood_read("bun_mg_dL") + urea_mmol * _UREA_MMOL_TO_BUN_MG_DL * dt_min)
+            ammonia_consumed = max(0.0, ammonia_val - new_ammonia)
+            urea_mmol = ammonia_consumed / 2.0
+            if urea_mmol > 0:
+                new_bun = new_bun + urea_mmol * _UREA_MMOL_TO_BUN_MG_DL * dt_min
 
-        # ── 4. 白蛋白合成（代数更新到 blood.albumin） ───────────────────────
+        # ── 4. 白蛋白合成 ───────────────────────────────────────────────────
         base_rate_g_day = 0.5 * self.w
         amino_g_L = self._blood_read("amino_acids_g_L")
         amino_factor = min(2.0, amino_g_L / 1.0)
         synthesis_rate = base_rate_g_day * self.metabolic_activity * amino_factor
         albumin_change = synthesis_rate * dt_hour / 24.0
         alb_current = self._blood_read("albumin_g_dL")
-        self._blood_write("albumin_g_dL", max(1.0, min(5.0, alb_current + albumin_change)))
-        self.cumulative_albumin_production_g += synthesis_rate * dt_min / 60.0
+        new_albumin = max(1.0, min(5.0, alb_current + albumin_change))
+        delta_cumulative_albumin_g = synthesis_rate * dt_min / 60.0
 
-        # ── 5. 胆红素代谢（时序 ODE → 状态变量） ───────────────────────────
+        # ── 5. 胆红素代谢 ───────────────────────────────────────────────────
         normal_production = _NORMAL_BILIRUBIN_MG_DL_PER_KG * self.w
         conj = self.bilirubin_conjugation
         k_clear = 0.5 * conj
@@ -234,33 +207,28 @@ class LiverModule:
         else:
             new_accum = self._bilirubin_accumulation + production_input * dt_day
         new_accum = max(0.0, new_accum)
-        dBilirubin_accum = (new_accum - self._bilirubin_accumulation) / dt_day  # 转换为 /s
-        self._bilirubin_accumulation = new_accum
+        dBilirubin_accum = (new_accum - self._bilirubin_accumulation) / dt_day if dt_day > 0 else 0.0
 
         bilirubin_level = _BILIRUBIN_AXIS_INTERCEPT + new_accum * _BILIRUBIN_SEVERITY_SLOPE
-        self._blood_write("bilirubin_mg_dL", max(0.1, min(15.0, bilirubin_level)))
+        new_bilirubin = max(0.1, min(15.0, bilirubin_level))
 
-        # 肝酶
-        if conj < 0.8:
-            self._blood_write("ALT_U_L", 25.0 + (1.0 - conj) * 150.0)
-            self._blood_write("AST_U_L", 25.0 + (1.0 - conj) * 200.0)
-            self._blood_write("ALP_U_L", 30.0 + (1.0 - conj) * 300.0)
+        new_ALT = 25.0 + (1.0 - conj) * 150.0 if conj < 0.8 else self._blood_read("ALT_U_L")
+        new_AST = 25.0 + (1.0 - conj) * 200.0 if conj < 0.8 else self._blood_read("AST_U_L")
+        new_ALP = 30.0 + (1.0 - conj) * 300.0 if conj < 0.8 else self._blood_read("ALP_U_L")
 
-        # ── 6. 凝血因子（代数更新到 blood） ──────────────────────────────────
+        # ── 6. 凝血因子 ─────────────────────────────────────────────────────
         k_VII = 0.12
         target_VII = 0.04 * self.metabolic_activity * max(0.1, conj)
         vii_current = self._blood_read("coagulation_factor_VII")
         vii_new = vii_current + (target_VII - vii_current) * k_VII * dt_hour
         vii_new = max(0.05, min(1.0, vii_new))
-        self._blood_write("coagulation_factor_VII", vii_new)
         PT_factor = 1.0 + (1.0 - vii_new) * 1.5
         PT_sec = 12.0 * PT_factor
         INR = PT_sec / 12.0
-        self._blood_write("PT_sec", PT_sec)
-        self._blood_write("INR", INR)
 
-        # ── 7. CYP450（代数） ───────────────────────────────────────────────
+        # ── 7. CYP450 ───────────────────────────────────────────────────────
         drug_conc = self._blood_read("drug_concentration_mg_kg")
+        new_drug_conc = drug_conc
         if drug_conc > 0 and self.cyp450_activity > 0:
             baseline_flow = 0.25 * base_cardiac_output_ml_min(self.w)
             hepatic_factor = min(1.0, hepatic_flow / baseline_flow)
@@ -268,20 +236,20 @@ class LiverModule:
             metabolism_rate = Vmax * drug_conc / (_CYP450_KM + drug_conc)
             max_clearance = drug_conc
             cleared = min(metabolism_rate, max_clearance)
-            self._blood_write("drug_concentration_mg_kg", max(0.0, drug_conc - cleared))
+            new_drug_conc = max(0.0, drug_conc - cleared)
 
         # ── 8. 肠道氨基酸清除 ────────────────────────────────────────────────
+        new_amino_acids_g_L = amino_g_L
         if hepatic_flow > 0:
             amino_removed_g_L = amino_g_min * dt_min / (hepatic_flow / 1000)
-            amino_current = self._blood_read("amino_acids_g_L")
-            self._blood_write("amino_acids_g_L", max(0.1, amino_current - amino_removed_g_L))
+            new_amino_acids_g_L = max(0.1, amino_g_L - amino_removed_g_L)
 
-        self.hepatic_blood_flow = hepatic_flow
-        self.cumulative_glucose_production_g += glucose_output * dt_min
-        self.cumulative_urea_production_mmol += total_production * dt_min / 2.0
+        delta_cumulative_glucose_g = glucose_output * dt_min
+        delta_cumulative_urea_mmol = total_production * dt_min / 2.0
 
-        # ── 9. Cori cycle（代数更新到 blood.lactate 和 blood.glucose） ─────
+        # ── 9. Cori cycle ────────────────────────────────────────────────────
         lactate = self._blood_read("lactate_mmol_L")
+        new_glucose_mmol_L = self._blood_read("glucose_mmol_L")
         if lactate > 0.1:
             baseline_flow = 0.25 * base_cardiac_output_ml_min(self.w)
             hepatic_factor = min(1.0, hepatic_flow / baseline_flow)
@@ -291,35 +259,54 @@ class LiverModule:
             )
             lactate_consumed = uptake_rate * dt_min
             glucose_from_lactate = lactate_consumed / 2.0
-            glu_current = self._blood_read("glucose_mmol_L")
-            self._blood_write("glucose_mmol_L", min(25.0, glu_current + glucose_from_lactate))
+            new_glucose_mmol_L = min(25.0, new_glucose_mmol_L + glucose_from_lactate)
 
         # ── 状态变量导数 ───────────────────────────────────────────────────
-        dGlycogen_net = dGlycogen  # per-second rate
         dydt = {
-            "glycogen_fraction": dGlycogen_net,
+            "glycogen_fraction": dGlycogen,
             "bilirubin_accumulation": dBilirubin_accum,
         }
 
         outputs = {
             "glucose_output_g_min": glucose_output,
             "ammonia_umol_L": new_ammonia,
-            "albumin_g_dL": self._blood_read("albumin_g_dL"),
-            "bilirubin_mg_dL": self._blood_read("bilirubin_mg_dL"),
-            "ALT_U_L": self._blood_read("ALT_U_L"),
-            "AST_U_L": self._blood_read("AST_U_L"),
-            "ALP_U_L": self._blood_read("ALP_U_L"),
+            "albumin_g_dL": new_albumin,
+            "bilirubin_mg_dL": new_bilirubin,
+            "ALT_U_L": new_ALT,
+            "AST_U_L": new_AST,
+            "ALP_U_L": new_ALP,
             "GGT_U_L": self._blood_read("GGT_U_L"),
             "hepatic_blood_flow_mL_min": hepatic_flow,
-            "coagulation_factor_VII": self._blood_read("coagulation_factor_VII"),
+            "coagulation_factor_VII": vii_new,
             "PT_sec": PT_sec,
             "INR": INR,
             "fibrinogen_mg_dL": self._blood_read("fibrinogen_mg_dL"),
             "metabolic_activity": self.metabolic_activity,
             "detox_capacity": self.detox_capacity,
             "cyp450_activity": self.cyp450_activity,
-            "glycogen_fraction": self.glycogen_fraction,
+            "glycogen_fraction": new_glycogen_fraction,
             "bilirubin_conjugation": conj,
+            # R2: blood 写入字段（由 radau Step 5a 通过 apply_factor 写入）
+            "blood_ammonia_umol_L": new_ammonia,
+            "blood_bun_mg_dL": new_bun,
+            "blood_albumin_g_dL": new_albumin,
+            "blood_bilirubin_mg_dL": new_bilirubin,
+            "blood_ALT_U_L": new_ALT,
+            "blood_AST_U_L": new_AST,
+            "blood_ALP_U_L": new_ALP,
+            "blood_coagulation_factor_VII": vii_new,
+            "blood_PT_sec": PT_sec,
+            "blood_INR": INR,
+            "blood_drug_concentration_mg_kg": new_drug_conc,
+            "blood_amino_acids_g_L": new_amino_acids_g_L,
+            "blood_glucose_mmol_L": new_glucose_mmol_L,
+            # R2: self 写入字段（由 caller 写回实例属性）
+            "self_glycogen_fraction": new_glycogen_fraction,
+            "self_bilirubin_accumulation": new_accum,
+            "self_hepatic_blood_flow": hepatic_flow,
+            "delta_cumulative_glucose_g": delta_cumulative_glucose_g,
+            "delta_cumulative_urea_mmol": delta_cumulative_urea_mmol,
+            "delta_cumulative_albumin_g": delta_cumulative_albumin_g,
         }
 
         return dydt, outputs

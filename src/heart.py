@@ -18,6 +18,8 @@ Heart Module - 心血管循环系统（修正版）
 
 import math
 
+from src.engine.numerics import first_order_lag
+
 from parameters import *
 from src.cardiac_electrophysiology import CardiacElectrophysiology
 from src.noble_purkinje import NoblePurkinjeFiber
@@ -93,6 +95,7 @@ class HeartModule:
         self.SVR = (MEAN_ARTERIAL_PRESSURE_MMHG - CENTRAL_VENOUS_PRESSURE_MMHG) / (CO_baseline_mL_min / 60.0)
         self.SVR_baseline = self.SVR
         self.SVR_max = self.SVR * 3.0
+        self.cortisol_factor = 1.0  # 疾病模块可写（heart.cortisol_factor），巴氏反射 SVR 基准乘子
 
         # 血压
         self.MAP_baseline = CENTRAL_VENOUS_PRESSURE_MMHG  # CVP as outflow pressure (Guyton C2)
@@ -246,7 +249,7 @@ class HeartModule:
 
         # SVR 补偿（τ = 1/alpha_svr = 10s）
         SVR_increase = 1.0 + 2.0 * self.sympathetic * max(0.0, error)
-        target_SVR = min(self.SVR_max, self.SVR_baseline * SVR_increase)
+        target_SVR = min(self.SVR_max, self.SVR_baseline * self.cortisol_factor * SVR_increase)
         alpha_svr = 0.1
         dSVR = (target_SVR - self.SVR) * alpha_svr  # τ=10s
 
@@ -494,7 +497,7 @@ class HeartModule:
         # 生理：严重休克时血管扩张物质（NO、腺苷）释放增加，对抗交感收缩
         SVR_increase = 1.0 + 2.0 * self.sympathetic * max(0.0, error)
         ischemic_svr_factor = max(0.3, 1.0 - self.myocardial_ischemia * 0.7)
-        svr_target = min(self.SVR_max * ischemic_svr_factor, self.SVR_baseline * SVR_increase)
+        svr_target = min(self.SVR_max * ischemic_svr_factor, self.SVR_baseline * self.cortisol_factor * SVR_increase)
         self.SVR = self._first_order_relax(self.SVR, svr_target, dt, SVR_BAROREFLEX_TAU_SEC)
         # Hard safety clamp: SVR must never exceed physiological maximum
         self.SVR = min(self.SVR, self.SVR_max * 1.5)  # allow 50% overshoot during transients
@@ -505,11 +508,8 @@ class HeartModule:
 
     @staticmethod
     def _first_order_relax(current: float, target: float, dt: float, tau: float) -> float:
-        """Stable first-order lag update for coarse outer simulation steps."""
-        if tau <= 0.0:
-            return target
-        alpha = 1.0 - math.exp(-max(0.0, dt) / tau)
-        return current + (target - current) * alpha
+        """Stable first-order lag update — delegates to shared numerics helper."""
+        return first_order_lag(current, target, dt, tau)
 
     def compute(self, dt: float, svr_factor: float = 1.0,
                 chemoreceptor_drive: float = 0.0):

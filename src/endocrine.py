@@ -108,29 +108,33 @@ class EndocrineModule:
         """
         返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
 
+        纯函数：只读 self.* 和 self.blood.*，不修改任何状态。
+        所有需要写入 self/blood 的值放入 outputs dict（self_*/blood_* 前缀），
+        由 caller 在 Newton 子迭代收敛后一次性写回。
+
         Returns:
             (dydt, outputs):
               dydt: dict[str, float] — 状态变量导数
-              outputs: dict[str, float] — 供其他模块使用的输出端口
+              outputs: dict[str, float] — 供其他模块使用的输出端口 + 待写回字段
         """
-        self._elapsed_s += dt
+        # 局部 elapsed，避免修改 self._elapsed_s（纯函数化）
+        elapsed_s = self._elapsed_s + dt
         glucose = self.blood.glucose_mmol_L
 
         # ── 甲状腺轴 ───────────────────────────────────────────────────────
-        circadian_T3 = 5.0 * math.sin(2.0 * math.pi * self._elapsed_s / 86400.0)
+        circadian_T3 = 5.0 * math.sin(2.0 * math.pi * elapsed_s / 86400.0)
         T3_target = BASELINE_T3_NG_DL + circadian_T3
         tau = THYROID_TAU_SEC
         dT3 = (T3_target - self.T3_ng_dL) / tau if tau > 0 else 0.0
-        self.T3_ng_dL = max(0.0, self.T3_ng_dL + dT3 * dt)
-        self.T4_ug_dL = self.T3_ng_dL * 0.015
-        baseline_ratio = self.T3_ng_dL / BASELINE_T3_NG_DL
+        new_T3 = max(0.0, self.T3_ng_dL + dT3 * dt)
+        new_T4 = new_T3 * 0.015
+        baseline_ratio = new_T3 / BASELINE_T3_NG_DL
         metabolic_rate = max(METABOLIC_RATE_MIN, min(METABOLIC_RATE_MAX, METABOLIC_RATE_NORMAL * baseline_ratio))
-        T3_factor = self.T3_ng_dL / BASELINE_T3_NG_DL
+        T3_factor = new_T3 / BASELINE_T3_NG_DL
 
         # 体温
         dt_min = dt / 60.0
         heat_drift = (metabolic_rate - METABOLIC_RATE_NORMAL) * 0.05 * dt_min
-        # NOTE(C5): 纯函数化 — 改为本地变量，由 caller 写回
         new_core_temp = max(37.0, min(42.0, self.blood.core_temperature_C + heat_drift))
         baseline_pull = (38.5 - new_core_temp) * 0.001
         new_core_temp = max(37.0, min(42.0, new_core_temp + baseline_pull))
@@ -151,39 +155,37 @@ class EndocrineModule:
         tau = PANCREATIC_RESPONSE_TAU_SEC
         dInsulin = (insulin_target - self.insulin_uU_mL) / tau if tau > 0 else 0.0
         dGlucagon = (glucagon_target - self.glucagon_pg_mL) / tau if tau > 0 else 0.0
-        self.insulin_uU_mL = max(0.0, self.insulin_uU_mL + dInsulin * dt)
-        self.glucagon_pg_mL = max(0.0, self.glucagon_pg_mL + dGlucagon * dt)
-        insulin_factor = self.insulin_uU_mL / BASELINE_INSULIN_UU_ML
-        glucagon_factor = self.glucagon_pg_mL / BASELINE_GLUCAGON_PG_ML
+        new_insulin = max(0.0, self.insulin_uU_mL + dInsulin * dt)
+        new_glucagon = max(0.0, self.glucagon_pg_mL + dGlucagon * dt)
+        insulin_factor = new_insulin / BASELINE_INSULIN_UU_ML
+        glucagon_factor = new_glucagon / BASELINE_GLUCAGON_PG_ML
 
         # 被动血糖调节
         insulin_effect = (insulin_factor - 1.0) * 0.01 * dt
         glucagon_effect = (1.0 - glucagon_factor) * 0.005 * dt
         net_glucose_shift = insulin_effect - glucagon_effect
-        # NOTE(C5): 纯函数化 — 改为本地变量
         new_glucose_mmol_L = self.blood.glucose_mmol_L
-        if self.insulin_uU_mL > BASELINE_INSULIN_UU_ML * 1.5:
+        if new_insulin > BASELINE_INSULIN_UU_ML * 1.5:
             new_glucose_mmol_L = max(2.0, self.blood.glucose_mmol_L + net_glucose_shift)
-        elif self.glucagon_pg_mL > BASELINE_GLUCAGON_PG_ML * 1.5:
+        elif new_glucagon > BASELINE_GLUCAGON_PG_ML * 1.5:
             new_glucose_mmol_L = min(12.0, self.blood.glucose_mmol_L - net_glucose_shift)
 
         # ── 肾上腺轴 ───────────────────────────────────────────────────────
         baseline_activity = 0.05
-        self.HPA_axis = max(self.HPA_axis, baseline_activity)
+        new_HPA = max(self.HPA_axis, baseline_activity)
         if self._stress_input > 0.1:
             growth_rate = 0.01 * self._stress_input
-            self.HPA_axis += growth_rate * self.HPA_axis * (1.0 - self.HPA_axis) * dt
-            self.HPA_axis = max(0.0, min(1.0, self.HPA_axis))
+            new_HPA += growth_rate * new_HPA * (1.0 - new_HPA) * dt
+            new_HPA = max(0.0, min(1.0, new_HPA))
 
         cortisol_range = CORTISOL_STRESS_MAX - BASELINE_CORTISOL_UG_DL
-        cortisol_target = BASELINE_CORTISOL_UG_DL + cortisol_range * self.HPA_axis
+        cortisol_target = BASELINE_CORTISOL_UG_DL + cortisol_range * new_HPA
         tau = CORTISOL_TAU_SEC
         dCortisol = (cortisol_target - self.cortisol_ug_dL) / tau if tau > 0 else 0.0
-        self.cortisol_ug_dL = max(0.0, self.cortisol_ug_dL + dCortisol * dt)
-        cortisol_factor = self.cortisol_ug_dL / BASELINE_CORTISOL_UG_DL
-        self.epinephrine_pg_mL = BASELINE_EPINEPHRINE_PG_ML * (1.0 + 5.0 * self.HPA_axis)
-        self.norepinephrine_pg_mL = BASELINE_NOREPINEPHRINE_PG_ML * (1.0 + 3.0 * self.HPA_axis)
-        self._stress_input = max(0.0, self._stress_input - 0.01 * dt)
+        new_cortisol = max(0.0, self.cortisol_ug_dL + dCortisol * dt)
+        cortisol_factor = new_cortisol / BASELINE_CORTISOL_UG_DL
+        new_epinephrine = BASELINE_EPINEPHRINE_PG_ML * (1.0 + 5.0 * new_HPA)
+        new_norepinephrine = BASELINE_NOREPINEPHRINE_PG_ML * (1.0 + 3.0 * new_HPA)
 
         # ── 甲状旁腺轴 ────────────────────────────────────────────────────
         calcium_deviation = CALCIUM_NORMAL_LOW - self.calcium_mg_dL
@@ -195,20 +197,18 @@ class EndocrineModule:
 
         tau = PTH_TAU_SEC
         dPTH = (pth_target - self.PTH_pg_mL) / tau if tau > 0 else 0.0
-        self.PTH_pg_mL = max(0.0, self.PTH_pg_mL + dPTH * dt)
+        new_PTH = max(0.0, self.PTH_pg_mL + dPTH * dt)
 
+        new_calcium = self.calcium_mg_dL
         if abs(calcium_deviation) > 0.5:
-            self.calcium_mg_dL += calcium_deviation * 0.002 * dt
+            new_calcium = self.calcium_mg_dL + calcium_deviation * 0.002 * dt
 
         phosphate_error = self.blood.phosphate_mg_dL - BASELINE_PHOSPHATE_MG_DL
-        if self.PTH_pg_mL > BASELINE_PTH_PG_ML:
-            self.phosphate_mg_dL = max(1.5, self.phosphate_mg_dL - 0.001 * (self.PTH_pg_mL / BASELINE_PTH_PG_ML - 1.0) * dt)
+        new_phosphate = self.phosphate_mg_dL
+        if new_PTH > BASELINE_PTH_PG_ML:
+            new_phosphate = max(1.5, self.phosphate_mg_dL - 0.001 * (new_PTH / BASELINE_PTH_PG_ML - 1.0) * dt)
 
-        calcium_factor = self.calcium_mg_dL / BASELINE_CALCIUM_MG_DL
-        # NOTE(C5): 纯函数化 — 改为本地变量，caller 写回
-        new_PTH_pg_mL = self.PTH_pg_mL
-        new_calcium_mg_dL = self.calcium_mg_dL
-        new_phosphate_mg_dL = self.phosphate_mg_dL
+        calcium_factor = new_calcium / BASELINE_CALCIUM_MG_DL
 
         # ── 生长轴 ─────────────────────────────────────────────────────────
         nutrition_factor = 1.0
@@ -220,10 +220,9 @@ class EndocrineModule:
         igf1_target = BASELINE_IGF1_NMOL_L * nutrition_factor
         tau = GROWTH_TAU_SEC
         dIGF1 = (igf1_target - self.IGF1_nmol_L) / tau if tau > 0 else 0.0
-        self.IGF1_nmol_L = max(0.0, self.IGF1_nmol_L + dIGF1 * dt)
-        growth_factor = self.IGF1_nmol_L / BASELINE_IGF1_NMOL_L
-        self.GH_ng_mL = BASELINE_GH_NG_ML * (0.8 + 0.2 * growth_factor)
-        # NOTE(C5): 纯函数化
+        new_IGF1 = max(0.0, self.IGF1_nmol_L + dIGF1 * dt)
+        growth_factor = new_IGF1 / BASELINE_IGF1_NMOL_L
+        new_GH = BASELINE_GH_NG_ML * (0.8 + 0.2 * growth_factor)
         albumin_delta = 0.0
         if growth_factor > 1.05:
             albumin_delta = min(4.5, self.blood.albumin_g_dL + (growth_factor - 1.0) * 0.001 * dt) - self.blood.albumin_g_dL
@@ -249,16 +248,30 @@ class EndocrineModule:
             "cortisol_factor": cortisol_factor,
             "calcium_factor": calcium_factor,
             "growth_factor": growth_factor,
-            "core_temperature_C": new_core_temp,  # NOTE(C5): 本地变量
-            "epinephrine_pg_mL": self.epinephrine_pg_mL,
-            "norepinephrine_pg_mL": self.norepinephrine_pg_mL,
-            "GH_ng_mL": self.GH_ng_mL,
-            # NOTE(C5): blood 字段 (Newton 迭代 caller 一次性写回)
+            "core_temperature_C": new_core_temp,
+            "epinephrine_pg_mL": new_epinephrine,
+            "norepinephrine_pg_mL": new_norepinephrine,
+            "GH_ng_mL": new_GH,
+            # self_* 字段：caller 在 Newton 迭代收敛后一次性写回
+            "self_T3_ng_dL": new_T3,
+            "self_T4_ug_dL": new_T4,
+            "self_insulin_uU_mL": new_insulin,
+            "self_glucagon_pg_mL": new_glucagon,
+            "self_cortisol_ug_dL": new_cortisol,
+            "self_PTH_pg_mL": new_PTH,
+            "self_IGF1_nmol_L": new_IGF1,
+            "self_HPA_axis": new_HPA,
+            "self_calcium_mg_dL": new_calcium,
+            "self_phosphate_mg_dL": new_phosphate,
+            "self_epinephrine_pg_mL": new_epinephrine,
+            "self_norepinephrine_pg_mL": new_norepinephrine,
+            "self_GH_ng_mL": new_GH,
+            # blood_* 字段：caller 一次性写回
             "blood_core_temperature_C": new_core_temp,
             "blood_glucose_mmol_L": new_glucose_mmol_L,
-            "blood_PTH_pg_mL": new_PTH_pg_mL,
-            "blood_calcium_mg_dL": new_calcium_mg_dL,
-            "blood_phosphate_mg_dL": new_phosphate_mg_dL,
+            "blood_PTH_pg_mL": new_PTH,
+            "blood_calcium_mg_dL": new_calcium,
+            "blood_phosphate_mg_dL": new_phosphate,
             "blood_albumin_g_dL": new_albumin_g_dL,
         }
 

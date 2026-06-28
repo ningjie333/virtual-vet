@@ -26,6 +26,29 @@ def make_immune():
     return ImmuneModule(weight_kg=20.0, blood=blood)
 
 
+def _apply_derivatives(module, dt, **kwargs):
+    """Call derivatives() and apply outputs to module (simulating Euler step).
+
+    derivatives() is a pure function: it returns (dydt, outputs) without
+    modifying self. outputs already contains the new (post-step, clamped)
+    values, so we SET matching attributes directly. blood_* outputs are
+    skipped (they are applied by the engine layer via apply_factor).
+    """
+    dydt, outputs = module.derivatives(dt=dt, **kwargs)
+    for k, v in outputs.items():
+        if k.startswith("blood_"):
+            continue
+        if k.startswith("self_"):
+            attr = k[5:]
+            if hasattr(module, attr):
+                setattr(module, attr, v)
+            elif hasattr(module, "_" + attr):
+                setattr(module, "_" + attr, v)
+        elif hasattr(module, k):
+            setattr(module, k, v)
+    return dydt, outputs
+
+
 # ---------------------------------------------------------------------------
 # TestCytokineDynamics
 # ---------------------------------------------------------------------------
@@ -43,7 +66,7 @@ class TestCytokineDynamics:
         im = make_immune()
         im.set_infection_signal(1.0)
         for _ in range(600):  # 60 s, tau=600s → ~10% of way
-            im.derivatives(dt=0.1, endocrine_cortisol=5.0)
+            _apply_derivatives(im, dt=0.1, endocrine_cortisol=5.0)
         assert 0.05 <= im.cytokine_level <= 0.20, \
             f"cytokine={im.cytokine_level:.3f}, expected ~0.095"
 
@@ -52,7 +75,7 @@ class TestCytokineDynamics:
         im = make_immune()
         im.set_infection_signal(1.0)
         for _ in range(6000):  # 600 s = 1 tau
-            im.derivatives(dt=0.1, endocrine_cortisol=5.0)
+            _apply_derivatives(im, dt=0.1, endocrine_cortisol=5.0)
         assert 0.50 <= im.cytokine_level <= 0.70, \
             f"cytokine={im.cytokine_level:.3f}, expected ~0.63 at 1τ"
 
@@ -64,8 +87,8 @@ class TestCytokineDynamics:
         im_lo.set_infection_signal(1.0)
 
         for _ in range(300):
-            im_hi.derivatives(dt=0.1, endocrine_cortisol=20.0)
-            im_lo.derivatives(dt=0.1, endocrine_cortisol=5.0)
+            _apply_derivatives(im_hi, dt=0.1, endocrine_cortisol=20.0)
+            _apply_derivatives(im_lo, dt=0.1, endocrine_cortisol=5.0)
 
         assert im_hi.cytokine_level < im_lo.cytokine_level, \
             f"High cortisol should suppress cytokine: hi={im_hi.cytokine_level}, lo={im_lo.cytokine_level}"
@@ -91,7 +114,7 @@ class TestFever:
         im = make_immune()
         im.set_infection_signal(0.8)
         for _ in range(6000):  # 600s = 1 tau → cytokine ~63% of 0.8 ≈ 0.5
-            im.derivatives(dt=0.1, endocrine_cortisol=5.0)
+            _apply_derivatives(im, dt=0.1, endocrine_cortisol=5.0)
         assert im.cytokine_level > 0.3, \
             f"cytokine={im.cytokine_level} should exceed 0.3 after 1 tau"
 
@@ -135,7 +158,7 @@ class TestWBCAndCRP:
         im = make_immune()
         im.set_infection_signal(1.0)
         for _ in range(6000):
-            im.derivatives(dt=0.1, endocrine_cortisol=5.0)
+            _apply_derivatives(im, dt=0.1, endocrine_cortisol=5.0)
         assert im.wbc_count > 10.0, \
             f"WBC should rise with infection, got {im.wbc_count}"
 
@@ -144,7 +167,7 @@ class TestWBCAndCRP:
         im = make_immune()
         im.set_infection_signal(0.8)
         for _ in range(6000):  # 600s = 1 tau
-            im.derivatives(dt=0.1, endocrine_cortisol=5.0)
+            _apply_derivatives(im, dt=0.1, endocrine_cortisol=5.0)
         assert im.cytokine_level > 0.1, \
             f"cytokine={im.cytokine_level} should exceed 0.1 CRP threshold"
 
@@ -169,7 +192,7 @@ class TestCoagulationState:
         im = make_immune()
         im.set_infection_signal(1.0)
         for _ in range(12000):  # enough for both cytokine and coag to rise
-            im.derivatives(dt=0.1, endocrine_cortisol=5.0)
+            _apply_derivatives(im, dt=0.1, endocrine_cortisol=5.0)
         assert im.cytokine_level > 0.6, \
             f"cytokine={im.cytokine_level} should exceed 0.6"
         assert im.coagulation_state > 0.0, \

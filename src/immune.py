@@ -90,6 +90,13 @@ class ImmuneModule:
         """
         返回本模块所有状态变量的导数 + 输出端口（供统一 ODE 求解器）。
 
+        纯函数：只读 self.* / self.blood.*，不修改任何状态。STATE_VARS
+        (cytokine_level / wbc_count / coagulation_state / acute_phase_response)
+        由 caller 从 y 向量解包设置；本方法仅返回其导数 dydt 与本次新值
+        （局部变量，供下游阈值判断与输出端口使用）。需写回 self 的非状态
+        字段以 "self_" 前缀放入 outputs；需写回 self.blood 的字段以 "blood_"
+        前缀放入 outputs（由 caller 一次性应用，避免 Newton 子迭代污染）。
+
         Returns:
             (dydt, outputs):
               dydt: dict[str, float] — 状态变量导数
@@ -104,20 +111,20 @@ class ImmuneModule:
             immune_suppression = min(0.9, suppression_excess / 20.0)
         else:
             immune_suppression = 0.0
-        self.immune_suppression = immune_suppression
 
         # ── 细胞因子动力学 ─────────────────────────────────────────────────
         infection_drive = self._infection_signal * (1.0 - immune_suppression * 0.8)
-        self._cytokine_target = infection_drive
+        cytokine_target = infection_drive  # 局部；self._cytokine_target 由 caller 通过 outputs 写回
 
         tau_cytokine = 600.0
-        dCytokine = (self._cytokine_target - self.cytokine_level) / tau_cytokine if tau_cytokine > 0 else 0.0
-        self.cytokine_level = max(0.0, min(1.0, self.cytokine_level + dCytokine * dt))
+        dCytokine = (cytokine_target - self.cytokine_level) / tau_cytokine if tau_cytokine > 0 else 0.0
+        # 新值（局部）— 供下游阈值判断与输出端口；self.cytokine_level 由 y 向量解包设置
+        cytokine_level = max(0.0, min(1.0, self.cytokine_level + dCytokine * dt))
 
         # ── 发热（写入 blood.temperature） ───────────────────────────────
         fever_target_C = 38.5
-        if self.cytokine_level > 0.3:
-            fever_magnitude = (self.cytokine_level - 0.3) / 0.7
+        if cytokine_level > 0.3:
+            fever_magnitude = (cytokine_level - 0.3) / 0.7
             fever_delta = fever_magnitude * 3.0
             fever_target_C = min(41.5, 38.5 + fever_delta)
             # NOTE(C5): 纯函数化 — 不再直接写 self.blood.core_temperature_C
@@ -125,92 +132,99 @@ class ImmuneModule:
             fever_target_C = max(37.0, min(41.5, fever_target_C))
 
         # ── WBC 响应 ───────────────────────────────────────────────────────
-        if self.cytokine_level > 0.2:
-            wbc_drive = (self.cytokine_level - 0.2) / 0.8
-            self._WBC_target = 10.0 + wbc_drive * 30.0
+        if cytokine_level > 0.2:
+            wbc_drive = (cytokine_level - 0.2) / 0.8
+            wbc_target = 10.0 + wbc_drive * 30.0
         else:
-            self._WBC_target = 10.0
+            wbc_target = 10.0
 
         tau_wbc = 600.0
-        dWBC = (self._WBC_target - self.wbc_count) / tau_wbc if tau_wbc > 0 else 0.0
-        self.wbc_count = max(3.0, min(50.0, self.wbc_count + dWBC * dt))
+        dWBC = (wbc_target - self.wbc_count) / tau_wbc if tau_wbc > 0 else 0.0
+        # 新值（局部）— self.wbc_count 由 y 向量解包设置
+        wbc_count = max(3.0, min(50.0, self.wbc_count + dWBC * dt))
 
         # ── CRP 急性期反应 ────────────────────────────────────────────────
-        if self.cytokine_level > 0.1:
-            crp_drive = (self.cytokine_level - 0.1) / 0.9
-            self._CRP_target = 10.0 + crp_drive * 200.0
+        if cytokine_level > 0.1:
+            crp_drive = (cytokine_level - 0.1) / 0.9
+            crp_target = 10.0 + crp_drive * 200.0
         else:
-            self._CRP_target = 10.0
+            crp_target = 10.0
 
         tau_crp = 1800.0
-        dCRP = (self._CRP_target - self.blood.CRP_mg_L) / tau_crp if tau_crp > 0 else 0.0
+        dCRP = (crp_target - self.blood.CRP_mg_L) / tau_crp if tau_crp > 0 else 0.0
         # NOTE(C5): 纯函数化 — 改为本地变量，由 caller 写回 self.blood.CRP_mg_L
         new_CRP_mg_L = max(0.0, self.blood.CRP_mg_L + dCRP * dt)
         # self.crp_level 镜像 blood.CRP_mg_L（与 `_PARAM_PATHS` 兼容），由 caller 同步
-        self.crp_level = new_CRP_mg_L
+        crp_level = new_CRP_mg_L
 
         # ── 高凝状态 ───────────────────────────────────────────────────────
-        if self.cytokine_level > 0.6:
-            coag_drive = (self.cytokine_level - 0.6) / 0.4
+        if cytokine_level > 0.6:
+            coag_drive = (cytokine_level - 0.6) / 0.4
             tau_coag = 900.0
             dCoag = (min(1.0, coag_drive) - self.coagulation_state) / tau_coag if tau_coag > 0 else 0.0
-            self.coagulation_state = max(0.0, min(1.0, self.coagulation_state + dCoag * dt))
+            # 新值（局部）— self.coagulation_state 由 y 向量解包设置
+            coagulation_state = max(0.0, min(1.0, self.coagulation_state + dCoag * dt))
         else:
             dCoag = -self.coagulation_state / 900.0 if self.coagulation_state > 0 else 0.0
-            self.coagulation_state = max(0.0, min(1.0, self.coagulation_state + dCoag * dt))
+            coagulation_state = max(0.0, min(1.0, self.coagulation_state + dCoag * dt))
 
         # ── 急性期反应 ────────────────────────────────────────────────────
-        dAcutePhase = (self.cytokine_level - self.acute_phase_response) / 600.0
-        self.acute_phase_response = max(0.0, min(1.0, self.acute_phase_response + dAcutePhase * dt))
+        dAcutePhase = (cytokine_level - self.acute_phase_response) / 600.0
+        # 新值（局部）— self.acute_phase_response 由 y 向量解包设置
+        acute_phase_response = max(0.0, min(1.0, self.acute_phase_response + dAcutePhase * dt))
 
         # ── 毛细血管漏（钠浓度变化） ──────────────────────────────────────
         capillary_leak_factor = 0.0
         # NOTE(C5): 纯函数化 — 改为本地变量 + outputs dict，由 caller 写回 self.blood
         sodium_shift = 0.0
-        if self.cytokine_level > 0.4:
-            leak_intensity = (self.cytokine_level - 0.4) / 0.6
+        if cytokine_level > 0.4:
+            leak_intensity = (cytokine_level - 0.4) / 0.6
             capillary_leak_factor = leak_intensity
             sodium_shift = leak_intensity * 8.0 * dt_min
 
         # ── 肠道屏障损伤因子（输出，供 gut 读取） ──────────────────────
         gut_barrier_mult = 1.0
-        if self.cytokine_level > 0.3:
-            barrier_effect = (self.cytokine_level - 0.3) / 0.7
+        if cytokine_level > 0.3:
+            barrier_effect = (cytokine_level - 0.3) / 0.7
             gut_barrier_mult = max(0.3, 1.0 - barrier_effect * 0.7)
 
         # ── 肝脏代谢负担因子（输出，供 liver 读取） ─────────────────────
         liver_factor = 1.0
-        if self.cytokine_level > 0.4:
-            liver_inflammation_cost = max(0.5, 1.0 - self.cytokine_level * 0.4)
+        if cytokine_level > 0.4:
+            liver_inflammation_cost = max(0.5, 1.0 - cytokine_level * 0.4)
             liver_factor = liver_inflammation_cost
 
         # ── SVR 因子（输出，供 heart 读取） ─────────────────────────────
         svr_factor = 1.0
-        if self.cytokine_level > 0.5:
-            vasodilation_intensity = (self.cytokine_level - 0.5) / 0.5
+        if cytokine_level > 0.5:
+            vasodilation_intensity = (cytokine_level - 0.5) / 0.5
             svr_factor = max(0.25, 1.0 - vasodilation_intensity * 0.75)
 
         dydt = {
             "cytokine": dCytokine,
             "acute_phase": dAcutePhase,
             "wbc": dWBC,
-            "coagulation_state": dCoag if self.cytokine_level <= 0.6 else 0.0,
+            "coagulation_state": dCoag if cytokine_level <= 0.6 else 0.0,
         }
 
         outputs = {
-            "cytokine_level": self.cytokine_level,
-            "wbc_count": self.wbc_count,
-            "crp_level": self.crp_level,  # NOTE(C5): 本地变量 (new_CRP_mg_L)
+            "cytokine_level": cytokine_level,
+            "wbc_count": wbc_count,
+            "crp_level": crp_level,  # NOTE(C5): 本地变量 (new_CRP_mg_L)
             "fever_C": fever_target_C,  # NOTE(C5): 本地变量
             "immune_suppression": immune_suppression,
-            "coagulation_state": self.coagulation_state,
-            "acute_phase_response": self.acute_phase_response,
+            "coagulation_state": coagulation_state,
+            "acute_phase_response": acute_phase_response,
             "gut_barrier_mult": gut_barrier_mult,
             "liver_metabolic_factor": liver_factor,
             "svr_factor": svr_factor,
             "capillary_leak_factor": capillary_leak_factor,
+            # NOTE(C5): 需写回 self 的非状态字段（caller 一次性应用，避免 Newton 迭代污染）
+            "self_immune_suppression": immune_suppression,
+            "self_crp_level": crp_level,
+            "self_cytokine_target": cytokine_target,
             # NOTE(C5): blood 字段 (Newton 迭代 caller 一次性写回)
-            "blood_crp_mg_L": self.crp_level,
+            "blood_crp_mg_L": crp_level,
             "blood_core_temperature_C": fever_target_C,
             "blood_sodium_shift": sodium_shift,
         }

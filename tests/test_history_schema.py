@@ -91,7 +91,7 @@ class TestHistorySchema:
                 assert not math.isnan(v), f"NaN in history['{key}'][{i}]"
                 assert not math.isinf(v), f"Inf in history['{key}'][{i}]"
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_history_has_canonical_keys(self):
         """Radau path also records all canonical keys (was the broken case)."""
         vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
@@ -101,7 +101,7 @@ class TestHistorySchema:
         missing = EXPECTED_HISTORY_KEYS - actual_keys
         assert not missing, f"Radau history missing keys: {missing}"
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_no_bare_sympathetic_collision(self):
         """P0 0b: Radau's bare 'sympathetic' was overwriting neuro_sympathetic."""
         vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
@@ -109,7 +109,7 @@ class TestHistorySchema:
         assert "sympathetic" not in vc.history
         assert "neuro_sympathetic" in vc.history
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_organ_health_recorded(self):
         """P0 0b: Radau was silently dropping organ_health fields."""
         vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
@@ -119,7 +119,7 @@ class TestHistorySchema:
             assert len(vc.history[k]) == 1
             assert isinstance(vc.history[k][0], float)
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_fluid_compartments_recorded(self):
         """P0 0b: Radau was silently dropping fluid compartment fields."""
         vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
@@ -128,7 +128,7 @@ class TestHistorySchema:
             assert k in vc.history, f"Radau dropped fluid field: {k}"
             assert len(vc.history[k]) == 1
 
-    @pytest.mark.skip(reason="scipy 1.17 + Python 3.14 Radau solver hangs (env issue, see src/engine/solvers/radau.py:16-21); Radau fallback path covered by tests/test_solver_fallback.py")
+    
     def test_radau_neuro_five_fields_recorded(self):
         """P0 0b: Radau was only recording 1 of 5 neuro fields."""
         vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)

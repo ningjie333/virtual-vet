@@ -172,6 +172,14 @@
       "bundle": "heavy-engine",
       "lane": "heavy"
     },
+    "test_step_contract.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
+    },
+    "test_solver_radau.py": {
+      "bundle": "core-solver",
+      "lane": "core"
+    },
     "test_solver_parity.py": {
       "bundle": "fast-engine",
       "lane": "fast"
@@ -211,6 +219,10 @@
     "test_time_management.py": {
       "bundle": "core-runtime",
       "lane": "core"
+    },
+    "test_toxicology.py": {
+      "bundle": "fast-engine",
+      "lane": "fast"
     },
     "test_twin_run.py": {
       "bundle": "core-solver",
