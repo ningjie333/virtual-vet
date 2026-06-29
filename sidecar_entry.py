@@ -136,15 +136,26 @@ def handle_administer_drug(params: dict[str, Any]) -> Any:
     return _run_action(session_id, "administer_drug", action_params)
 
 
+# 前端别名 → virtual-vet 金标准命名
+# virtual-vet 的 data/exam_templates.json key 为命名金标准，前端可能用英文缩写别名
+_EXAM_TYPE_ALIASES: dict[str, str] = {
+    "cbc": "blood_routine",          # Complete Blood Count = 血常规
+    "blood_chem": "blood_biochem",   # 血液生化
+}
+
+
 def handle_examine(params: dict[str, Any]) -> Any:
     """game.examine — 开具检查。
 
-    必填: test_type（如 'physical' / 'cbc' / 'blood_chem' / 'xray_thorax'）
+    必填: test_type（如 'physical' / 'blood_routine' / 'blood_biochem'）
+    支持前端别名：cbc→blood_routine, blood_chem→blood_biochem。
     """
     session_id = _require_session_id(params)
     test_type = params.get("test_type")
     if not isinstance(test_type, str) or not test_type:
         raise RpcError(ERR_INVALID_PARAMS, "test_type required")
+    # 别名归一化到 virtual-vet 金标准命名
+    test_type = _EXAM_TYPE_ALIASES.get(test_type, test_type)
     return _run_action(session_id, "examine", {"test_type": test_type})
 
 
