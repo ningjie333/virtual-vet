@@ -143,10 +143,13 @@ def apply_treatment(
         }
 
     # ── Q4.3=B: 运行时合并 — 按 guess list 顺序依次 admin 单病 protocol ──
+    # 守卫：错误诊断不给药（避免错药不可撤回污染 pharmacology 状态）。
+    # 仅在 primary_correct 时执行 protocol；错误诊断仅推进时间 + 返回 loss_message。
     drugs_given: list[str] = []
-    for guess in guesses:
-        if guess in _DRUG_PROTOCOL:
-            drugs_given.extend(_administer_protocol(game_state.engine, guess, runtime))
+    if primary_correct:
+        for guess in guesses:
+            if guess in _DRUG_PROTOCOL:
+                drugs_given.extend(_administer_protocol(game_state.engine, guess, runtime))
 
     # ── Q4.2=B: win 判定 — 主诊断必须对 ──
     if primary_correct:
@@ -165,10 +168,11 @@ def apply_treatment(
         logger.info("治疗正确: 主诊断=%s, 合并症=%s, 给药=%s → phase=won",
                      primary, comorbidity_correct, drugs_given)
     else:
-        # 主诊断错
+        # 主诊断错：未给药，仅推进时间，体征按疾病自然进展变化
         message = _loss_message(primary)
+        message += "（未执行治疗，疾病继续自然进展。）"
         phase = "playing"
-        logger.info("治疗误诊: 猜测=%s, 主诊断=%s", guesses, primary)
+        logger.info("治疗误诊: 猜测=%s, 主诊断=%s, 未给药", guesses, primary)
 
     return {
         "success": True,

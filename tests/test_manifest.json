@@ -172,6 +172,10 @@
       "bundle": "heavy-runtime",
       "lane": "heavy"
     },
+    "test_sidecar_async.py": {
+      "bundle": "heavy-runtime",
+      "lane": "heavy"
+    },
     "test_simulation.py": {
       "bundle": "heavy-engine",
       "lane": "heavy"

@@ -32,6 +32,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Callable
+from uuid import uuid4
 
 # 确保 virtual-vet 项目根在 sys.path 上（dev 模式下由 PYTHONPATH 注入；
 # 这里做兜底，允许直接 `python sidecar_entry.py` 启动）
@@ -113,6 +114,70 @@ def handle_advance(params: dict[str, Any]) -> Any:
     """
     session_id = _require_session_id(params)
     return _run_action(session_id, "wait", {})
+
+
+def handle_advance_async(params: dict[str, Any]) -> Any:
+    """game.advance_async — 异步推进时间，立即返回 job_id。
+
+    在后台线程执行 process_action("wait")，通过 progress callback 更新 JobInfo。
+    前端通过 game.poll_status 轮询进度。
+    """
+    session_id = _require_session_id(params)
+    minutes = float(params.get("minutes", 10))
+
+    job_id = f"job_{uuid4().hex[:8]}"
+    # 粗估：minutes*60/DT_SECONDS*~2ms/step ≈ minutes*240 ms（DT_SECONDS=0.5）
+    estimated_ms = int(minutes * 240)
+
+    context = session_pool.get_session(session_id)
+
+    def _worker(job: "session_pool.JobInfo") -> None:
+        lock = session_pool.acquire_lock(session_id)
+        with lock:
+            def _on_progress(current: int, total: int) -> None:
+                job.progress = {"current": current, "total": total}
+
+            result = process_action(
+                context.state,
+                "wait",
+                {},
+                runtime=context.runtime,
+                on_progress=_on_progress,
+            )
+            job.snapshot = serialize_snapshot(
+                context.state,
+                context.runtime,
+                new_reports=result.get("new_reports", []),
+                pending_count=result.get("pending_count", 0),
+                last_result=result,
+            )
+
+    session_pool.start_job(session_id, job_id, _worker)
+    return {"job_id": job_id, "estimated_ms": estimated_ms}
+
+
+def handle_poll_status(params: dict[str, Any]) -> Any:
+    """game.poll_status — 轮询异步任务状态。
+
+    返回 {done, progress_pct, snapshot, error}。done=true 时 snapshot 为最终结果。
+    """
+    job_id = params.get("job_id")
+    if not isinstance(job_id, str) or not job_id:
+        raise RpcError(ERR_INVALID_PARAMS, "job_id required")
+
+    job = session_pool.get_job(job_id)
+    total = job.progress.get("total", 0)
+    current = job.progress.get("current", 0)
+    progress_pct = round(100.0 * current / total, 1) if total > 0 else 0.0
+    if job.done:
+        progress_pct = 100.0
+
+    return {
+        "done": job.done,
+        "progress_pct": progress_pct,
+        "snapshot": job.snapshot,
+        "error": job.error,
+    }
 
 
 def handle_administer_drug(params: dict[str, Any]) -> Any:
@@ -228,6 +293,8 @@ _HANDLERS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "game.list_cases": handle_list_cases,
     "game.new_session": handle_new_session,
     "game.advance": handle_advance,
+    "game.advance_async": handle_advance_async,
+    "game.poll_status": handle_poll_status,
     "game.administer_drug": handle_administer_drug,
     "game.examine": handle_examine,
     "game.diagnose": handle_diagnose,

@@ -4,6 +4,7 @@ Simulation Engine - 多系统耦合仿真引擎
 """
 
 import logging
+from typing import Callable, Optional
 
 import numpy as np
 
@@ -981,13 +982,15 @@ class VirtualCreature:
         # not here. This avoids double-advancement when Euler calls _record_history
         # and then also increments current_time_s.
 
-    def advance_seconds(self, duration_seconds: float, verbose: bool = False):
+    def advance_seconds(self, duration_seconds: float, verbose: bool = False,
+                        progress_callback: Optional[Callable[[int, int], None]] = None):
         """
         运行仿真直到指定物理时长。
 
         Args:
             duration_seconds: 仿真时长（秒）
             verbose: 是否打印进度
+            progress_callback: 可选进度回调 (current_step, total_steps)，每 100 步触发
         """
         total_steps = int(duration_seconds / self.dt)
 
@@ -996,6 +999,8 @@ class VirtualCreature:
 
         for i in range(total_steps):
             self.step()
+            if progress_callback is not None and i % 100 == 0:
+                progress_callback(i + 1, total_steps)
             if verbose and i % 1000 == 0:
                 t = self.current_time_s
                 if self._record_history_enabled and self.history["HR_bpm"]:

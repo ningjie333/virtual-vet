@@ -164,6 +164,7 @@ def process_action(
     action_type: str,
     params: dict = None,
     runtime: Optional[GameRuntime] = None,
+    on_progress: Optional[Callable[[int, int], None]] = None,
 ) -> dict:
     """
     处理一次玩家行动（v2：时间预算版）。
@@ -299,7 +300,7 @@ def process_action(
     state.time_elapsed_min += time_cost
 
     # ── 推进引擎模拟并刷新解释状态（按消耗的分钟数）──
-    runtime.advance_and_refresh(state.engine, float(time_cost))
+    runtime.advance_and_refresh_async(state.engine, float(time_cost), on_progress=on_progress)
 
     # ── 处理延迟报告（时间流逝后检查是否有报告到期）──
     new_reports = _process_pending_reports(state, time_cost)

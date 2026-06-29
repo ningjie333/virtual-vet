@@ -93,6 +93,12 @@ def serialize_snapshot(
         # 给药失败的 error 透传
         if not last_result.get("success", True) and "error" in last_result:
             out["error"] = last_result["error"]
+        # 透传 treatment 的中文结果描述（win/loss/supportive_care 文案）。
+        # process_action 把 treatment_result 包在 "result" 键下，
+        # examine/administer_drug/wait 的 result 不是 dict 或不含 message，需守卫。
+        inner = last_result.get("result")
+        if isinstance(inner, dict) and "message" in inner:
+            out["message"] = inner["message"]
 
     return out
 

@@ -347,6 +347,6 @@ COCAINE_LD50_DOG_MG_KG = 60.0                     # 犬 LD50 ≈ 60 mg/kg
 DEFAULT_AGE_DAYS = 1095.0                         # 成年犬默认年龄（天）
 
 # --- ODE 求解器参数 ---
-DT_SECONDS = 0.1                                  # 积分时间步长（秒）
+DT_SECONDS = 0.5                                  # 积分时间步长（秒）—— 阶段 1 已消除 heart.py 的 dt 敏感隐式假设（SV/MAP 低通滤波改用 first_order_lag 精确指数解），从 0.1 提升到 0.5 可获 5x 性能提升且连续轨迹等价。注：test_solver_drift 硬编码 dt=0.1 不受此参数影响，其 GFR Euler/Radau 5.71% 偏差为预先存在问题（git stash 验证）
 SIMULATION_STEP_MS = 100                          # 仿真记录步长（毫秒）
 T_MAX_MINUTES = 10                                # 默认仿真时长（分钟）

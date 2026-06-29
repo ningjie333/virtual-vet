@@ -420,9 +420,12 @@ class HeartModule:
         ischemic_factor = max(0.2, 1.0 - self.myocardial_ischemia * 0.8)
         effective_target *= ischemic_factor
 
-        # 低通滤波
-        alpha = 0.3
-        self.stroke_volume = alpha * self.stroke_volume + (1 - alpha) * effective_target
+        # 低通滤波（精确指数解，消除 dt 敏感性）
+        # 原 alpha=0.3 @ dt=0.1 → 每步闭合 70% 间隙；反推 tau 使 dt=0.1 行为不变：
+        # exp(-dt/tau)=alpha → tau = -dt/ln(alpha) = -0.1/ln(0.3) ≈ 0.08306s
+        # 改用 first_order_lag 后 dt=0.1 与 dt=0.5 连续轨迹等价
+        tau_sv = 0.08306
+        self.stroke_volume = first_order_lag(self.stroke_volume, effective_target, dt, tau_sv)
         # Layer 2: 缺血严重时允许 SV 降到更低（base_SV * 0.05 = 1.0 mL）
         # 原 clamp 0.15 太高，baroreflex 通过 HR↑ 完美代偿，MAP 降不下来
         sv_floor = self.base_SV * (0.15 if self.myocardial_ischemia < 0.3 else 0.05)
@@ -559,9 +562,12 @@ class HeartModule:
         dISCHEMIA = ischemia_drive / tau_ischemia
         self.myocardial_ischemia = min(1.0, self.myocardial_ischemia + dISCHEMIA * dt)
 
-        # 低通滤波平滑 MAP
-        alpha = 0.1
-        self.mean_arterial_pressure = alpha * self.mean_arterial_pressure + (1 - alpha) * raw_MAP
+        # 低通滤波平滑 MAP（精确指数解，消除 dt 敏感性）
+        # 原 alpha=0.1 @ dt=0.1 → 每步闭合 90% 间隙；反推 tau 使 dt=0.1 行为不变：
+        # exp(-dt/tau)=alpha → tau = -dt/ln(alpha) = -0.1/ln(0.1) ≈ 0.04343s
+        # 改用 first_order_lag 后 dt=0.1 与 dt=0.5 连续轨迹等价
+        tau_map = 0.04343
+        self.mean_arterial_pressure = first_order_lag(self.mean_arterial_pressure, raw_MAP, dt, tau_map)
 
         # Step 5: 肺动脉压
         self.pulmonary_arterial_pressure = self.mean_arterial_pressure * 0.15

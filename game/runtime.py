@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Callable, Optional
 
 from src.clinical_interpreter import (
     ClinicalInterpreterProtocol,
@@ -47,6 +48,11 @@ class GameRuntime:
 
     def advance_and_refresh(self, engine, minutes: float) -> None:
         self.advancer.advance_minutes(engine, minutes)
+        self.refresher.refresh(engine)
+
+    def advance_and_refresh_async(self, engine, minutes: float,
+                                  on_progress: Optional[Callable[[int, int], None]] = None) -> None:
+        self.advancer.advance_minutes_async(engine, minutes, on_progress=on_progress)
         self.refresher.refresh(engine)
 
 
