@@ -1,0 +1,30 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "vet-knowledge disease_id → virtual-vet disease key 映射表。game_diagnose 提交前查表翻译 dis_XXX → virtual-vet snake_case key。",
+    "usage": "vet-knowledge src-tauri/src/commands/game.rs::translate_disease_id()",
+    "mismatch_reason": "vet-knowledge 用 dis_XXX 序号 ID，virtual-vet 用 pneumonia 等 snake_case key，两侧命名空间独立。"
+  },
+  "mappings": {
+    "dis_001": "pneumonia",
+    "dis_005": "acute_renal_failure",
+    "dis_006": "ckd_anemia",
+    "dis_008": "urinary_obstruction",
+    "dis_012": "hepatic_failure_coagulopathy",
+    "dis_014": "dilated_cardiomyopathy",
+    "dis_016": "pericardial_effusion",
+    "dis_017": "diabetic_ketoacidosis",
+    "dis_019": "hyperthyroidism",
+    "dis_029": "gastric_dilatation_volvulus",
+    "dis_033": "immune_mediated_hemolytic_anemia",
+    "dis_041": "ivdd",
+    "dis_085": "phosphorus_poisoning",
+    "dis_086": "disseminated_intravascular_coagulation",
+    "dis_087": "hypoadrenocorticism",
+    "dis_088": "sepsis",
+    "dis_089": "meningitis",
+    "dis_090": "splenic_rupture",
+    "dis_091": "hepatic_anemia",
+    "dis_092": "ivdd"
+  }
+}

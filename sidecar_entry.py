@@ -15,6 +15,7 @@ stderr 直通便于调试。
     game.administer_drug           → snapshot
     game.examine                   → snapshot
     game.diagnose                  → snapshot (含 win/lost 判定)
+    game.list_drugs                → {drugs: [{drug_name, name, half_life_h, description}]}
     game.apply_gameplay            → snapshot (预留 modifier 通道)
     game.end_session               → ok
     shutdown                       → ok (清理所有会话并退出主循环)
@@ -210,6 +211,18 @@ def handle_shutdown(_params: dict[str, Any]) -> Any:
     return {"ok": True, "cleared": cleared}
 
 
+def handle_list_drugs(_params: dict[str, Any]) -> Any:
+    """game.list_drugs — 返回所有已注册药物的元数据列表。
+
+    供前端给药弹窗渲染下拉选项。复用 pharmacology.list_drugs()，
+    保证与 Flask /api/drugs 行为一致。
+    """
+    from pharmacology import list_drugs
+
+    drugs = list_drugs()
+    return {"drugs": [{"drug_name": k, **v} for k, v in drugs.items()]}
+
+
 # ── 方法分发表 ──
 _HANDLERS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "game.list_cases": handle_list_cases,
@@ -218,6 +231,7 @@ _HANDLERS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "game.administer_drug": handle_administer_drug,
     "game.examine": handle_examine,
     "game.diagnose": handle_diagnose,
+    "game.list_drugs": handle_list_drugs,
     "game.apply_gameplay": handle_apply_gameplay,
     "game.end_session": handle_end_session,
     "shutdown": handle_shutdown,
