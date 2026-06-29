@@ -305,9 +305,10 @@ class LungModule:
         # 从 VdP 输出获取目标呼吸频率
         target_rr = self._vdp.respiratory_rate
 
-        # 步骤5：RR 变化限幅（每步最多 ±1 breath/min，防止 Kussmaul 超调）
+        # 步骤5：RR 变化限幅（速率限制：10 breath/min/s，防止 Kussmaul 超调）
+        # 原 dt=0.1s 时每步 ±1 breath/min = 10 breath/min/s；改为按 dt 缩放，dt 改变时代偿速度不变。
         rr_error = target_rr - self.respiratory_rate
-        max_rr_change =1.0  # breath/min per step
+        max_rr_change = 10.0 * dt  # breath/min per step (rate-limited: 10 breath/min/s)
         clamped_error = max(-max_rr_change, min(max_rr_change, rr_error))
         self.respiratory_rate += clamped_error
 

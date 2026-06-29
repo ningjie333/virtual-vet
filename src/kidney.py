@@ -405,8 +405,9 @@ class KidneyModule:
         else:
             bun_target = 150.0  # 无尿时 BUN 上限
         bun_target = min(150.0, bun_target)
-        # 低通滤波：每步向目标移动 5%（时间常数约 20s，避免振荡）
-        self.blood.bun_mg_dL = max(5.0, self.blood.bun_mg_dL + (bun_target - self.blood.bun_mg_dL) * 0.05)
+        # BUN 一阶松弛：原 dt=0.1s 时固定 alpha=0.05，反推 tau = -0.1/ln(0.95) ≈ 1.95s。
+        # 改用 first_order_lag 解析解，dt 改变时时间常数不变。
+        self.blood.bun_mg_dL = max(5.0, first_order_lag(self.blood.bun_mg_dL, bun_target, dt, 1.95))
 
         # 肌酐：与 GFR 成反比（GFR↓→Cr↑），正常 GFR 时目标≈1.0 mg/dL
         # 公式：crea_target = base_GFR / current_GFR * 1.0
@@ -415,7 +416,9 @@ class KidneyModule:
         else:
             crea_target = 5.0  # 无尿时肌酐上限
         crea_target = min(5.0, crea_target)
-        self.blood.creatinine_mg_dL = max(0.5, self.blood.creatinine_mg_dL + (crea_target - self.blood.creatinine_mg_dL) * 0.1)
+        # 肌酐一阶松弛：原 dt=0.1s 时固定 alpha=0.1，反推 tau = -0.1/ln(0.9) ≈ 0.95s。
+        # 改用 first_order_lag 解析解，dt 改变时时间常数不变。
+        self.blood.creatinine_mg_dL = max(0.5, first_order_lag(self.blood.creatinine_mg_dL, crea_target, dt, 0.95))
 
         # Step 8: 累计尿量（urine_output 是 mL/min，dt 是秒）
         dt_min = dt / 60.0
