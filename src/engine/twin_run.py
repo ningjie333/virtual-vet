@@ -2,43 +2,31 @@
 twin_run.py — twin-run validation harness for the physiology engine.
 
 Solver Refactor Roadmap v3, Step 4. Establishes a safety-net baseline BEFORE
-touching coupling (Step 5) or splitting Radau (Step 3): run the SAME scenario
-through two integration paths and assert their trajectories agree
-vital-by-vital within a tolerance matrix.
+touching coupling (Step 5): run the SAME scenario through two integration
+paths and assert their trajectories agree vital-by-vital within a tolerance
+matrix.
 
-## Strategy (Euler-vs-Euler dt refinement, default)
+## Strategy (Euler-vs-Euler dt refinement)
 
-The roadmap originally specified Euler vs Radau. However, real
-`solve_ivp(method="Radau")` is pathologically slow on Python 3.14 + scipy 1.17
-(single step > 5 min, baseline-confirmed — an environment issue, not a code
-bug). The harness therefore defaults to a **dt-refinement** reference: the
-production solver (Euler, dt_prod) is compared against the same solver at a
-10× finer timestep (dt_ref = dt_prod / refinement).
+The harness uses a **dt-refinement** reference: the production solver
+(Euler, dt_prod) is compared against the same solver at a 10× finer
+timestep (dt_ref = dt_prod / refinement).
 
 This is a standard Richardson-style convergence check. Both paths share the
 same O(dt) truncation, so the dominant difference is the production
 truncation error; tightening `refinement` must shrink the gap linearly
 (verified by the convergence self-test). It runs in seconds locally and
-establishes the exact baseline a future Radau (or any new solver) must beat.
-
-## opt-in Radau mode
-
-Set `reference_solver="radau"` (or env `TWIN_RUN_REFERENCE=radau`) to make the
-reference path use the real Radau solver at dt_prod. The code path is
-complete; the test in `tests/test_twin_run.py` is `skipif`-gated on that env
-var so CI / other machines can enable it. Locally it stays skipped to avoid
-the env-driven hang.
+establishes the exact baseline any new solver must beat.
 
 ## Fallback detection (roadmap D3)
 
 Every run asserts `reference._solver_fallback_count == 0`. This blocks the
-"Radau failed → silently fell back to Euler → self-compared and passed"
-failure mode the roadmap flags.
+"silently fell back → self-compared and passed" failure mode the roadmap
+flags.
 """
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -91,24 +79,6 @@ SCENARIO_SPECIFIC_MULTIPLIERS: dict[str, float] = {
     "cocaine": 3.0,                   # CO/MAP dt-sensitivity under tox ~2.8× base
     "dcm_moderate": 5.5,              # full-cardio dt-sensitivity ~5.2× base
     "fluid_resuscitation": 5.5,       # GFR/MAP dt-sensitivity ~5.3× base
-}
-
-# LSODA-specific multipliers — LSODA is more accurate than Euler for stiff
-# portions (kidney fluid dynamics, respiratory coupling), producing different
-# steady-state values. These reflect the observed Euler-vs-LSODA gaps from
-# tools/dev/validate_lsoda.py (30-step, 3s simulation). Values = max(observed)
-# + 10% headroom, rounded up to nearest 0.5.
-SCENARIO_SPECIFIC_RADAU_MULTIPLIERS: dict[str, float] = {
-    "arf_moderate": 4.0,
-    "arf_severe": 4.0,
-    "blood_loss_mild": 5.0,
-    "blood_loss_severe": 5.5,
-    "exercise": 4.0,
-    "healthy": 4.0,
-    "hypoadrenocorticism_moderate": 4.5,
-    # cocaine and dcm_moderate: LSODA deviations extreme (19-20×). These
-    # scenarios have very fast dynamics that LSODA captures differently.
-    # Not included here — they remain xfail for LSODA reference mode.
 }
 
 
@@ -175,13 +145,12 @@ class TwinRunConfig:
     Attributes:
         body_weight_kg: creature body weight.
         species: species string forwarded to VirtualCreature.
-        dt_prod: production timestep (reference for dt_refinement too,
-                 when reference_solver == "radau").
-        refinement: dt_ref = dt_prod / refinement (Euler-ref mode only).
+        dt_prod: production timestep.
+        refinement: dt_ref = dt_prod / refinement (Euler dt-refinement).
         n_steps_prod: number of production-path steps. Total simulated
                       physical time = n_steps_prod * dt_prod.
-        reference_solver: "euler" (default, dt-refinement) or "radau" (opt-in
-                          real Radau at dt_prod).
+        reference_solver: reserved for future solvers; currently always
+                          "euler" (dt-refinement reference).
         record_history: keep history buffers (required for comparison).
     """
     body_weight_kg: float = 20.0
@@ -277,23 +246,21 @@ def _aligned_samples(prod_hist: dict, ref_hist: dict, refinement: int,
 
 
 def _effective_reference_solver(config: TwinRunConfig) -> str:
-    """Resolve the reference solver: explicit config wins, else env var."""
-    if config.reference_solver != "euler":
-        return config.reference_solver
-    env = os.environ.get("TWIN_RUN_REFERENCE", "").strip().lower()
-    if env in ("radau", "euler"):
-        return env
+    """Resolve the reference solver.
+
+    Radau/LSODA reference path is deprecated; only Euler dt-refinement
+    is supported. The env var and config field are retained for API
+    stability but always resolve to "euler".
+    """
     return "euler"
 
 
 def run_twin(scenario: str, config: TwinRunConfig | None = None) -> TwinRunResult:
     """Run `scenario` through production + reference paths and compare.
 
-    Production is always Euler at dt_prod for n_steps_prod steps.
-    Reference is config.reference_solver:
-      - "euler" (default): Euler at dt_ref = dt_prod/refinement for
-        n_steps_prod*refinement steps (dt-refinement reference).
-      - "radau": real Radau at dt_prod for n_steps_prod steps.
+    Production is Euler at dt_prod for n_steps_prod steps.
+    Reference is Euler at dt_ref = dt_prod/refinement for
+    n_steps_prod*refinement steps (dt-refinement reference).
 
     Comparison is per-vital max relative error over aligned sample points,
     against VITAL_TOLERANCES × SCENARIO_MULTIPLIERS[scenario kind].
@@ -307,40 +274,24 @@ def run_twin(scenario: str, config: TwinRunConfig | None = None) -> TwinRunResul
         prod.step()
 
     # ── reference path ─────────────────────────────────────────────────────
-    if ref_solver == "euler":
-        dt_ref = config.dt_prod / config.refinement
-        n_ref = config.n_steps_prod * config.refinement
-        ref = build_scenario_creature(scenario, config, solver="euler", dt=dt_ref)
-        for _ in range(n_ref):
-            ref.step()
-    else:  # "radau"
-        ref = build_scenario_creature(scenario, config, solver="radau", dt=config.dt_prod)
-        for _ in range(config.n_steps_prod):
-            ref.step()
-        # Radau at dt_prod samples once per step → aligns 1:1 with prod
-        # (refinement effectively 1)
+    dt_ref = config.dt_prod / config.refinement
+    n_ref = config.n_steps_prod * config.refinement
+    ref = build_scenario_creature(scenario, config, solver="euler", dt=dt_ref)
+    for _ in range(n_ref):
+        ref.step()
 
     fallback_count = getattr(ref, "_solver_fallback_count", 0)
 
     # ── per-vital comparison ───────────────────────────────────────────────
     _kind, _ = SCENARIOS[scenario]
-    # LSODA reference mode uses wider tolerances (systematic offset from Euler)
-    if ref_solver == "radau":
-        mult = SCENARIO_SPECIFIC_RADAU_MULTIPLIERS.get(scenario, SCENARIO_SPECIFIC_MULTIPLIERS.get(scenario, SCENARIO_MULTIPLIERS[_kind]))
-    else:
-        mult = SCENARIO_SPECIFIC_MULTIPLIERS.get(scenario, SCENARIO_MULTIPLIERS[_kind])
+    mult = SCENARIO_SPECIFIC_MULTIPLIERS.get(scenario, SCENARIO_MULTIPLIERS[_kind])
     tol = {v: base * mult for v, base in VITAL_TOLERANCES.items()}
 
     max_rel_error: dict[str, float] = {}
     for vital in VITAL_TOLERANCES:
-        if ref_solver == "euler":
-            prod_vals, ref_vals = _aligned_samples(
-                prod.history, ref.history, config.refinement,
-                config.n_steps_prod, vital)
-        else:
-            # radau: 1:1 alignment (same n_steps, same dt)
-            prod_vals = prod.history[vital][:config.n_steps_prod]
-            ref_vals = ref.history[vital][:config.n_steps_prod]
+        prod_vals, ref_vals = _aligned_samples(
+            prod.history, ref.history, config.refinement,
+            config.n_steps_prod, vital)
         max_rel_error[vital] = max(
             _relative_diff(p, r) for p, r in zip(prod_vals, ref_vals)
         )

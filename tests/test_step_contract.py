@@ -9,7 +9,6 @@ Verifies that:
 5. Intentional divergences are recorded (not raised)
 6. Step functions with guard=None skip checks (backward compat)
 7. Euler step driver completes all required phases
-8. Radau step driver completes all required phases (with R3 fixes)
 """
 from __future__ import annotations
 
@@ -29,8 +28,6 @@ from src.engine.step_contract import (
     PHASE_HISTORY,
     INV_BASELINES_SNAPSHOTTED,
     INV_BASELINES_CLEARED,
-    DIVERGENCE_IMMUNE_ORDER,
-    DIVERGENCE_DISEASE_ORDER,
 )
 
 
@@ -124,21 +121,21 @@ class TestStepGuardDivergences:
 
     def test_divergence_recorded_not_raised(self):
         guard = StepGuard(label="test")
-        guard.divergence_ok(DIVERGENCE_IMMUNE_ORDER, "test reason")
+        guard.divergence_ok("immune_order", "test reason")
         assert len(guard.divergences()) == 1
         name, reason = guard.divergences()[0]
-        assert name == DIVERGENCE_IMMUNE_ORDER
+        assert name == "immune_order"
         assert "test reason" in reason
 
     def test_multiple_divergences(self):
         guard = StepGuard(label="test")
-        guard.divergence_ok(DIVERGENCE_IMMUNE_ORDER, "reason 1")
-        guard.divergence_ok(DIVERGENCE_DISEASE_ORDER, "reason 2")
+        guard.divergence_ok("immune_order", "reason 1")
+        guard.divergence_ok("disease_order", "reason 2")
         assert len(guard.divergences()) == 2
 
     def test_reset_clears_divergences(self):
         guard = StepGuard(label="test")
-        guard.divergence_ok(DIVERGENCE_IMMUNE_ORDER, "test")
+        guard.divergence_ok("immune_order", "test")
         guard.reset()
         assert len(guard.divergences()) == 0
 
@@ -264,7 +261,7 @@ class TestStepGuardNoneBackwardCompat:
         clear_baselines(guard=None)
 
 
-# ── Integration tests: Euler/Radau drivers complete all phases ───────────────
+# ── Integration tests: Euler driver completes all phases ─────────────────────
 
 class TestEulerStepCompletesAllPhases:
     """Verify that _step_euler marks all required phases via the guard."""
@@ -282,31 +279,4 @@ class TestEulerStepCompletesAllPhases:
         from src.simulation import VirtualCreature
         engine = VirtualCreature(record_history=False)
         for _ in range(10):
-            engine.step()
-
-
-class TestRadauStepCompletesAllPhases:
-    """Verify that run_radau_step marks all required phases via the guard."""
-
-    def test_radau_step_completes_without_contract_violation(self):
-        """A single Radau step should complete without raising StepContractError."""
-        from src.simulation import VirtualCreature
-        from src.diseases import create_disease
-        engine = VirtualCreature(solver="radau", record_history=False)
-        # Attach a disease so the Radau path doesn't degenerate to Euler
-        disease = create_disease("sepsis", severity="moderate")
-        if disease is not None:
-            engine.attach_disease(disease)
-        # This will raise StepContractError if any contract is violated
-        engine.step()
-
-    def test_radau_multiple_steps_no_violation(self):
-        """Multiple Radau steps should complete without contract violations."""
-        from src.simulation import VirtualCreature
-        from src.diseases import create_disease
-        engine = VirtualCreature(solver="radau", record_history=False)
-        disease = create_disease("sepsis", severity="moderate")
-        if disease is not None:
-            engine.attach_disease(disease)
-        for _ in range(5):
             engine.step()

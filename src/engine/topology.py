@@ -1,22 +1,16 @@
 """
-Engine topology — module coupling graph and parameter registry.
+Engine topology — parameter registry.
 
 This module centralises the engine's "shape" data:
 
-1. **CONNECTIONS** — the cross-module data flow graph. Each entry is
-   `(src_module, src_var) -> [(tgt_module, tgt_var), ...]`. In `_unified_rhs()`
-   the engine routes outputs of one module into the cached inputs of downstream
-   modules. In `_step_euler()` OrganContext publishes signals that
-   `CouplingEngine.resolve()` reads.
-
-2. **_PARAM_PATHS** — the whitelisted parameter paths that
+1. **_PARAM_PATHS** — the whitelisted parameter paths that
    `apply_factor(FactorCommand)` is allowed to write to. This is a
    **write-protocol**, not a data-flow table. Format:
    `"module.attr" -> (engine_module_name, attribute_name)`.
 
-3. **Topology / discover_topology** — Phase 5 placeholders. When modules
+2. **Topology / discover_topology** — Phase 5 placeholders. When modules
    declare `INPUTS` / `OUTPUTS` class attributes, `discover_topology`
-   will auto-derive the CONNECTIONS table from those declarations
+   will auto-derive the coupling graph from those declarations
    (eliminating the central-table drift problem flagged in the audit).
 
 Phase 1: this module is a pure code-motion extraction from
@@ -24,100 +18,6 @@ Phase 1: this module is a pure code-motion extraction from
 """
 
 from dataclasses import dataclass, field
-
-
-# ── CONNECTIONS: cross-module data flow graph (Radau path only) ──────────────
-# **Scope**: This table is consumed ONLY by `src/engine/state_vector.unified_rhs`,
-# i.e. the Radau integration path's intra-step data flow. It routes each
-# module's `derivatives()` outputs into `_cached_inputs` for the next RHS
-# evaluation (Gauss-Seidel semi-implicit coupling — see unified_rhs docstring).
-#
-# **NOT used by the Euler path.** The Euler path's coupling is the post-step
-# `CouplingEngine.resolve()` rule engine driven by `data/coupling_rules.json`
-# (16 rules, 5 enabled) + the signal-publish helpers in `step_common.py`.
-# The two mechanisms cover DIFFERENT coupling relationships and are NOT
-# synchronized — see `docs/coupling_inventory.md` for the full drift inventory.
-#
-# Format: (src_module, src_var) -> [(tgt_module, tgt_var), ...]
-#
-# **R4 cleanup (2026-06-28)**: Removed 28 dead routes that were silently
-# skipped by `if val is not None` in unified_rhs. Three categories:
-#   1. `blood`-targeted routes (blood not in UNIFIED_MODULES → never consumed)
-#      — all `→ blood` routes dropped (lung, kidney, immune, coagulation,
-#        liver, lymphatic sources).
-#   2. `blood`-sourced routes (blood never in all_outputs) — all 6 blood→*
-#      routes dropped.
-#   3. Mismatched src_var names (liver emits glucose_output_g_min not
-#      glucose_output; gut emits portal_blood_flow_mL_min not portal_flow;
-#      gut emits fat_absorption_g_min not fat_absorption_active; neuro has
-#      no heart_rate_bpm in derivatives(); lung respiratory_rate only in
-#      compute(); fluid has no V_vascular_mL/V_isf_mL in derivatives()).
-# After R4 the table contains only live routes (20 entries, down from 48).
-#
-# Phase 5 plan: this table will be auto-derived from each module's
-# `INPUTS`/`OUTPUTS` class attributes via `discover_topology()`. Until then
-# it remains the canonical hand-maintained source (Radau path only).
-#
-# Moved from simulation.py:52-128 (Phase 1).
-
-CONNECTIONS: dict[tuple[str, str], list[tuple[str, str]]] = {
-    # Heart → kidney, fluid, neuro
-    ("heart", "cardiac_output"):    [("kidney", "co_input"), ("lung", "co_input"), ("gut", "co_input")],
-    ("heart", "MAP"):                [("kidney", "map_input"), ("fluid", "map_input"), ("neuro", "map_input")],
-    ("heart", "CVP"):               [("kidney", "cvp_input")],
-    ("heart", "blood_volume_ratio"): [("fluid", "blood_volume_ratio")],
-
-    # Lung → neuro (blood targets removed — blood not in UNIFIED_MODULES;
-    #   arterial_saturation/arterial_pH only had blood targets → dropped;
-    #   respiratory_rate only emitted in compute(), not derivatives() → dropped)
-    ("lung", "arterial_PO2_mmHg"):  [("neuro", "PO2")],
-    ("lung", "arterial_PCO2_mmHg"): [("neuro", "PCO2")],
-
-    # Kidney → fluid (blood target dropped)
-    ("kidney", "ADH_level"):         [("fluid", "ADH")],
-    ("kidney", "urine_output_mL_min"): [("fluid", "urine_output")],
-    ("kidney", "angiotensin_II"):    [("fluid", "RAAS_activity")],
-    # R4: removed ("kidney", "blood_volume_loss_rate_mL_min") → blood target (dead)
-    # R4: removed ("fluid", "V_vascular_mL") / ("fluid", "V_isf_mL") — fluid.derivatives()
-    # never emits these keys (dead source routes)
-
-    # Endocrine → immune, liver, heart, kidney
-    ("endocrine", "cortisol_ug_dL"): [("immune", "endocrine_cortisol")],
-    ("endocrine", "T3_factor"):     [("heart", "T3")],
-    ("endocrine", "insulin_uU_mL"):  [("liver", "insulin")],
-    ("endocrine", "glucagon_pg_mL"): [("liver", "glucagon")],
-    ("endocrine", "PTH_pg_mL"):      [("kidney", "PTH")],
-    ("endocrine", "calcium_mg_dL"): [("kidney", "calcium")],
-
-    # Neuro → endocrine (heart_rate_bpm dead route removed — neuro.derivatives()
-    # never emits this key)
-    ("neuro", "pain_level"):         [("endocrine", "pain_stress")],
-
-    # Immune → neuro, liver, coagulation, lymphatic (blood targets dropped)
-    ("immune", "cytokine_level"):    [("neuro", "cytokine"), ("coagulation", "immune_cytokine"), ("lymphatic", "cytokine_input"), ("liver", "inflammation")],
-    ("immune", "coagulation_state"): [("coagulation", "immune_coagulation_state")],
-    # R4: removed ("immune", "wbc_count") / ("immune", "capillary_leak_factor")
-    # — only blood targets (dead)
-
-    # R4: removed entire Coagulation → blood block (4 routes: PT_sec, aPTT_sec,
-    # fibrinogen_mg_dL, coagulation_state) — all targets were blood (dead)
-
-    # Liver → coagulation (blood targets dropped; glucose_output/ammonia/
-    # albumin/bilirubin routes removed — liver emits glucose_output_g_min, and
-    # the others targeted blood which is not in UNIFIED_MODULES)
-    ("liver", "metabolic_activity"): [("coagulation", "liver_health_factor")],
-
-    # Gut → liver (portal_flow / fat_absorption_active dead routes removed —
-    # gut emits portal_blood_flow_mL_min and fat_absorption_g_min, not these keys)
-    ("gut", "amino_absorption_g_min"): [("liver", "amino_absorption_g_min")],
-
-    # R4: removed entire Lymphatic → blood block (3 routes: splenic_reserve_mL,
-    # lymph_flow_rate, interstitial_fluid_mL) — all targets were blood (dead)
-
-    # Disease outputs (from disease.derivatives) → target modules
-    # disease.compute_derivatives returns FactorCommand-style outputs
-    # routed via CONNECTIONS as a special "disease" module
-}
 
 
 # ── _PARAM_PATHS: whitelisted write-protocol for apply_factor() ────────────
@@ -138,7 +38,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "heart.CVP":                     ("heart", "central_venous_pressure"),
     "heart.blood_volume":            ("heart", "circulating_volume_ml"),
     "heart.stroke_volume":           ("heart", "stroke_volume"),
-    "heart.cardiac_output":          ("heart", "cardiac_output"),  # Radau organ_health factor
+    "heart.cardiac_output":          ("heart", "cardiac_output"),  # organ_health factor
     # ── Lung ──────────────────────────────────────────────────────────────
     "lung.diffusion_coefficient":    ("lung", "diffusion_coefficient"),
     "lung.PaO2":                     ("lung", "alveolar_PO2"),
@@ -183,7 +83,7 @@ _PARAM_PATHS: dict[str, tuple[str, str]] = {
     "blood.fibrinogen_mg_dL":      ("blood", "fibrinogen_mg_dL"),
     "blood.INR":                   ("blood", "INR"),
     "blood.coagulation_factor_VII": ("blood", "coagulation_factor_VII"),
-    # P0 0d: factor-paths for fields previously written direct in _step_radau
+    # P0 0d: factor-paths for fields previously written direct in step
     "blood.saturation":            ("blood", "arterial_saturation"),
     "blood.CRP":                   ("blood", "CRP_mg_L"),
     "blood.drug_concentration_mg_kg": ("blood", "drug_concentration_mg_kg"),
@@ -277,7 +177,7 @@ def discover_topology(modules: list) -> Topology:
     Phase 1: returns an empty Topology (no introspection yet — modules
     still don't declare INPUTS/OUTPUTS class attributes).
     Phase 5: will introspect `module.INPUTS` and `module.OUTPUTS` class
-    attributes and build the adjacency. At that point, CONNECTIONS becomes
-    derived from this Topology rather than hand-maintained.
+    attributes and build the adjacency. At that point, the coupling graph
+    becomes derived from this Topology rather than hand-maintained.
     """
     return Topology()

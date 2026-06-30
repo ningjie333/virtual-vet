@@ -9,7 +9,6 @@ from typing import Callable, Optional
 import numpy as np
 
 from src.common_types import FactorCommand
-from src.engine import CONNECTIONS
 from src.engine.factor_pipeline import apply_factor as _apply_factor_impl, snapshot_baselines, clear_baselines
 from src.engine.step_contract import (
     StepGuard,
@@ -27,11 +26,6 @@ from src.engine.step_contract import (
     PHASE_ORGAN_HEALTH_APPLY,
     PHASE_HISTORY,
     PHASE_TIME_ADVANCE,
-    DIVERGENCE_IMMUNE_ORDER,
-    DIVERGENCE_DISEASE_ORDER,
-    DIVERGENCE_COUPLING_RESOLVE_COUNT,
-    DIVERGENCE_CHEMORECEPTOR_LAG,
-    DIVERGENCE_ORGAN_HEALTH_MECHANISM,
 )
 from src.engine.step_common import (
     run_pre_dispatch,
@@ -46,14 +40,6 @@ from src.engine.step_common import (
     refresh_state_dicts,
 )
 from src.engine.solvers import SolverRegistry
-from src.engine.solvers.radau import run_radau_step as _run_radau_step_fn
-from src.engine.state_vector import (
-    UNIFIED_MODULES,
-    build_state_map as _build_state_map_fn,
-    pack_state as _pack_state_fn,
-    unpack_state as _unpack_state_fn,
-    unified_rhs as _unified_rhs_fn,
-)
 from blood import BloodCompartment
 from heart import HeartModule
 from lung import LungModule
@@ -202,18 +188,12 @@ class VirtualCreature:
             self._organ_contexts[mod_name] = OrganContext(mod_name)
         self.coupling_engine = CouplingEngine()
 
-        # ── 统一 ODE 求解器缓存（半隐式耦合）────────────────────────────
-        # _cached_inputs[module_name][input_name] = value
-        # 在 rhs(t,y) 调用时，用上一 rhs 调用的 outputs 填充 inputs
-        self._cached_inputs: dict[str, dict[str, float]] = {}
-        self._current_outputs: dict[str, dict[str, float]] = {}
-
-        # ── 连续失血模型（A3：替代 schedule_event 用于 Radau）──────────
+        # ── 连续失血模型（A3：替代 schedule_event 用于连续仿真）──────────
         # sigmoid 失血：dV/dt = -k * sigmoid((t-t_onset)/width)
         # k = blood_loss_total / duration  (mL/s)
-        # 累积失血量通过 Radau 积分（每次 rhs 调用应用微小损失）
+        # 累积失血量通过积分（每次 step 应用微小损失）
         self._blood_loss_config: dict[str, float] | None = None
-        self._cumulative_blood_loss_ml: float = 0.0  # 累积失血量（每次 rhs 调用累加）
+        self._cumulative_blood_loss_ml: float = 0.0  # 累积失血量（每次 step 累加）
 
         # ── 生命周期引擎（驱动生长/衰老/死亡）──────────────────────────
         self.lifecycle = LifecycleEngine(
@@ -234,8 +214,8 @@ class VirtualCreature:
         self.events = []                            # 待处理事件列表
         self.event_log = []                         # 事件历史
 
-        # 求解器诊断（Step 0a: 让 twin-run harness 能检测 Radau fallback）
-        self._solver_fallback_count = 0             # Radau 失败退化到 Euler 的次数
+        # 求解器诊断（Step 0a: twin-run harness 依赖这些属性）
+        self._solver_fallback_count = 0             # fallback 计数（保留供 twin-run 检测）
         self._solver_last_method_used = "primary"   # "primary" | "euler_fallback"
 
         # 历史记录
@@ -323,7 +303,7 @@ class VirtualCreature:
 
     def set_blood_loss_scenario(self, t_onset: float, total_ml: float, duration: float = 300.0, width: float = 5.0):
         """
-        设置连续 ODE 失血场景（替代 schedule_event，用于 Radau/Euler 仿真）。
+        设置连续 ODE 失血场景（替代 schedule_event，用于连续仿真）。
 
         失血模型：dV/dt = -k * sigmoid_on(t) * (1 - sigmoid_off(t))
                   bell curve 面积 = k * 3 * width
@@ -547,7 +527,6 @@ class VirtualCreature:
 
         Delegates to the injected SolverPlugin (self._solver).
         Default: EulerSolver (explicit, O(dt)).
-        Activate Radau: solver='radau' or RADAU_ENABLED=1.
         """
         return self._solver.step(self)
 
@@ -570,8 +549,6 @@ class VirtualCreature:
         8. 记录历史
 
         R3: StepGuard enforces ordering contracts at runtime.
-        Documented divergences from Radau path are recorded via
-        guard.divergence_ok() so they are explicit and auditable.
         """
         t = self.current_time_s
         dt = self.dt
@@ -579,43 +556,8 @@ class VirtualCreature:
         # R3: create per-step guard. Enabled by default; tests can
         # construct a disabled guard via StepGuard(enabled=False).
         guard = StepGuard(label="euler")
-        # Document intentional divergences from Radau path (not violations).
-        guard.divergence_ok(
-            DIVERGENCE_IMMUNE_ORDER,
-            "Euler: immune.compute() runs BEFORE coupling (Step 4.9). "
-            "Radau: runs AFTER coupling (Step 7b). Euler needs immune's "
-            "factor_commands applied before coupling sees them."
-        )
-        guard.divergence_ok(
-            DIVERGENCE_DISEASE_ORDER,
-            "Euler: disease runs BEFORE organ compute (Step 2.5). "
-            "Radau: disease runs AFTER coupling (Step 7). Euler needs "
-            "disease factors in place before organ compute() reads them."
-        )
-        guard.divergence_ok(
-            DIVERGENCE_COUPLING_RESOLVE_COUNT,
-            "Euler: 2-substep Gauss-Seidel relaxation — substep 1 at Step 4.95 "
-            "(PHASE_COUPLING_RESOLVE_1, reads lagged signals) + substep 2 at "
-            "Step 8 (PHASE_COUPLING_RESOLVE_2, reads fresh signals). "
-            "Radau: intra-step Newton iteration on _cached_inputs (no explicit "
-            "substeps). Twin-run tests proved the 2-substep relaxation is "
-            "required for Euler stability."
-        )
-        guard.divergence_ok(
-            DIVERGENCE_CHEMORECEPTOR_LAG,
-            "Euler: chemoreceptor_drive read from previous step's "
-            "neuro.compute() (Gauss-Seidel 1-step lag, O(dt) error). "
-            "Radau: neuro integrated in solve_ivp, no lag."
-        )
-        guard.divergence_ok(
-            DIVERGENCE_ORGAN_HEALTH_MECHANISM,
-            "Euler: organ_health factor applied via direct setattr "
-            "(self.heart.MAP *= factor). Radau: via apply_factor "
-            "'multiply'. Euler bypasses baseline since factor is "
-            "applied once per step to current value."
-        )
 
-        # Step 0-0.5: 事件处理 + 连续失血 + lifecycle（shared with Radau）
+        # Step 0-0.5: 事件处理 + 连续失血 + lifecycle
         if run_pre_dispatch(self, guard=guard):
             return
 
@@ -696,7 +638,7 @@ class VirtualCreature:
         guard.mark(PHASE_GUT_COMPUTE)
 
         # Step 4.6-4.8: organ compute chain (liver→endocrine→coagulation→lymphatic→neuro)
-        # P1.2: unified with Radau path via run_organ_compute_chain
+        # P1.2: unified via run_organ_compute_chain
         organ_states = run_organ_compute_chain(
             self, dt, gut_state, heart_state, lung_state, guard=guard
         )
@@ -721,8 +663,7 @@ class VirtualCreature:
         # (tests/test_twin_run.py) empirically proved that the 2-substep
         # relaxation is required for Euler stability (removing this substep
         # flips blood_loss_severe from PASS to FAIL, GFR error 0.066 → 0.142).
-        # See docs/coupling_inventory.md "double-resolve" and the
-        # DIVERGENCE_COUPLING_RESOLVE_COUNT contract marker below.
+        # See docs/coupling_inventory.md "double-resolve".
         #
         # P0.2: re-snapshot baselines after all organ compute() calls so
         # coupling multiply/add ops use post-organ values as baseline.
@@ -785,8 +726,8 @@ class VirtualCreature:
         svr_phys_max = self.heart.SVR_baseline * 4.0  # 4× baseline ≈ 5.6 PRU
         self.heart.SVR = min(self.heart.SVR, svr_phys_max)
 
-        # Step 8: history recording (shared with Radau via _record_history)
-        # P0 0b: was inline divergence with Radau; now single source of truth
+        # Step 8: history recording (single source of truth via _record_history)
+        # P0 0b: was inline divergence; now single source of truth
         if self._record_history_enabled:
             self._record_history(
                 dt, t=t,
@@ -822,17 +763,6 @@ class VirtualCreature:
             "pharmacology": pharma_effects if (hasattr(self, "pharmacology") and self.pharmacology is not None) else {},
         }
 
-    def _step_radau(self):
-        """
-        Radau 隐式求解器路径 — 单步推进。
-
-        Step 3 (solver-refactor-roadmap-v3): implementation extracted verbatim to
-        src/engine/solvers/radau.run_radau_step. This is a thin forwarder for
-        backward compatibility (RadauSolver.step + experiments/tools call
-        engine._step_radau). Full data-flow docstring lives in the new module.
-        """
-        return _run_radau_step_fn(self)
-
     def _record_history(self, dt: float, t: float = None,
                         heart_state: dict = None, lung_state: dict = None,
                         kidney_state: dict = None, gut_state: dict = None,
@@ -842,15 +772,13 @@ class VirtualCreature:
         """
         Record current engine state to history dict.
 
-        Single source of truth for history schema (P0 0b fix: was divergent
-        between Euler inline and Radau _record_history; now both call this).
+        Single source of truth for history schema.
 
         Args:
             dt: timestep
             t: timestamp (defaults to self.current_time_s)
             *_state: per-organ state dicts from this step's compute() calls.
-                     If None, falls back to reading self.module.X directly
-                     (used by Radau which doesn't pass per-step dicts).
+                     If None, falls back to reading self.module.X directly.
         """
         t = t if t is not None else self.current_time_s
 
@@ -941,7 +869,7 @@ class VirtualCreature:
         # Core temperature (single canonical key: core_temperature_C)
         self.history["core_temperature_C"].append(self.blood.core_temperature_C)
 
-        # Neuro (NO bare 'sympathetic' key — was colliding with neuro_sympathetic in old Radau path)
+        # Neuro (NO bare 'sympathetic' key — collides with neuro_sympathetic)
         if neuro_state:
             self.history["neuro_sympathetic"].append(neuro_state["sympathetic_tone"])
             self.history["neuro_consciousness"].append(neuro_state["consciousness"])
@@ -978,7 +906,7 @@ class VirtualCreature:
         self.history["lymph_splenic_reserve"].append(self.blood.splenic_reserve_mL)
         self.history["lymph_lymph_flow"].append(self.lymphatic.lymph_flow_rate)
 
-        # NOTE: time advancement is handled by the caller (_step_euler or _step_radau),
+        # NOTE: time advancement is handled by the caller (_step_euler),
         # not here. This avoids double-advancement when Euler calls _record_history
         # and then also increments current_time_s.
 
@@ -1022,199 +950,6 @@ class VirtualCreature:
             verbose: 是否打印进度
         """
         self.advance_seconds(duration_minutes * 60.0, verbose=verbose)
-
-    # ── solve_ivp Radau 引擎（Phase 2: 替换 Euler 求解器）────────────────────────
-
-    # 统一 ODE 状态映射（器官 + 疾病）。
-    # Step 1（solver-refactor-roadmap-v3）：实现已抽到 src/engine/state_vector.py，
-    # 这里保留类属性名做向后兼容（experiments/tools 通过 vc._UNIFIED_MODULES 访问）。
-    _UNIFIED_MODULES = UNIFIED_MODULES
-
-    def _build_unified_state_map(self) -> dict[tuple[str, str], int]:
-        """建立 (module_name, var_name) → y-array index 映射表（器官 + 疾病）。
-
-        Step 1: 转发到 src/engine/state_vector.build_state_map。零行为变化。
-        """
-        return _build_state_map_fn(self)
-
-    def _pack_unified_state(self) -> np.ndarray:
-        """将所有器官 + 疾病状态打包成 numpy 向量 y0。
-
-        Step 1: 转发到 src/engine/state_vector.pack_state。零行为变化。
-        """
-        return _pack_state_fn(self)
-
-    def _unpack_unified_state(self, y: np.ndarray) -> None:
-        """将 numpy 向量 y 分解到各模块的实例属性。
-
-        Step 1: 转发到 src/engine/state_vector.unpack_state。零行为变化。
-        """
-        _unpack_state_fn(self, y)
-
-    def _unified_rhs(self, t: float, y: np.ndarray) -> np.ndarray:
-        """
-        统一 ODE 右端函数（供 solve_ivp Radau 调用）。
-
-        半隐式耦合策略：
-        - 在 rhs(t,y) 调用时，用上一 rhs 调用的 outputs 路由为当前 inputs
-        - 每个模块的 derivatives() 只读 inputs（不读其他模块的当前状态）
-        - Radau 的 Newton 迭代会自动收敛到耦合解
-
-        Step 1: 转发到 src/engine/state_vector.unified_rhs。零行为变化。
-        完整数据流文档见 src/engine/state_vector.py。
-        """
-        return _unified_rhs_fn(self, t, y)
-
-    def _build_ivp_state_map(self) -> dict[tuple[str, str], int]:
-        """建立 (module_name, var_name) → y-array index 映射表。"""
-        ivp_state_map: dict[tuple[str, str], int] = {}
-        idx = 0
-        for module_name in self._get_ivp_disease_modules():
-            module = getattr(self, module_name)
-            for var_name in module._state_vars:
-                ivp_state_map[(module_name, var_name)] = idx
-                idx += 1
-        return ivp_state_map
-
-    def _get_ivp_disease_modules(self) -> list[str]:
-        """返回所有 active 疾病的 namespaced module 名列表。
-
-        用 `disease.{name}` 形式给每个疾病独立命名空间，避免多病 state var
-        名字冲突。Q1 (2026-06-14) 多病叠加支持。
-        """
-        return [
-            f"disease.{d.name}" for d in self.diseases
-            if d.active and hasattr(d, "compute_derivatives")
-        ]
-
-    def _disease_for_mname(self, mname: str):
-        """根据 'disease.{name}' namespace 找到对应 DiseaseModule 实例。"""
-        assert mname.startswith("disease."), f"unexpected mname {mname!r}"
-        disease_name = mname[len("disease."):]
-        for d in self.diseases:
-            if d.name == disease_name:
-                return d
-        raise KeyError(f"no disease named {disease_name!r} in self.diseases")
-
-    def _pack_disease_state(self) -> np.ndarray:
-        """将当前所有疾病状态打包成 numpy 向量 y0。"""
-        state_map = self._build_ivp_state_map()
-        n = len(state_map)
-        y0 = np.zeros(n)
-        for (mname, vname), idx in state_map.items():
-            if mname.startswith("disease."):
-                d = self._disease_for_mname(mname)
-                y0[idx] = d._state_vars[vname]
-        return y0
-
-    def _unpack_disease_state(self, y: np.ndarray) -> None:
-        """将 numpy 向量 y 分解到各疾病模块的 _state_vars。"""
-        state_map = self._build_ivp_state_map()
-        for (mname, vname), idx in state_map.items():
-            if mname.startswith("disease."):
-                d = self._disease_for_mname(mname)
-                d._state_vars[vname] = y[idx]
-
-    def _get_engine_state(self) -> dict:
-        """收集当前血液/器官状态（供导数计算用）。"""
-        return {
-            "heart": {
-                "heart_rate_bpm": self.heart.heart_rate,
-                "MAP_mmHg": self.heart.mean_arterial_pressure,
-                "cardiac_output_ml_min": self.heart.cardiac_output,
-            },
-            "lung": {"arterial_PO2": self.blood.arterial_PO2_mmHg},
-            "kidney": {"GFR_ml_min": self.kidney.GFR},
-            "immune": {"antibiotic_effect": self.immune.antibiotic_effect},
-        }
-
-    def _ivp_rhs(self, t: float, y: np.ndarray) -> np.ndarray:
-        """ODE 右端函数（供 solve_ivp 调用）。Q1 (2026-06-14): 遍历所有 active 疾病。"""
-        self._unpack_disease_state(y)
-        engine_state = self._get_engine_state()
-        state_map = self._build_ivp_state_map()
-        n = len(state_map)
-        dydt = np.zeros(n)
-
-        # Cache derivatives per disease to avoid redundant calls
-        per_disease_derivs: dict = {}
-        for (mname, vname), idx in state_map.items():
-            if mname.startswith("disease."):
-                if mname not in per_disease_derivs:
-                    d = self._disease_for_mname(mname)
-                    per_disease_derivs[mname] = d.compute_derivatives(engine_state)
-                dydt[idx] = per_disease_derivs[mname].get(vname, 0.0)
-
-        return dydt
-
-    def run_ivp(self, t_end: float, dt_save: float = 1.0):
-        """使用 Radau 隐式求解器跑 ODE 疾病子系统。
-
-        Args:
-            t_end: 仿真结束时间（秒）
-            dt_save: 采样间隔（秒）
-
-        Returns:
-            solve_ivp result object with sol.t, sol.y
-        """
-        from scipy.integrate import solve_ivp
-
-        y0 = self._pack_disease_state()
-        t_eval = np.arange(0.0, t_end + dt_save, dt_save)
-
-        sol = solve_ivp(
-            self._ivp_rhs,
-            [0.0, t_end],
-            y0,
-            method='Radau',
-            rtol=1e-6,
-            atol=1e-9,
-            t_eval=t_eval,
-            dense_output=True,
-            vectorized=False,
-        )
-        return sol
-
-    def run_unified_ivp(self, t_end: float, dt_save: float = 1.0):
-        """使用 Radau 隐式求解器跑统一 ODE 系统（所有器官 + 疾病）。
-
-        半隐式耦合：_cached_inputs 在每次 rhs 调用时从上一输出的 outputs 填充。
-        Radau 的 Newton 迭代会收敛耦合解。
-
-        Args:
-            t_end: 仿真结束时间（秒）
-            dt_save: 采样间隔（秒）
-
-        Returns:
-            solve_ivp result object with sol.t, sol.y
-        """
-        from scipy.integrate import solve_ivp
-
-        # 初始化缓存（启动时为空，使用模块默认值）
-        self._cached_inputs.clear()
-
-        y0 = self._pack_unified_state()
-        state_map = self._build_unified_state_map()
-
-        # 预热：调用一次 rhs 以初始化 _cached_inputs
-        if len(y0) > 0:
-            _ = self._unified_rhs(0.0, y0)
-
-        t_eval = np.arange(0.0, t_end + dt_save, dt_save)
-        t_eval = t_eval[t_eval <= t_end]  # clip to t_span
-
-        sol = solve_ivp(
-            self._unified_rhs,
-            [0.0, t_end],
-            y0,
-            method='Radau',
-            rtol=1e-5,
-            atol=1e-8,
-            t_eval=t_eval,
-            dense_output=True,
-            vectorized=False,
-        )
-        return sol
 
     def run_scenario(self, scenario_name: str):
         """

@@ -1,16 +1,15 @@
 """
 test_solver_parity.py — Tier-3 solver parity tests (P2-2).
 
-Verifies Euler and Radau produce equivalent results within O(dt) tolerance.
+Verifies the Euler solver produces physiologically valid results.
 Run with: uv run pytest tests/test_solver_parity.py -v
 
 P2-3 Tier markers:
 - tier0: fast (no engine setup, metadata only)
-- tier3: slow (full simulation, Radau requires Newton iteration)
+- tier3: slow (full simulation)
 """
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
 from src.simulation import VirtualCreature
@@ -19,16 +18,11 @@ from src.engine.solvers import SolverRegistry
 
 @pytest.mark.tier3
 class TestSolverParity:
-    """Euler vs Radau parity within convergence-rate tolerance."""
+    """Euler solver produces physiologically valid results."""
 
     @pytest.fixture
     def euler_vc(self):
         vc = VirtualCreature(body_weight_kg=20.0, solver="euler", record_history=True)
-        return vc
-
-    @pytest.fixture
-    def radau_vc(self):
-        vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
         return vc
 
     def _step_n(self, vc, n=10):
@@ -41,24 +35,10 @@ class TestSolverParity:
         hr = euler_vc.heart.heart_rate
         assert 40 <= hr <= 250, f"HR={hr} outside valid range"
 
-    
-    def test_radau_heart_rate_positive(self, radau_vc):
-        """Radau: heart rate stays in physiologically valid range."""
-        self._step_n(radau_vc, 10)
-        hr = radau_vc.heart.heart_rate
-        assert 40 <= hr <= 250, f"HR={hr} outside valid range"
-
     def test_euler_MAP_positive(self, euler_vc):
         """Euler: MAP stays in physiologically valid range."""
         self._step_n(euler_vc, 10)
         map_val = euler_vc.heart.mean_arterial_pressure
-        assert 30 <= map_val <= 200, f"MAP={map_val} outside valid range"
-
-    
-    def test_radau_MAP_positive(self, radau_vc):
-        """Radau: MAP stays in physiologically valid range."""
-        self._step_n(radau_vc, 10)
-        map_val = radau_vc.heart.mean_arterial_pressure
         assert 30 <= map_val <= 200, f"MAP={map_val} outside valid range"
 
     def test_euler_step_delegation(self, euler_vc):
@@ -67,20 +47,14 @@ class TestSolverParity:
         assert isinstance(result, dict)
         assert "heart" in result
 
-    
-    def test_radau_step_delegation(self, radau_vc):
-        """step() returns a dict for Radau (may be empty {})."""
-        result = radau_vc.step()
-        assert isinstance(result, dict)
-
 
 @pytest.mark.tier0
 class TestSolverRegistry:
     """Pure metadata checks — no engine setup, runs in <1s."""
 
-    def test_both_solvers_registered(self):
-        """Solver names are registered correctly."""
-        assert SolverRegistry.names() == ["euler", "radau"]
+    def test_euler_solver_registered(self):
+        """Euler solver is registered correctly."""
+        assert SolverRegistry.names() == ["euler"]
 
     def test_euler_solver_properties(self):
         """EulerSolver has correct metadata."""
@@ -88,13 +62,6 @@ class TestSolverRegistry:
         assert solver.name == "euler"
         assert solver.order == 1
         assert solver.solver_type == "explicit"
-
-    def test_radau_solver_properties(self):
-        """RadauSolver has correct metadata."""
-        solver = SolverRegistry.get("radau")
-        assert solver.name == "radau"
-        assert solver.order == 5
-        assert solver.solver_type == "implicit"
 
     def test_unknown_solver_raises(self):
         """Unknown solver name raises ValueError."""

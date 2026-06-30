@@ -3,9 +3,9 @@ R3: Step ordering contracts.
 
 Problem (root cause R3):
     10+ ordering constraints between step phases exist only as code
-    comments and physical line order in `_step_euler` / `run_radau_step`.
+    comments and physical line order in `_step_euler`.
     Reordering, refactoring, or adding new phases silently breaks
-    invariants (e.g., Radau path was missing `snapshot_baselines`,
+    invariants (e.g., missing `snapshot_baselines`,
     `clear_baselines`, and `refresh_state_dicts` for the entire P0.2/R1
     era — undetected because no contract enforced their presence).
 
@@ -16,7 +16,7 @@ Solution:
     invoking helpers directly) can pass `guard=None` to skip checks.
 
 Design philosophy:
-    This is NOT a scheduler. The Euler/Radau drivers still sequence
+    This is NOT a scheduler. The Euler driver still sequences
     phases. `StepGuard` only catches ordering bugs at runtime, in
     tests, and during refactoring. It is the minimum viable contract
     layer — no decorator magic, no topological sort, no metaprogramming.
@@ -27,7 +27,7 @@ Two kinds of contract state:
     2. State invariants — boolean flags
        (e.g., `INV_BASELINES_SNAPSHOTTED` before any `multiply` op)
 
-Intentional divergences (Euler vs Radau) are documented via
+Intentional divergences are documented via
 `StepGuard.divergence_ok()` calls — these are NOT contract violations
 but are recorded so the divergence is explicit and inspectable.
 """
@@ -50,7 +50,7 @@ PHASE_PRE_DISPATCH = "pre_dispatch"          # events + lifecycle + blood_loss
 PHASE_TOX = "tox"                            # toxicology.compute()
 PHASE_PHARMA = "pharma"                      # pharmacology.compute()
 PHASE_HEART_COMPUTE = "heart_compute"        # heart.compute() OR solve_ivp unpack
-PHASE_DISEASE = "disease"                    # disease modules (Euler: pre-organ; Radau: post-coupling)
+PHASE_DISEASE = "disease"                    # disease modules (Euler: pre-organ)
 PHASE_LUNG_COMPUTE = "lung_compute"          # lung.compute()
 PHASE_KIDNEY_COMPUTE = "kidney_compute"      # kidney.compute()
 PHASE_GUT_COMPUTE = "gut_compute"            # gut.compute()
@@ -58,16 +58,14 @@ PHASE_GUT_COMPUTE = "gut_compute"            # gut.compute()
 # Organ compute chain (liver → endocrine → coagulation → lymphatic → neuro)
 PHASE_ORGAN_CHAIN = "organ_chain"
 
-# Immune — NOTE: ordering diverges between Euler (before coupling) and
-# Radau (after coupling). See `mark_immune()` for divergence tracking.
+# Immune — runs before coupling.
 PHASE_IMMUNE = "immune"
 
 # Coupling — R4: Euler path uses a 2-substep Gauss-Seidel relaxation.
 #   substep 1 (Step 4.95): reads PREVIOUS step's published signals (lagged)
 #   substep 2 (Step 8):    reads FRESH signals just published by run_coupling
 # Both substeps are required for Euler stability (twin-run proven; removing
-# substep 1 flips blood_loss_severe from PASS to FAIL). Radau path uses
-# intra-step Newton iteration instead (see state_vector.unified_rhs).
+# substep 1 flips blood_loss_severe from PASS to FAIL).
 PHASE_COUPLING_RESOLVE_1 = "coupling_resolve_1"   # Euler substep 1: lagged resolve
 PHASE_PHYSIOLOGY_POST = "physiology_post"          # run_physiology_post (urine loss + fluid + sync)
 PHASE_COUPLING_RESOLVE_2 = "coupling_resolve_2"   # Euler substep 2: fresh resolve (after publish)
@@ -85,15 +83,6 @@ PHASE_TIME_ADVANCE = "time_advance"                # current_time_s += dt
 # ── State invariants (booleans, not ordered) ─────────────────────────────────
 INV_BASELINES_SNAPSHOTTED = "baselines_snapshotted"
 INV_BASELINES_CLEARED = "baselines_cleared"
-
-# ── Known intentional divergences (Euler vs Radau) ───────────────────────────
-# These are NOT violations — they are documented mathematical differences
-# between explicit (Euler) and implicit (Radau) solver paths.
-DIVERGENCE_IMMUNE_ORDER = "immune_order"          # Euler: immune before coupling; Radau: after
-DIVERGENCE_DISEASE_ORDER = "disease_order"         # Euler: disease before organ compute; Radau: after coupling
-DIVERGENCE_COUPLING_RESOLVE_COUNT = "resolve_count"  # Euler: 2x resolve; Radau: 1x
-DIVERGENCE_CHEMORECEPTOR_LAG = "chemoreceptor_lag"  # Euler: 1-step lag (Gauss-Seidel); Radau: integrated
-DIVERGENCE_ORGAN_HEALTH_MECHANISM = "organ_health_mechanism"  # Euler: setattr; Radau: apply_factor multiply
 
 
 class StepContractError(RuntimeError):
@@ -195,12 +184,12 @@ class StepGuard:
             )
         return self
 
-    # ── intentional divergences (Euler vs Radau) ─────────────────────────
+    # ── intentional divergences ─────────────────────────────────────────
     def divergence_ok(self, name: str, reason: str) -> "StepGuard":
         """Record an intentional divergence between solver paths.
 
-        Use this to document WHY a phase ordering differs between Euler
-        and Radau. The divergence is recorded (not raised) so it can be
+        Use this to document WHY a phase ordering differs between solver
+        paths. The divergence is recorded (not raised) so it can be
         inspected via `guard.divergences()` for auditing.
         """
         if not self.enabled:

@@ -112,7 +112,7 @@ def pytest_addoption(parser):
         choices=_BUNDLE_NAMES,
         help=(
             "Optionally narrow a run to one or more named test bundles such as "
-            "core-runtime, benchmark-performance, research-solver-radau, or "
+            "core-runtime, benchmark-performance, core-solver, or "
             "benchmark-deterioration."
         ),
     )

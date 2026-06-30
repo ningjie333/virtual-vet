@@ -4,7 +4,6 @@ solvers.py — pluggable ODE solver plugins.
 RATIONALE
 =========
 Production uses Euler (O(dt) — fast, stable for physiological timescales).
-Validation uses Radau (O(dt^5) — implicit, handles stiff systems).
 Future solvers (RK4, adaptive-step) slot in here without touching simulation.py.
 
 P1-3 refactor: replaces the hard-coded if/else in step() with a injected
@@ -59,14 +58,14 @@ class SolverPlugin(ABC):
         """
         Convergence order (exponent of dt in error term).
 
-        Euler = 1, RK4 = 4, Radau = 5.
+        Euler = 1, RK4 = 4.
         Used only for solver-parity tests and documentation.
         """
 
     @property
     @abstractmethod
     def solver_type(self) -> Literal["explicit", "implicit"]:
-        """'explicit' (Euler/RK4) or 'implicit' (Radau)."""
+        """'explicit' (Euler/RK4) or 'implicit'."""
 
 
 # ── Euler solver ────────────────────────────────────────────────────────────────
@@ -87,24 +86,6 @@ class EulerSolver(SolverPlugin):
         return engine._step_euler()
 
 
-# ── Radau solver ───────────────────────────────────────────────────────────────
-
-class RadauSolver(SolverPlugin):
-    """
-    5th-order implicit Radau IIA.
-
-    Stiff-systems-ready, O(dt^5) convergence.
-    Activated by RADAU_ENABLED=1 or solver='radau' kwarg.
-    """
-
-    name = "radau"
-    order = 5
-    solver_type: Literal["implicit"] = "implicit"
-
-    def step(self, engine: "VirtualCreature") -> dict:
-        return engine._step_radau()
-
-
 # ── Solver registry ────────────────────────────────────────────────────────────
 
 class SolverRegistry:
@@ -114,7 +95,6 @@ class SolverRegistry:
     Usage:
         registry = SolverRegistry()
         registry.register("euler", EulerSolver)
-        registry.register("radau", RadauSolver)
         solver = registry.get("euler")
     """
 
@@ -145,4 +125,3 @@ class SolverRegistry:
 # ── Register built-ins ────────────────────────────────────────────────────────
 
 SolverRegistry.register("euler", EulerSolver)
-SolverRegistry.register("radau", RadauSolver)

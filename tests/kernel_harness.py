@@ -2,7 +2,7 @@
 
 Tier1 (trivial):   h = KernelHarness(); h.step(10); assert h.get('heart.heart_rate') > 0
 Tier2 (accessible):  h.set('kidney.GFR', 30.0); h.step(10)
-Tier3 (solver):     compare Euler vs Radau parity
+Tier3 (solver):     Euler dt-refinement parity checks
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -18,7 +18,7 @@ class KernelHarness:
 
     body_weight_kg: float = 20.0
     species: str = "canine"
-    solver: Literal["euler", "radau"] = "euler"
+    solver: Literal["euler"] = "euler"
     dt: float = 5.0
     record_history: bool = False
 

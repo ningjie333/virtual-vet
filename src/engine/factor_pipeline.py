@@ -21,7 +21,7 @@ on `add` or `set` operations.
 
 P0.2: Per-step baseline idempotency
   - snapshot_baselines(engine) captures all writable param values at
-    step start.  Called once at the top of _step_euler / _step_radau.
+    step start.  Called once at the top of _step_euler.
   - First multiply / add on a target uses the step-baseline as the
     base (prevents exponential compounding across steps).  Subsequent
     writes to the same target chain from the current value (preserves

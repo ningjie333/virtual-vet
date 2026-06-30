@@ -203,16 +203,12 @@ for the implementation-oriented path.
 
 ## Solver Status
 
-As of 2026-06-09:
+As of 2026-06-30:
 
-- `VirtualCreature` contains both Euler and Radau execution paths
-- the application shell currently uses the default solver path, which is Euler
-- Radau remains an important validation and research path, but should not be implicitly documented as the current gameplay default
-
-Documentation must distinguish:
-
-- what the kernel can do
-- what the current application path actually uses
+- `VirtualCreature` uses Euler (first-order forward Euler) as the sole production solver
+- the Radau/LSODA validation path has been deprecated and removed (it was a broken validation path: scipy `solve_ivp(method="Radau")` hung on the full ~50-ODE system, and the LSODA fallback had silent degeneration issues)
+- twin-run validation (`src/engine/twin_run.py`) uses Euler-vs-Euler dt-refinement (Richardson-style convergence check) as the sole reference path
+- the `SolverRegistry` plugin mechanism is retained for future solver additions, but only `EulerSolver` is currently registered
 
 ## Testing Tiers
 

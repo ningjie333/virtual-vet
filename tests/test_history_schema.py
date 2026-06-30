@@ -1,7 +1,7 @@
 """
 test_history_schema.py — Step 0b regression test.
 
-Verifies Euler and Radau paths produce the same history schema:
+Verifies the Euler path produces the correct history schema:
 - Same set of keys
 - No key collisions (e.g. bare 'sympathetic' vs 'neuro_sympathetic')
 - All organ subsystems recorded
@@ -51,7 +51,7 @@ EXPECTED_HISTORY_KEYS = {
 
 
 class TestHistorySchema:
-    """P0 0b: Euler and Radau must produce identical history schema."""
+    """P0 0b: Euler path must produce the canonical history schema."""
 
     def test_euler_history_has_canonical_keys(self):
         """Euler path records all 45 canonical keys."""
@@ -90,50 +90,3 @@ class TestHistorySchema:
                 assert isinstance(v, (int, float)), f"{key}[{i}] is {type(v).__name__}"
                 assert not math.isnan(v), f"NaN in history['{key}'][{i}]"
                 assert not math.isinf(v), f"Inf in history['{key}'][{i}]"
-
-    
-    def test_radau_history_has_canonical_keys(self):
-        """Radau path also records all canonical keys (was the broken case)."""
-        vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
-        # Single Radau step (slow) — checks schema, not trajectories
-        vc.step()
-        actual_keys = set(vc.history.keys())
-        missing = EXPECTED_HISTORY_KEYS - actual_keys
-        assert not missing, f"Radau history missing keys: {missing}"
-
-    
-    def test_radau_no_bare_sympathetic_collision(self):
-        """P0 0b: Radau's bare 'sympathetic' was overwriting neuro_sympathetic."""
-        vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
-        vc.step()
-        assert "sympathetic" not in vc.history
-        assert "neuro_sympathetic" in vc.history
-
-    
-    def test_radau_organ_health_recorded(self):
-        """P0 0b: Radau was silently dropping organ_health fields."""
-        vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
-        vc.step()
-        for k in ("heart_health", "lung_health", "kidney_health", "liver_health"):
-            assert k in vc.history
-            assert len(vc.history[k]) == 1
-            assert isinstance(vc.history[k][0], float)
-
-    
-    def test_radau_fluid_compartments_recorded(self):
-        """P0 0b: Radau was silently dropping fluid compartment fields."""
-        vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
-        vc.step()
-        for k in ("fluid_vascular_ml", "fluid_isf_ml", "fluid_icf_ml", "fluid_nfp_mmHg"):
-            assert k in vc.history, f"Radau dropped fluid field: {k}"
-            assert len(vc.history[k]) == 1
-
-    
-    def test_radau_neuro_five_fields_recorded(self):
-        """P0 0b: Radau was only recording 1 of 5 neuro fields."""
-        vc = VirtualCreature(body_weight_kg=20.0, solver="radau", record_history=True)
-        vc.step()
-        for k in ("neuro_sympathetic", "neuro_consciousness", "neuro_seizure",
-                  "neuro_pain", "neuro_chemodrive"):
-            assert k in vc.history, f"Radau dropped neuro field: {k}"
-            assert len(vc.history[k]) == 1

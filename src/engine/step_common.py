@@ -1,11 +1,11 @@
 """
-step_common.py — shared step scaffolding for Euler and Radau paths.
+step_common.py — shared step scaffolding for the Euler path.
 
 All pre-dispatch (event/lifecycle) and post-dispatch (fluid/耦合/history) steps
-live here so the two solver paths differ only in the inner ODE solve.
+live here so the solver path contains only the inner ODE solve.
 
-Phase 4 refactor: eliminates ~60% code duplication between _step_euler and
-_step_radau without changing any behavior.
+Phase 4 refactor: eliminates ~60% code duplication by extracting shared
+step scaffolding without changing any behavior.
 """
 from __future__ import annotations
 
@@ -243,7 +243,7 @@ def run_pre_dispatch(engine: "VirtualCreature", guard: StepGuard | None = None) 
     engine._process_events(t)
 
     # Step 0.x: continuous sigmoid blood loss
-    # (identical formula in _step_euler and _unified_rhs)
+    # (identical formula in _step_euler)
     if engine._blood_loss_config is not None:
         cfg = engine._blood_loss_config
         t_rel = t - cfg["t_onset"]
@@ -322,14 +322,10 @@ def run_coupling(
     step's organ states, then resolves again — forming one full relaxation
     sweep. Both substeps are required for Euler stability (twin-run proven).
 
-    Radau path does NOT call this — it uses intra-step Newton iteration on
-    `_cached_inputs` via `state_vector.unified_rhs` + `CONNECTIONS` table.
-
     Args:
         engine: VirtualCreature instance
         dt: time step
-        signal_time: timestamp for signal publication.
-            Euler: current_time_s (before +=dt); Radau: current_time_s + dt (after step)
+        signal_time: timestamp for signal publication (current_time_s before +=dt).
         guard: optional StepGuard for R3 contract enforcement
 
     Must be called AFTER all organ compute() calls AND run_physiology_post().

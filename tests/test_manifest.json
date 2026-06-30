@@ -184,15 +184,7 @@
       "bundle": "fast-engine",
       "lane": "fast"
     },
-    "test_solver_radau.py": {
-      "bundle": "core-solver",
-      "lane": "core"
-    },
     "test_solver_parity.py": {
-      "bundle": "fast-engine",
-      "lane": "fast"
-    },
-    "test_radau_factor_command.py": {
       "bundle": "fast-engine",
       "lane": "fast"
     },
@@ -200,20 +192,12 @@
       "bundle": "benchmark-solver",
       "lane": "benchmark"
     },
-    "test_solver_drift.py": {
-      "bundle": "research-solver-drift",
-      "lane": "research"
-    },
     "test_solver_fallback.py": {
       "bundle": "core-solver",
       "lane": "core"
     },
     "test_solver_numerics.py": {
       "bundle": "research-solver-parity",
-      "lane": "research"
-    },
-    "test_solver_radau_endurance.py": {
-      "bundle": "research-solver-radau",
       "lane": "research"
     },
     "test_species_specific.py": {

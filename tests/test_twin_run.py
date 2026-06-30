@@ -3,13 +3,11 @@ test_twin_run.py — Step 4 twin-run validation harness tests.
 
 Drives `src.engine.twin_run` over 10 scenarios and asserts:
   1. converged: every vital within its tolerance (per-vital × scenario mult)
-  2. fallback_count == 0 (roadmap D3: no silent Radau→Euler degeneration)
+  2. fallback_count == 0 (roadmap D3: no silent fallback degeneration)
   3. harness self-consistency (alignment count, tight-healthy, fallback detect)
 
-Strategy: Euler(dt_prod) vs Euler(dt_prod/refinement) dt-refinement. Real
-Radau twin-run is opt-in via env TWIN_RUN_REFERENCE=radau (skipped locally
-because solve_ivp(Radau) hangs on Python 3.14 + scipy 1.17 — env issue, not
-code). See src/engine/twin_run.py docstring for full rationale.
+Strategy: Euler(dt_prod) vs Euler(dt_prod/refinement) dt-refinement.
+See src/engine/twin_run.py docstring for full rationale.
 
 Baseline established 2026-06-14: 5 scenarios PASS, 5 xfail (pre-existing).
 Updated 2026-06-27: 10/10 scenarios PASS. Fixed hypoadrenocorticism compound
@@ -19,8 +17,6 @@ The xfail set is the recorded "known noise floor"; a Step 5 coupling change
 must keep these xfailing-or-better and must not break the 5 passing ones.
 """
 from __future__ import annotations
-
-import os
 
 import pytest
 
@@ -119,23 +115,6 @@ def test_relative_diff_helper():
     # floor denominator guards against div-by-zero
     assert _relative_diff(0.0, 0.0) == 0.0
     assert _relative_diff(0.0, 1e-12) < 1.0
-
-
-# ── opt-in real Radau twin-run (CI / other machines) ──────────────────────────
-
-def test_twin_run_radau_healthy():
-    """Real Euler-vs-LSODA twin-run on the healthy scenario.
-
-    Uses SCENARIO_SPECIFIC_RADAU_MULTIPLIERS (4.0×) — LSODA is more accurate
-    for stiff portions (kidney fluid dynamics, respiratory coupling), producing
-    systematic offsets from Euler. Tolerances calibrated from offline validation
-    (tools/dev/validate_lsoda.py).
-    """
-    config = TwinRunConfig(reference_solver="radau")
-    result = run_twin("healthy", config)
-    assert result.reference_solver == "radau"
-    assert result.fallback_count == 0, "Radau fell back to Euler — D3 violation"
-    assert result.converged, f"Radau twin-run did not converge:\n{result.summary()}"
 
 
 # ── RAAS oscillation characterization (#4, pre-existing) ──────────────────────

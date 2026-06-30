@@ -22,9 +22,6 @@ testpaths = ["tests"]
 # lane per-test budget (see docs/test-runbook.md) but well below infinity,
 # so a single hung test no longer blocks the whole `core` channel. Heavy
 # tests that legitimately need >60s should pass --timeout=N explicitly.
-# Motivation: 2026-06-27 — scipy solve_ivp(method="Radau") hangs on the
-# full ~50-ODE system (LU decomposition of the Jacobian, scipy >= 1.15).
-# Replaced with LSODA in radau.py. See radau.py:1-21.
 timeout = 60
 markers = [
     "fast: fast daily development lane (formulae, invariants, lightweight contracts)",
